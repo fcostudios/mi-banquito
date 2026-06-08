@@ -1,0 +1,69 @@
+{
+  "description": "Treasurer-side view + edit of group rules per US-028 with HR-1 versioning.",
+  "id": "SCR-group-config",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "id": "rules_intro",
+        "type": "info-banner",
+        "kind": "info",
+        "icon": "book-open",
+        "title": "¿Cómo funciona Mi grupo?",
+        "body": "Aquí ves las reglas vigentes del banquito. Para cambiar una regla, las socias deben acordar en reunión y la tesorera actualiza aquí."
+      },
+      {
+        "cards": [
+          {
+            "title": "Aporte mensual",
+            "value": "$50.00"
+          },
+          {
+            "title": "Tasa de interés (socias)",
+            "value": "2.0% / mes"
+          },
+          {
+            "title": "Tasa de interés (no-socias)",
+            "value": "4.0% / mes"
+          },
+          {
+            "title": "Cargo administrativo",
+            "value": "$10.00 al inicio"
+          },
+          {
+            "title": "Mora por atraso",
+            "value": "$0.25 / día",
+            "subtitle": "tope: cuota vencida"
+          }
+        ],
+        "id": "rules_summary",
+        "type": "metric-cards"
+      },
+      {
+        "actions": [
+          {
+            "action": "modal:edit_rules_form",
+            "id": "btn_edit",
+            "label": "Editar reglas"
+          }
+        ],
+        "id": "edit_action",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-028",
+      "US-104"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/grupo",
+  "title": "Mi grupo"
+}

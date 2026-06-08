@@ -1,0 +1,44 @@
+{
+  "description": "Trigger + history of tenant exports per US-021 with integrity-hash manifest per F43.",
+  "id": "SCR-admin-export",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "actions": [
+          {
+            "action": "server_action:exportOrgData",
+            "id": "btn_export",
+            "label": "Exportar ahora"
+          }
+        ],
+        "id": "export_action",
+        "type": "action-bar"
+      },
+      {
+        "columns": [
+          "generated_at",
+          "operator",
+          "zip_uri",
+          "zip_sha256",
+          "size_bytes"
+        ],
+        "id": "export_history",
+        "type": "data-table"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-021"
+    ]
+  },
+  "roles": [
+    "platform_operator"
+  ],
+  "route": "/admin/orgs/[id]/export",
+  "title": "Exportar datos"
+}

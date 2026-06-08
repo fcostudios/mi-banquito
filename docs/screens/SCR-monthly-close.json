@@ -1,0 +1,223 @@
+{
+  "description": "Reconciliation + close wizard with bank + petty cash separately per US-074, period-lock warning per F46 + US-083.",
+  "id": "SCR-monthly-close",
+  "layout": {
+    "kind": "wizard",
+    "sections": [
+      {
+        "fields": [
+          {
+            "id": "declared_bank_balance",
+            "label": "Saldo declarado del banco (USD)",
+            "required": true,
+            "type": "currency"
+          },
+          {
+            "added_per": "US-074",
+            "id": "declared_petty_cash_balance",
+            "label": "Saldo declarado de caja chica (USD)",
+            "required": true,
+            "type": "currency"
+          }
+        ],
+        "id": "step1_balances",
+        "type": "form",
+        "title": "Saldos declarados",
+        "description": "Anota los saldos finales de banco y caja chica."
+      },
+      {
+        "content": ":computed:discrepancy_summary",
+        "id": "step2_discrepancy",
+        "type": "info-banner",
+        "title": "Conciliar diferencias",
+        "description": "Si hay diferencia con lo esperado, decide cómo resolver.",
+        "kind": "warning",
+        "icon": "alert-triangle",
+        "body": "Comparamos lo declarado contra lo esperado. Si hay diferencia, decide cómo resolverla antes de cerrar el mes.",
+        "items": [
+          "Saldo banco esperado: $3,420.00 — declarado: $3,420.00 → ✓",
+          "Caja chica esperado: $150.00 — declarado: $150.00 → ✓",
+          "Aportes recibidos: 7 de 12 socias → 5 pendientes",
+          "Si la diferencia es menor a $5, puedes anotar y aceptar."
+        ]
+      },
+      {
+        "id": "step2b_regularization",
+        "type": "data-table",
+        "title": "Movimientos pendientes de regularizar",
+        "description": "No se puede cerrar el mes mientras haya depósitos en una cuenta personal o externa sin pasar al fondo (BR-12). Regulariza cada uno para habilitar el cierre.",
+        "added_per": "US-095",
+        "columns": [
+          {
+            "id": "fecha",
+            "label": "Fecha"
+          },
+          {
+            "id": "origen",
+            "label": "Quién / qué"
+          },
+          {
+            "id": "cuenta",
+            "label": "Cuenta donde entró"
+          },
+          {
+            "id": "monto",
+            "label": "Monto"
+          },
+          {
+            "id": "estado",
+            "label": "Estado",
+            "type": "badge"
+          }
+        ],
+        "empty_state": "Cero pendientes — el mes se puede cerrar.",
+        "row_actions": [
+          {
+            "id": "regularizar",
+            "label": "Regularizar",
+            "action": "navigate:SCR-record-movement"
+          }
+        ],
+        "rows": [
+          {
+            "fecha": "2026-05-22",
+            "origen": "Aporte de Lucía Farinango",
+            "cuenta": "Cuenta personal de la tesorera",
+            "monto": "$50.00",
+            "estado": "Pendiente"
+          }
+        ]
+      },
+      {
+        "id": "step2b_lock_note",
+        "type": "info-banner",
+        "kind": "warning",
+        "icon": "lock",
+        "title": "Bloqueo de cierre",
+        "content": "El botón \"Cerrar el mes\" permanece deshabilitado mientras exista al menos un movimiento pendiente de regularizar. Cuando la lista de arriba quede en cero, el cierre se habilita y el PDF afirma \"cero movimientos pendientes de regularizar\".",
+        "added_per": "US-095"
+      },
+      {
+        "id": "step2c_movements_summary",
+        "type": "info-banner",
+        "kind": "info",
+        "icon": "receipt",
+        "title": "Movimientos del fondo del mes (va en el PDF de cierre)",
+        "description": "Lo que el presidente y las socias ven en el PDF: en qué se usó la plata y el saldo neto del fondo.",
+        "added_per": "US-095 / Presidente review",
+        "body": "El PDF de cierre resume los movimientos del fondo por categoría y muestra el saldo neto (después de gastos), junto con \"cero pendientes de regularizar\".",
+        "items": [
+          "Comisiones bancarias: -$3.50",
+          "Insumos (tintas, papel): -$18.00",
+          "Gastos compartidos (desayunos): -$27.00",
+          "Transferencias entre cuentas: $0.00",
+          "Total movimientos del fondo: -$48.50",
+          "Saldo neto del fondo: $3,371.50",
+          "Movimientos pendientes de regularizar: 0"
+        ],
+        "content": "Resumen de movimientos del fondo del mes — va en el PDF de cierre."
+      },
+      {
+        "id": "step3_resolution",
+        "tabs": [
+          {
+            "id": "find_diff",
+            "label": "Encontrar la diferencia",
+            "sections": [
+              {
+                "id": "diff_table",
+                "type": "data-table",
+                "columns": [
+                  {
+                    "id": "socia",
+                    "label": "Socia"
+                  },
+                  {
+                    "id": "esperado",
+                    "label": "Esperado"
+                  },
+                  {
+                    "id": "declarado",
+                    "label": "Declarado"
+                  },
+                  {
+                    "id": "dif",
+                    "label": "Diferencia"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "annotate_accept",
+            "label": "Anotar y aceptar",
+            "sections": [
+              {
+                "id": "annotate_note",
+                "type": "info-banner",
+                "kind": "info",
+                "icon": "pencil",
+                "title": "Aceptar con diferencia documentada",
+                "content": "Registra el motivo de la diferencia (mínimo 10 caracteres) y acepta el cierre. La discrepancia queda anotada en la bitácora del grupo."
+              }
+            ]
+          },
+          {
+            "id": "cancel_close",
+            "label": "Cancelar el cierre",
+            "sections": [
+              {
+                "id": "cancel_note",
+                "type": "info-banner",
+                "kind": "warning",
+                "icon": "x-circle",
+                "title": "Cancelar y corregir",
+                "content": "Si la diferencia es un error de captura, cancela el cierre, corrige los saldos en el paso 1 y vuelve a intentarlo. No se bloquea el mes."
+              }
+            ]
+          }
+        ],
+        "type": "tabs",
+        "title": "Anotar y cerrar",
+        "description": "Confirma la resolución y bloquea el mes."
+      },
+      {
+        "fields": [
+          {
+            "id": "resolution_note",
+            "label": "Motivo (mínimo 10 caracteres)",
+            "min_length": 10,
+            "type": "textarea"
+          }
+        ],
+        "id": "step3_annotation_form",
+        "type": "form",
+        "title": "Nota de cierre"
+      },
+      {
+        "body": "Lo que llegue después del cierre va al período de ajuste. ¿Estás segura?",
+        "confirm_label": "Sí, cerrar el mes",
+        "id": "step3_final_confirm",
+        "title": "Confirmar cierre",
+        "type": "modal"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "CHG-001",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-044",
+      "US-045",
+      "US-046",
+      "US-074",
+      "US-095"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/cierre",
+  "title": "Cierre del mes"
+}

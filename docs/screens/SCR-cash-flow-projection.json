@@ -1,0 +1,78 @@
+{
+  "description": "12-month projection + sandbox + available capital (pool minus base fund) per US-054.",
+  "id": "SCR-cash-flow-projection",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "content": "Proyección de caja para los próximos 6 meses según aportes esperados y cuotas de préstamos, neta de los movimientos del fondo (comisiones, insumos, gastos compartidos). El mes más ajustado es septiembre con $2,840 disponibles.",
+        "id": "narrative",
+        "type": "info-banner",
+        "kind": "info",
+        "title": "Liquidez proyectada"
+      },
+      {
+        "cards": [
+          {
+            "id": "pool_balance",
+            "title": "Capital del grupo (banco + caja chica)",
+            "value": "$3,420.00"
+          },
+          {
+            "id": "base_fund_pool",
+            "title": "Fondo base (no se presta)",
+            "value": "$1,200.00"
+          },
+          {
+            "id": "available_capital",
+            "title": "Capital disponible para préstamos",
+            "value": "$2,220.00"
+          }
+        ],
+        "id": "available_capital",
+        "type": "metric-cards"
+      },
+      {
+        "columns": [
+          "month",
+          "projected_balance",
+          "inflows",
+          "outflows",
+          "notes"
+        ],
+        "id": "projection_chart",
+        "type": "data-table"
+      },
+      {
+        "fields": [
+          {
+            "id": "hypothetical_principal",
+            "label": "Considera un préstamo (monto)",
+            "type": "currency"
+          },
+          {
+            "id": "hypothetical_term",
+            "label": "Plazo (meses)",
+            "type": "integer"
+          }
+        ],
+        "id": "loan_sandbox",
+        "type": "form"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "CHG-001",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-054",
+      "US-099"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/liquidez",
+  "title": "Liquidez proyectada"
+}

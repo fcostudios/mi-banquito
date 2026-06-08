@@ -1,0 +1,114 @@
+{
+  "accessibility": {
+    "ariaLandmarks": true,
+    "skipToContent": true
+  },
+  "description": "One-screen member admission form per US-026 + F46 (cédula + emergency contact added).",
+  "i18n": {
+    "es-EC": {
+      "subtitle": "Registrar una nueva miembro del grupo",
+      "title": "Agregar socia"
+    }
+  },
+  "id": "SCR-add-member",
+  "layout": {
+    "grid": {
+      "lg": 6,
+      "md": 8,
+      "sm": 12,
+      "xl": 6,
+      "xs": 12
+    },
+    "kind": "page",
+    "sections": [
+      {
+        "cancel": {
+          "action": "navigate:SCR-members-list",
+          "id": "btn_cancel",
+          "label": "Cancelar"
+        },
+        "fields": [
+          {
+            "id": "display_name",
+            "label": "Nombre completo",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "whatsapp_number",
+            "label": "WhatsApp",
+            "mask": "+593-#########",
+            "required": false,
+            "type": "phone"
+          },
+          {
+            "id": "national_id",
+            "label": "Cédula",
+            "required": false,
+            "type": "text"
+          },
+          {
+            "id": "emergency_contact",
+            "label": "Contacto de emergencia",
+            "required": false,
+            "type": "text"
+          },
+          {
+            "default": "aportante",
+            "id": "role",
+            "label": "Rol",
+            "options": [
+              "aportante",
+              "presidenta",
+              "secretaria"
+            ],
+            "type": "select"
+          },
+          {
+            "default": "today",
+            "id": "joined_on",
+            "label": "Fecha de ingreso",
+            "type": "date"
+          },
+          {
+            "default": "0.00",
+            "id": "initial_savings_balance",
+            "label": "Ahorros iniciales (USD)",
+            "type": "currency"
+          }
+        ],
+        "gridSpan": {
+          "lg": 12,
+          "md": 12,
+          "sm": 12,
+          "xl": 12,
+          "xs": 12
+        },
+        "id": "form_member",
+        "submit": {
+          "action": "server_action:addMember",
+          "id": "btn_save_member",
+          "label": "Guardar",
+          "navigate_to": "SCR-member-detail"
+        },
+        "type": "form"
+      }
+    ],
+    "titleBar": {
+      "subtitle": "Registrar una nueva miembro del grupo"
+    }
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-026"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/socias/nueva",
+  "title": "Agregar socia"
+}

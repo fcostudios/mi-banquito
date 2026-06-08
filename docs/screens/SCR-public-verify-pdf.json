@@ -1,0 +1,174 @@
+{
+  "description": "Public no-auth hash verifier per US-085. Supports QR scan or paste.",
+  "id": "SCR-public-verify-pdf",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "id": "public_header",
+        "type": "info-banner",
+        "kind": "success",
+        "icon": "shield-check",
+        "title": "Mi Banquito · Verificación pública",
+        "body": "Esta página es de uso público — sirve para comprobar que un PDF firmado por el grupo es auténtico."
+      },
+      {
+        "fields": [
+          {
+            "id": "hash",
+            "label": "Código de verificación",
+            "prefill_from_url": true,
+            "type": "text"
+          }
+        ],
+        "id": "verify_input",
+        "submit": {
+          "action": "server_action:verifyHash",
+          "id": "btn_verify",
+          "label": "Verificar"
+        },
+        "type": "form"
+      },
+      {
+        "id": "result_banner",
+        "type": "info-banner",
+        "kind": "success",
+        "icon": "badge-check",
+        "title": "Documento auténtico",
+        "content": "El código coincide con un PDF firmado por el grupo. Revisa los detalles abajo.",
+        "states": [
+          {
+            "id": "match",
+            "label": {
+              "es-EC": "Coincide",
+              "en-US": "Match"
+            },
+            "kind": "success",
+            "title": "Documento auténtico",
+            "content": "El código coincide con un PDF firmado por el grupo."
+          },
+          {
+            "id": "no_match",
+            "label": {
+              "es-EC": "No coincide",
+              "en-US": "No match"
+            },
+            "kind": "danger",
+            "title": "No encontrado",
+            "content": "Ese código no corresponde a ningún documento del grupo. Verifica que lo copiaste completo."
+          },
+          {
+            "id": "processing",
+            "label": {
+              "es-EC": "Procesando",
+              "en-US": "Processing"
+            },
+            "kind": "info",
+            "title": "Comprobando…",
+            "content": "Estamos verificando el código contra el registro del grupo."
+          }
+        ]
+      },
+      {
+        "content": "También puedes escanear el código QR impreso en el PDF para verificarlo al instante.",
+        "id": "qr_scan_hint",
+        "type": "info-banner",
+        "icon": "qr-code"
+      },
+      {
+        "id": "verify_result",
+        "type": "info-card",
+        "title": "Detalles del registro",
+        "description": "Registro del grupo \"Banquito El Valle\" · cierre 2026-05-01 09:14 · Hash 5f3a2bc1…"
+      },
+      {
+        "id": "pdf_preview",
+        "type": "info-card",
+        "title": "Vista previa del PDF",
+        "description": "Grupo: Banquito El Valle · Período: Abril 2026 · 12 socias · Aportes $680.00 · Préstamos $420.00 · Movimientos del fondo −$48.50 (comisiones, insumos, desayunos) · Saldo neto del fondo $3,371.50"
+      },
+      {
+        "id": "movements_transparency",
+        "type": "data-table",
+        "title": "Movimientos del fondo y colectas (transparencia)",
+        "description": "Todo lo que entró y salió del fondo es público y aparece aquí — nada queda fuera del registro (BR-16).",
+        "added_per": "US-099",
+        "columns": [
+          {
+            "id": "fecha",
+            "label": "Fecha"
+          },
+          {
+            "id": "concepto",
+            "label": "Concepto"
+          },
+          {
+            "id": "categoria",
+            "label": "Categoría"
+          },
+          {
+            "id": "monto",
+            "label": "Monto"
+          },
+          {
+            "id": "estado",
+            "label": "Estado",
+            "type": "badge"
+          }
+        ],
+        "rows": [
+          {
+            "fecha": "2026-05-03",
+            "concepto": "Comisión mantenimiento de cuenta",
+            "categoria": "Comisión bancaria",
+            "monto": "-$3.50",
+            "estado": "Conciliado"
+          },
+          {
+            "fecha": "2026-05-09",
+            "concepto": "Tintas y papel para impresora",
+            "categoria": "Insumos",
+            "monto": "-$18.00",
+            "estado": "Conciliado"
+          },
+          {
+            "fecha": "2026-05-18",
+            "concepto": "Desayunos reunión mensual",
+            "categoria": "Gasto compartido",
+            "monto": "-$27.00",
+            "estado": "Conciliado"
+          },
+          {
+            "fecha": "2026-05-21",
+            "concepto": "Transferencia caja chica → banco",
+            "categoria": "Transferencia",
+            "monto": "$0.00",
+            "estado": "Conciliado"
+          },
+          {
+            "fecha": "2026-05-24",
+            "concepto": "Colecta solidaria — pago a Rosa",
+            "categoria": "Pago solidario",
+            "monto": "-$80.00",
+            "estado": "Conciliado"
+          }
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "CHG-001",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-085",
+      "US-099",
+      "US-107"
+    ]
+  },
+  "roles": [
+    "public"
+  ],
+  "route": "/verify/[hash]",
+  "title": "Verificar documento"
+}

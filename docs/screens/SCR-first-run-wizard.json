@@ -1,0 +1,63 @@
+{
+  "description": "3-screen first-run setup per US-025 with server-side draft row for resume.",
+  "id": "SCR-first-run-wizard",
+  "layout": {
+    "kind": "wizard",
+    "sections": [
+      {
+        "fields": [
+          {
+            "id": "group_name",
+            "label": "¿Cómo se llama tu grupo?",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "logo",
+            "label": "Logo (opcional)",
+            "type": "file"
+          }
+        ],
+        "id": "step1_name_logo",
+        "type": "form"
+      },
+      {
+        "content": "Esto es lo que tu grupo decidió. Si algo no calza, dímelo.",
+        "id": "step2_rules_review",
+        "type": "info-banner"
+      },
+      {
+        "id": "step3_summary",
+        "type": "info-banner",
+        "kind": "success",
+        "icon": "check-circle",
+        "title": "¡Tu grupo está listo!",
+        "content": "Ya configuraste el nombre, el logo y revisaste las reglas del grupo. Al continuar entrarás al Inicio, donde podrás registrar el primer aporte y dar de alta a las socias."
+      },
+      {
+        "actions": [
+          {
+            "action": "navigate:SCR-add-member",
+            "id": "btn_ready",
+            "label": "Vamos a registrar las socias"
+          }
+        ],
+        "id": "step3_ready",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-025"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/bienvenida",
+  "title": "Bienvenida"
+}

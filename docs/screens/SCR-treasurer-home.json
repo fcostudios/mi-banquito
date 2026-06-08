@@ -1,0 +1,123 @@
+{
+  "description": "Treasurer dashboard with 3 primary action tiles + live A/R aging + alerts bell per US-031 + US-040 + US-058.",
+  "id": "SCR-treasurer-home",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "id": "heading",
+        "title": "¿Qué quieres registrar hoy?",
+        "type": "hero"
+      },
+      {
+        "cards": [
+          {
+            "icon": "Wallet",
+            "id": "card_record_contribution",
+            "kind": "primary",
+            "navigate_to": "SCR-record-contribution",
+            "title": "Registrar aporte"
+          },
+          {
+            "icon": "HandCoins",
+            "id": "card_record_repayment",
+            "navigate_to": "SCR-record-repayment",
+            "title": "Registrar pago de préstamo"
+          },
+          {
+            "icon": "AlertCircle",
+            "id": "card_view_arrears",
+            "navigate_to": "SCR-ar-aging",
+            "title": "Ver atrasos"
+          },
+          {
+            "icon": "ScrollText",
+            "id": "card_record_movement",
+            "navigate_to": "SCR-record-movement",
+            "title": "Registrar movimiento"
+          }
+        ],
+        "id": "primary_actions",
+        "type": "cards-grid"
+      },
+      {
+        "cards": [
+          {
+            "icon": "Banknote",
+            "id": "card_accounts",
+            "navigate_to": "SCR-accounts",
+            "title": "Cuentas del grupo"
+          },
+          {
+            "icon": "HandCoins",
+            "id": "card_solidarity",
+            "navigate_to": "SCR-solidarity-collection",
+            "title": "Colecta solidaria"
+          }
+        ],
+        "id": "fund_actions",
+        "type": "cards-grid"
+      },
+      {
+        "cards": [
+          {
+            "id": "pending_regularization",
+            "navigate_to": "SCR-monthly-close",
+            "title": "Pendientes de regularizar",
+            "value": ":computed:pending_regularization_count",
+            "subtitle": "Depósitos en cuenta personal sin pasar al fondo"
+          }
+        ],
+        "id": "regularization_tile",
+        "type": "metric-cards"
+      },
+      {
+        "id": "ar_summary",
+        "limit": 5,
+        "type": "ar-aging-list"
+      },
+      {
+        "fields": [
+          {
+            "id": "member_q",
+            "label": "¿Cuánto tiene...?",
+            "type": "autocomplete:Member"
+          }
+        ],
+        "id": "member_search",
+        "type": "form"
+      },
+      {
+        "cards": [
+          {
+            "id": "liquidity_min",
+            "navigate_to": "SCR-cash-flow-projection",
+            "title": "Mes más bajo proyectado",
+            "value": "$2,840",
+            "subtitle": "Septiembre (proyectado)"
+          }
+        ],
+        "id": "liquidity_tile",
+        "type": "metric-cards"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "CHG-001",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-031",
+      "US-040",
+      "US-058",
+      "US-091",
+      "US-092",
+      "US-096"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/",
+  "title": "Inicio"
+}

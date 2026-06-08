@@ -1,0 +1,60 @@
+{
+  "description": "Plain-Spanish audit narration per US-056/057.",
+  "id": "SCR-history",
+  "layout": {
+    "kind": "listing",
+    "sections": [
+      {
+        "fields": [
+          {
+            "id": "member_id",
+            "label": "Socia",
+            "type": "autocomplete"
+          },
+          {
+            "id": "action_kind",
+            "label": "Tipo",
+            "type": "select"
+          },
+          {
+            "id": "date_range",
+            "label": "Rango de fechas",
+            "type": "date-range"
+          }
+        ],
+        "id": "filter_bar",
+        "type": "filters"
+      },
+      {
+        "fields": [
+          {
+            "id": "narrated_text",
+            "label": "Evento",
+            "type": "text"
+          },
+          {
+            "id": "at",
+            "label": "Cuándo",
+            "type": "datetime"
+          }
+        ],
+        "id": "timeline",
+        "type": "timeline"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-056",
+      "US-057"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/historial",
+  "title": "Historial"
+}

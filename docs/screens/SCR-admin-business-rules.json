@@ -1,0 +1,58 @@
+{
+  "description": "Read-only business-rules panel per US-024 + 09b §6.",
+  "id": "SCR-admin-business-rules",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "columns": [
+          {
+            "id": "br_id",
+            "label": "Regla"
+          },
+          {
+            "id": "current_value",
+            "label": "Valor actual"
+          },
+          {
+            "id": "last_changed_at",
+            "label": "Último cambio"
+          },
+          {
+            "id": "last_changed_by",
+            "label": "Por"
+          }
+        ],
+        "gridSpan": {
+          "xs": 12
+        },
+        "id": "rules_table",
+        "type": "data-table"
+      },
+      {
+        "actions": [
+          {
+            "action": "download:rules_csv",
+            "id": "btn_csv",
+            "label": "Exportar CSV"
+          }
+        ],
+        "id": "export_csv",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-024"
+    ]
+  },
+  "roles": [
+    "platform_operator"
+  ],
+  "route": "/admin/orgs/[id]/business-rules",
+  "title": "Reglas del grupo"
+}

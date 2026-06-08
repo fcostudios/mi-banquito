@@ -1,0 +1,97 @@
+{
+  "accessibility": {
+    "ariaLandmarks": true,
+    "skipToContent": true
+  },
+  "description": "Dense cross-org audit forensic search per US-022.",
+  "i18n": {
+    "es-EC": {
+      "subtitle": "Auditoría de eventos cruzando organizaciones",
+      "title": "Bitácora"
+    }
+  },
+  "id": "SCR-admin-audit",
+  "layout": {
+    "kind": "listing",
+    "sections": [
+      {
+        "fields": [
+          {
+            "id": "org_id",
+            "label": "Organización",
+            "type": "select"
+          },
+          {
+            "id": "actor_kind",
+            "label": "Actor",
+            "options": [
+              "member",
+              "platform_operator",
+              "system"
+            ],
+            "type": "select"
+          },
+          {
+            "id": "action_kind",
+            "label": "Acción",
+            "type": "text"
+          },
+          {
+            "id": "date_range",
+            "label": "Rango de fechas",
+            "type": "date-range"
+          }
+        ],
+        "gridSpan": {
+          "xs": 12
+        },
+        "id": "filters",
+        "type": "filters"
+      },
+      {
+        "columns": [
+          {
+            "id": "at",
+            "label": "Cuando"
+          },
+          {
+            "id": "actor",
+            "label": "Actor"
+          },
+          {
+            "id": "action_kind",
+            "label": "Acción"
+          },
+          {
+            "id": "subject",
+            "label": "Sujeto"
+          },
+          {
+            "id": "view_payload",
+            "label": "Detalle",
+            "type": "drilldown"
+          }
+        ],
+        "gridSpan": {
+          "xs": 12
+        },
+        "id": "audit_table",
+        "row_on_click": "open_payload_drawer",
+        "type": "data-table"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-022"
+    ]
+  },
+  "roles": [
+    "platform_operator"
+  ],
+  "route": "/admin/audit",
+  "title": "Bitácora"
+}

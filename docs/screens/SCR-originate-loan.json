@@ -1,0 +1,150 @@
+{
+  "description": "Loan origination single-screen with member/non-member toggle + guarantor picker + referrer picker + disbursement source per BR-04/05/06 + US-076.",
+  "id": "SCR-originate-loan",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "fields": [
+          {
+            "id": "borrower_kind",
+            "label": "¿A quién es el préstamo?",
+            "options": [
+              {
+                "label": "A una socia",
+                "value": "member"
+              },
+              {
+                "label": "A alguien que no es socia",
+                "value": "non_member"
+              }
+            ],
+            "type": "select"
+          }
+        ],
+        "id": "borrower_kind_toggle",
+        "type": "form"
+      },
+      {
+        "conditional_on": "borrower_kind == 'member'",
+        "fields": [
+          {
+            "id": "borrower_member_id",
+            "label": "Socia",
+            "type": "autocomplete:Member"
+          }
+        ],
+        "id": "member_branch",
+        "type": "form"
+      },
+      {
+        "conditional_on": "borrower_kind == 'non_member'",
+        "fields": [
+          {
+            "id": "non_member.display_name",
+            "label": "Nombre",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "non_member.whatsapp_number",
+            "label": "WhatsApp",
+            "type": "phone"
+          },
+          {
+            "id": "non_member.national_id_redacted_tail4",
+            "label": "Últimos 4 de cédula",
+            "type": "text"
+          },
+          {
+            "id": "guarantor_member_id",
+            "label": "Socia garante (obligatoria)",
+            "required": true,
+            "type": "autocomplete:Member"
+          }
+        ],
+        "id": "non_member_branch",
+        "type": "form"
+      },
+      {
+        "fields": [
+          {
+            "id": "principal_amount",
+            "label": "Monto (USD)",
+            "required": true,
+            "type": "currency"
+          },
+          {
+            "id": "term_periods",
+            "label": "Plazo (meses)",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "default": ":auto:",
+            "id": "rate_value",
+            "label": "Tasa (%)",
+            "type": "decimal"
+          },
+          {
+            "id": "purpose",
+            "label": "Propósito",
+            "type": "text"
+          },
+          {
+            "id": "referrer_member_id",
+            "label": "Socia que refirió (opcional)",
+            "type": "autocomplete:Member"
+          },
+          {
+            "default": "banco",
+            "id": "disbursement_source",
+            "label": "¿De dónde sale la plata?",
+            "options": [
+              "banco",
+              "caja chica"
+            ],
+            "type": "select"
+          }
+        ],
+        "id": "terms",
+        "type": "form"
+      },
+      {
+        "content": "La socia está al día en sus aportes y no tiene préstamos en mora — cumple los requisitos del grupo.",
+        "id": "eligibility_result",
+        "type": "info-banner",
+        "kind": "info"
+      },
+      {
+        "actions": [
+          {
+            "action": "server_action:originateLoan",
+            "id": "btn_create",
+            "kind": "primary",
+            "label": "Crear préstamo",
+            "navigate_to": "SCR-loan-detail"
+          }
+        ],
+        "id": "actions",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-033",
+      "US-034",
+      "US-035",
+      "US-076"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/prestamos/nuevo",
+  "title": "Nuevo préstamo"
+}

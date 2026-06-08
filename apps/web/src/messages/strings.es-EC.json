@@ -1,0 +1,30 @@
+{
+  "_note": "Seeded from vocabulary_locked_words (the LOCKED terms) + surfaces. This is a WORD-LIST seed, not the full microcopy/translation map — TODO: full translations need a richer extract (Step-6 md / brand microcopy).",
+  "locked": {
+    "activo": "activo",
+    "al día": "al día",
+    "aportante": "aportante",
+    "aporte": "aporte",
+    "atrasado": "atrasado",
+    "baja": "baja",
+    "cancelado": "cancelado",
+    "cierre": "cierre",
+    "conciliación": "conciliación",
+    "cuota": "cuota",
+    "en mora": "en mora",
+    "en pausa": "en pausa",
+    "historial": "historial",
+    "pagado": "pagado",
+    "parcial": "parcial",
+    "pendiente": "pendiente",
+    "préstamo": "préstamo",
+    "retiro": "retiro",
+    "saldo": "saldo",
+    "socia": "socia",
+    "socio": "socio"
+  },
+  "surfaces": [
+    "platform_admin_slice",
+    "treasurer_console"
+  ]
+}

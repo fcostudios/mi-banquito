@@ -1,0 +1,209 @@
+{
+  "accessibility": {
+    "ariaLandmarks": true,
+    "skipToContent": true
+  },
+  "description": "Extraordinary / solidarity collection per US-096 (open + collect) and US-097 (payout + close). An inflow with its own collect→pay-out lifecycle (open → collecting → paid_out → closed), separate from the regular contribution cycle and never part of share-out. BR-14; payout capped at the regularized collected total and blocked while any line is pending (BR-12).",
+  "i18n": {
+    "es-EC": {
+      "subtitle": "Colecta para una calamidad o para reconocer una gestión",
+      "title": "Colecta solidaria"
+    }
+  },
+  "id": "SCR-solidarity-collection",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "id": "collection_summary",
+        "type": "info-banner",
+        "kind": "info",
+        "icon": "heart-handshake",
+        "title": "Estado de la colecta",
+        "items": [
+          "Motivo: calamidad doméstica de Rosa Tituaña",
+          "Beneficiaria: Rosa Tituaña",
+          "Recaudado: $30.00 de $40.00 (meta)",
+          "Aportaron: 3 de 4 socias",
+          "Pendientes de regularizar: 1"
+        ]
+      },
+      {
+        "id": "form_open_collection",
+        "type": "form",
+        "title": "Abrir una colecta",
+        "fields": [
+          {
+            "id": "purpose",
+            "label": "Motivo de la colecta",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "beneficiary_member_id",
+            "label": "Beneficiaria",
+            "required": true,
+            "type": "autocomplete:Member"
+          },
+          {
+            "id": "kind",
+            "label": "Tipo",
+            "type": "select",
+            "default": "solidarity",
+            "options": [
+              {
+                "value": "solidarity",
+                "label": "Solidaria (calamidad)"
+              },
+              {
+                "value": "treasurer_recognition",
+                "label": "Reconocimiento a tesorera"
+              }
+            ]
+          },
+          {
+            "id": "target_amount",
+            "label": "Meta (USD, opcional)",
+            "type": "currency"
+          }
+        ],
+        "submit": {
+          "action": "server_action:openCollection",
+          "client_request_id": true,
+          "id": "btn_open_collection",
+          "label": "Abrir colecta"
+        }
+      },
+      {
+        "id": "form_add_line",
+        "type": "form",
+        "title": "Registrar aporte a la colecta",
+        "fields": [
+          {
+            "id": "member_id",
+            "label": "Socia",
+            "required": true,
+            "type": "autocomplete:Member"
+          },
+          {
+            "id": "amount",
+            "label": "Monto (USD)",
+            "required": true,
+            "type": "currency"
+          },
+          {
+            "id": "account_id",
+            "label": "¿En qué cuenta entró?",
+            "required": true,
+            "type": "autocomplete:Account"
+          }
+        ],
+        "submit": {
+          "action": "server_action:addCollectionLine",
+          "client_request_id": true,
+          "id": "btn_add_line",
+          "label": "Agregar aporte"
+        }
+      },
+      {
+        "id": "lines_table",
+        "type": "data-table",
+        "title": "Aportes recibidos",
+        "columns": [
+          {
+            "id": "member",
+            "label": "Socia"
+          },
+          {
+            "id": "amount",
+            "label": "Monto"
+          },
+          {
+            "id": "account",
+            "label": "Cuenta"
+          },
+          {
+            "id": "reconciliation_status",
+            "label": "Estado",
+            "type": "badge"
+          }
+        ],
+        "rows": [
+          {
+            "member": "María Quishpe",
+            "amount": "$10.00",
+            "account": "Banco del grupo",
+            "reconciliation_status": "Regularizado"
+          },
+          {
+            "member": "Rosa Tituaña",
+            "amount": "$10.00",
+            "account": "Banco del grupo",
+            "reconciliation_status": "Regularizado"
+          },
+          {
+            "member": "Lucía Farinango",
+            "amount": "$10.00",
+            "account": "Cuenta personal de la tesorera",
+            "reconciliation_status": "Pendiente"
+          }
+        ]
+      },
+      {
+        "id": "form_payout",
+        "type": "form",
+        "title": "Registrar el pago a la beneficiaria",
+        "fields": [
+          {
+            "id": "payout_amount",
+            "label": "Monto a pagar (USD)",
+            "required": true,
+            "type": "currency"
+          },
+          {
+            "id": "surplus_disposition",
+            "label": "Si sobra dinero",
+            "type": "select",
+            "default": "devolver",
+            "options": [
+              "devolver a las socias",
+              "retener en el fondo"
+            ]
+          }
+        ],
+        "submit": {
+          "action": "server_action:payoutCollection",
+          "client_request_id": true,
+          "id": "btn_payout",
+          "label": "Registrar pago y cerrar colecta"
+        }
+      },
+      {
+        "id": "payout_guard",
+        "type": "info-banner",
+        "kind": "warning",
+        "icon": "alert-triangle",
+        "title": "Reglas del pago",
+        "content": "No puedes pagar más de lo recaudado, ni cerrar la colecta mientras haya aportes pendientes de regularizar. El pago aparece en el estado de cada socia y en la verificación pública."
+      }
+    ],
+    "titleBar": {
+      "subtitle": "Colecta para una calamidad o para reconocer una gestión"
+    }
+  },
+  "meta": {
+    "change_id": "CHG-001",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-096",
+      "US-097",
+      "US-098"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/colectas",
+  "title": "Colecta solidaria"
+}

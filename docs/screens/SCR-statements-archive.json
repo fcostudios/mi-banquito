@@ -1,0 +1,125 @@
+{
+  "description": "Statement archive + per-member PDF generation + WhatsApp share per US-048/049 with enriched content per US-086.",
+  "id": "SCR-statements-archive",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "id": "period_summary",
+        "type": "metric-cards",
+        "title": "Resumen del último cierre (Abril 2026) — neto de movimientos",
+        "cards": [
+          {
+            "id": "members",
+            "title": "Socias con estado",
+            "value": "12"
+          },
+          {
+            "id": "in",
+            "title": "Aportes del mes",
+            "value": "$680.00"
+          },
+          {
+            "id": "out",
+            "title": "Préstamos desembolsados",
+            "value": "$420.00"
+          },
+          {
+            "id": "movements",
+            "title": "Movimientos del fondo",
+            "value": "-$48.50"
+          },
+          {
+            "id": "saldo",
+            "title": "Saldo neto del fondo",
+            "value": "$3,371.50"
+          }
+        ]
+      },
+      {
+        "actions": [
+          {
+            "action": "server_action:generateMemberStatementsBatch",
+            "id": "btn_batch",
+            "label": "Generar estados del último cierre"
+          }
+        ],
+        "id": "batch_action",
+        "type": "action-bar"
+      },
+      {
+        "columns": [
+          "period",
+          "kind",
+          "member",
+          "generated_at",
+          "hash"
+        ],
+        "id": "archive_table",
+        "row_actions": [
+          {
+            "action": "modal:pdf_preview",
+            "id": "btn_preview",
+            "label": "Previsualizar"
+          },
+          {
+            "action": "share_intent:whatsapp_pdf",
+            "id": "btn_share",
+            "label": "Compartir por WhatsApp"
+          }
+        ],
+        "type": "data-table",
+        "row_on_click": "navigate:SCR-public-verify-pdf",
+        "rows": [
+          {
+            "period": "Abr 2026",
+            "kind": "Cierre mensual",
+            "member": "—",
+            "generated_at": "2026-05-01",
+            "hash": "5f3a2bc1…"
+          },
+          {
+            "period": "Abr 2026",
+            "kind": "Estado de socia",
+            "member": "María Quishpe",
+            "generated_at": "2026-05-01",
+            "hash": "a91c77de…"
+          },
+          {
+            "period": "Abr 2026",
+            "kind": "Estado de socia",
+            "member": "Rosa Tituaña",
+            "generated_at": "2026-05-01",
+            "hash": "3b80f1aa…"
+          },
+          {
+            "period": "2025",
+            "kind": "Corte de fin de año",
+            "member": "—",
+            "generated_at": "2026-01-15",
+            "hash": "9c2e44fb…"
+          }
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "CHG-001",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-048",
+      "US-049",
+      "US-086",
+      "US-099",
+      "US-106",
+      "US-107",
+      "US-119"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/estados",
+  "title": "Estados de cuenta"
+}

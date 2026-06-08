@@ -1,0 +1,70 @@
+{
+  "description": "Drift status badge + last check + raw report per US-023.",
+  "id": "SCR-admin-drift",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "gridSpan": {
+          "xs": 12
+        },
+        "id": "drift_badge",
+        "type": "info-banner"
+      },
+      {
+        "id": "raw_report",
+        "tabs": [
+          {
+            "id": "resumen",
+            "label": "Resumen",
+            "sections": [
+              {
+                "id": "resumen_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "Resumen del estado de drift: secciones revisadas, hallazgos y bloqueos."
+              }
+            ]
+          },
+          {
+            "id": "reporte_completo",
+            "label": "Reporte completo",
+            "sections": [
+              {
+                "id": "reporte_completo_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "Salida completa del detector de drift (texto), sección por sección."
+              }
+            ]
+          }
+        ],
+        "type": "tabs"
+      },
+      {
+        "actions": [
+          {
+            "action": "modal:imp_template",
+            "id": "btn_file_imp",
+            "label": "Crear IMP desde este drift"
+          }
+        ],
+        "id": "file_imp",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-023"
+    ]
+  },
+  "roles": [
+    "platform_operator"
+  ],
+  "route": "/admin/drift",
+  "title": "Estado del substrato"
+}

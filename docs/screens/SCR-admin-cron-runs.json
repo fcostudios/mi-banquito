@@ -1,0 +1,101 @@
+{
+  "description": "Cron run history + manual replay per US-081 (Review Pass F20).",
+  "id": "SCR-admin-cron-runs",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "id": "endpoint_picker",
+        "tabs": [
+          {
+            "id": "accrue_interest",
+            "label": "accrue-interest",
+            "sections": [
+              {
+                "id": "accrue_interest_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "Acumula el interés diario de los préstamos activos de cada grupo."
+              }
+            ]
+          },
+          {
+            "id": "award_treasurer_compensa",
+            "label": "award-treasurer-compensation",
+            "sections": [
+              {
+                "id": "award_treasurer_compensa_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "Calcula la compensación de la tesorera según las reglas del grupo."
+              }
+            ]
+          },
+          {
+            "id": "drift_check",
+            "label": "drift-check",
+            "sections": [
+              {
+                "id": "drift_check_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "Verifica que el substrato y los datos de cada grupo estén consistentes."
+              }
+            ]
+          },
+          {
+            "id": "nightly_snapshot",
+            "label": "nightly-snapshot",
+            "sections": [
+              {
+                "id": "nightly_snapshot_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "Toma una copia diaria del estado de cada grupo para auditoría."
+              }
+            ]
+          }
+        ],
+        "type": "tabs"
+      },
+      {
+        "columns": [
+          "timestamp",
+          "duration_ms",
+          "orgs_processed",
+          "failures",
+          "summary"
+        ],
+        "gridSpan": {
+          "xs": 12
+        },
+        "id": "runs_table",
+        "type": "data-table"
+      },
+      {
+        "actions": [
+          {
+            "action": "modal:replay_picker",
+            "id": "btn_replay",
+            "label": "Replay with from_date / to_date"
+          }
+        ],
+        "id": "replay_action",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-081"
+    ]
+  },
+  "roles": [
+    "platform_operator"
+  ],
+  "route": "/admin/cron-runs",
+  "title": "Estado de crons"
+}

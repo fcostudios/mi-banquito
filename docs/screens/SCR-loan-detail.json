@@ -1,0 +1,155 @@
+{
+  "description": "Loan detail with tabs Resumen / Cronograma (BR-01) / Pagos / Historial per US-037.",
+  "id": "SCR-loan-detail",
+  "layout": {
+    "kind": "tabs-card",
+    "sections": [
+      {
+        "id": "tabs",
+        "tabs": [
+          {
+            "id": "tab_resumen",
+            "label": "Resumen",
+            "sections": [
+              {
+                "id": "summary",
+                "type": "session-header-card",
+                "content": {
+                  "title": "Préstamo PRE-007 · Manuela Quishpe",
+                  "subtitle": "Capital $600.00 · Plazo 12 meses · Cuotas $50.00 + interés",
+                  "badges": [
+                    {
+                      "label": "Al día",
+                      "kind": "committed"
+                    },
+                    {
+                      "label": "Cuota 4/12",
+                      "kind": "team"
+                    }
+                  ],
+                  "creator": "Rosa Vilcacundo",
+                  "created_at": "2026-02-15"
+                }
+              },
+              {
+                "id": "resumen_metrics",
+                "type": "metric-cards",
+                "cards": [
+                  {
+                    "id": "balance_due",
+                    "title": "Saldo pendiente",
+                    "value": "$400.00"
+                  },
+                  {
+                    "id": "paid_to_date",
+                    "title": "Pagado a la fecha",
+                    "value": "$200.00"
+                  },
+                  {
+                    "id": "next_due",
+                    "title": "Próxima cuota",
+                    "value": "$52.00",
+                    "subtitle": "vence 2026-06-15"
+                  },
+                  {
+                    "id": "progress",
+                    "title": "Progreso",
+                    "value": "4 / 12 cuotas"
+                  },
+                  {
+                    "id": "mora_accrued",
+                    "title": "Mora acumulada",
+                    "value": "$0.00",
+                    "subtitle": "$0.25/día sobre cuotas vencidas"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "tab_cronograma",
+            "label": "Cronograma",
+            "sections": [
+              {
+                "columns": [
+                  "period",
+                  "due_on",
+                  "principal_due",
+                  "interest_due",
+                  "admin_fee_due",
+                  "mora_accrued",
+                  "installment_total",
+                  "status"
+                ],
+                "id": "schedule_table",
+                "type": "data-table"
+              }
+            ]
+          },
+          {
+            "id": "tab_pagos",
+            "label": "Pagos",
+            "sections": [
+              {
+                "columns": [
+                  "dated_on",
+                  "amount",
+                  "applied_to_principal",
+                  "applied_to_interest",
+                  "applied_to_mora"
+                ],
+                "id": "repayments_table",
+                "type": "data-table"
+              }
+            ]
+          },
+          {
+            "id": "tab_historial",
+            "label": "Historial",
+            "sections": [
+              {
+                "id": "loan_history_timeline",
+                "type": "timeline",
+                "title": "Historial del préstamo",
+                "fields": [
+                  "narrated_text",
+                  "at"
+                ]
+              }
+            ]
+          }
+        ],
+        "type": "tabs"
+      },
+      {
+        "actions": [
+          {
+            "action": "navigate:SCR-record-repayment",
+            "id": "btn_record_payment",
+            "kind": "primary",
+            "label": "Registrar pago",
+            "navigate_to": "SCR-record-repayment",
+            "icon": "plus"
+          }
+        ],
+        "id": "actions",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-037",
+      "US-103",
+      "US-104"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/prestamos/[id]",
+  "title": "Detalle del préstamo"
+}

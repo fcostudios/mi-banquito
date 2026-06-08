@@ -1,0 +1,96 @@
+{
+  "description": "Per-org health snapshot + drift badge + active impersonations badge per US-019.",
+  "id": "SCR-admin-home",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "cards": [
+          {
+            "id": "orgs_total",
+            "title": "Organizaciones activas",
+            "value": "3"
+          },
+          {
+            "id": "consecutive_clean_months",
+            "title": "Meses con conciliación cero",
+            "value": "2"
+          },
+          {
+            "id": "drift_badge",
+            "title": "Estado del substrato",
+            "value": "Sin drift"
+          }
+        ],
+        "gridSpan": {
+          "xs": 12
+        },
+        "id": "kpi_strip",
+        "type": "metric-cards"
+      },
+      {
+        "columns": [
+          {
+            "id": "org_id",
+            "label": "Organización"
+          },
+          {
+            "id": "name",
+            "label": "Nombre"
+          },
+          {
+            "id": "last_activity_at",
+            "label": "Última actividad"
+          },
+          {
+            "id": "last_close_at",
+            "label": "Último cierre"
+          },
+          {
+            "id": "reconciliation_status",
+            "label": "Conciliación",
+            "type": "status"
+          },
+          {
+            "id": "ar_total",
+            "label": "Total por cobrar"
+          },
+          {
+            "id": "open_loans_count",
+            "label": "Préstamos activos"
+          }
+        ],
+        "gridSpan": {
+          "xs": 12
+        },
+        "id": "orgs_table",
+        "type": "data-table",
+        "row_on_click": "navigate:SCR-admin-org-detail"
+      },
+      {
+        "actions": [
+          {
+            "action": "navigate:SCR-admin-orgs-new",
+            "id": "btn_new_org",
+            "label": "Nueva organización"
+          }
+        ],
+        "id": "new_org_cta",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-019"
+    ]
+  },
+  "roles": [
+    "platform_operator"
+  ],
+  "route": "/admin",
+  "title": "Admin Inicio"
+}

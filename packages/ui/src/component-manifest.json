@@ -1,0 +1,462 @@
+{
+  "_note": "Per-component render-status manifest (IMP-251). 'rendered' = a real importable+renderable component; 'typed-stub' = REAL typed prop interface + token wiring whose final layout comes from the Step-7 mocks (NOT an empty placeholder). Source: the rich 06_design_system.md component inventory.",
+  "status_pill_atom": "packages/ui/src/atoms/status-pill.tsx",
+  "summary": {
+    "rendered": 29,
+    "typed-stub": 17
+  },
+  "components": [
+    {
+      "id": "atom.avatar",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.button.destructive",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.button.ghost",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.button.primary",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "prose",
+      "prop_count": 6,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.button.secondary",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.checkbox",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.divider",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.icon-button",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.input.number",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.input.text",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "prose",
+      "prop_count": 7,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.link",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.radio",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.select",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.spinner",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.status-pill",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "prose",
+      "prop_count": 3,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.switch",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "atom.tag",
+      "category": "atom",
+      "render_status": "rendered",
+      "render_reason": "atom — deterministic primitive from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "molecule.alert-card",
+      "category": "molecule",
+      "render_status": "rendered",
+      "render_reason": "molecule — deterministic stack of known parts from props+tokens",
+      "spec_source": "prose",
+      "prop_count": 4,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "molecule.amount-input",
+      "category": "molecule",
+      "render_status": "rendered",
+      "render_reason": "molecule — deterministic stack of known parts from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "molecule.confirmation-modal",
+      "category": "molecule",
+      "render_status": "rendered",
+      "render_reason": "molecule — deterministic stack of known parts from props+tokens",
+      "spec_source": "prose",
+      "prop_count": 6,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "molecule.currency-input",
+      "category": "molecule",
+      "render_status": "rendered",
+      "render_reason": "molecule — deterministic stack of known parts from props+tokens",
+      "spec_source": "prose",
+      "prop_count": 2,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "molecule.date-picker",
+      "category": "molecule",
+      "render_status": "rendered",
+      "render_reason": "molecule — deterministic stack of known parts from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "molecule.empty-state",
+      "category": "molecule",
+      "render_status": "rendered",
+      "render_reason": "molecule — deterministic stack of known parts from props+tokens",
+      "spec_source": "prose",
+      "prop_count": 4,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "molecule.form-field",
+      "category": "molecule",
+      "render_status": "rendered",
+      "render_reason": "molecule — deterministic stack of known parts from props+tokens",
+      "spec_source": "prose",
+      "prop_count": 3,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "molecule.kpi-tile",
+      "category": "molecule",
+      "render_status": "rendered",
+      "render_reason": "molecule — deterministic stack of known parts from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "molecule.loan-row",
+      "category": "molecule",
+      "render_status": "rendered",
+      "render_reason": "molecule — deterministic stack of known parts from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "molecule.member-picker",
+      "category": "molecule",
+      "render_status": "typed-stub",
+      "render_reason": "needs mock layout (spec signal: 'search') — typed DoR stub",
+      "spec_source": "prose",
+      "prop_count": 4,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "molecule.member-row",
+      "category": "molecule",
+      "render_status": "rendered",
+      "render_reason": "molecule — deterministic stack of known parts from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "molecule.slip-uploader",
+      "category": "molecule",
+      "render_status": "typed-stub",
+      "render_reason": "needs mock layout (spec signal: 'upload') — typed DoR stub",
+      "spec_source": "prose",
+      "prop_count": 2,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "molecule.success-feedback",
+      "category": "molecule",
+      "render_status": "rendered",
+      "render_reason": "molecule — deterministic stack of known parts from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "molecule.transaction-row",
+      "category": "molecule",
+      "render_status": "rendered",
+      "render_reason": "molecule — deterministic stack of known parts from props+tokens",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": true
+    },
+    {
+      "id": "organism.admin-org-table",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "organism — typed prop interface; final layout from Step-7 mocks",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.alerts-bell-list",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "organism — typed prop interface; final layout from Step-7 mocks",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.app-header",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "organism — typed prop interface; final layout from Step-7 mocks",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.ar-aging-list",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "organism — typed prop interface; final layout from Step-7 mocks",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.bottom-bar",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "organism — typed prop interface; final layout from Step-7 mocks",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.cash-flow-projection-chart",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "needs mock layout (spec signal: 'chart') — typed DoR stub",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.first-run-wizard",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "needs mock layout (spec signal: 'wizard') — typed DoR stub",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.loan-card",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "organism — typed prop interface; final layout from Step-7 mocks",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.member-list",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "organism — typed prop interface; final layout from Step-7 mocks",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.monthly-close-panel",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "organism — typed prop interface; final layout from Step-7 mocks",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.pdf-statement-template",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "needs mock layout (spec signal: 'pdf') — typed DoR stub",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.reconciliation-panel",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "needs mock layout (spec signal: 'reconcil') — typed DoR stub",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.sidebar",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "organism — typed prop interface; final layout from Step-7 mocks",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.transaction-list",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "organism — typed prop interface; final layout from Step-7 mocks",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    },
+    {
+      "id": "organism.year-end-share-out-editor",
+      "category": "organism",
+      "render_status": "typed-stub",
+      "render_reason": "needs mock layout (spec signal: 'editor') — typed DoR stub",
+      "spec_source": "none",
+      "prop_count": 0,
+      "deterministic_from_spec": false
+    }
+  ],
+  "parse_warnings": [
+    "atom.avatar: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.button.destructive: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.button.ghost: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.button.secondary: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.checkbox: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.divider: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.icon-button: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.input.number: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.link: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.radio: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.select: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.spinner: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.switch: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "atom.tag: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "molecule.amount-input: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "molecule.date-picker: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "molecule.kpi-tile: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "molecule.loan-row: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "molecule.member-row: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "molecule.success-feedback: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "molecule.transaction-row: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.admin-org-table: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.alerts-bell-list: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.app-header: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.ar-aging-list: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.bottom-bar: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.cash-flow-projection-chart: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.first-run-wizard: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.loan-card: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.member-list: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.monthly-close-panel: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.pdf-statement-template: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.reconciliation-panel: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.sidebar: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.transaction-list: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated",
+    "organism.year-end-share-out-editor: no parseable props in SEC9.2 JSON or SEC5 prose — emitter will use archetype defaults (atom) or a typed DoR stub (molecule/organism); NOT fabricated"
+  ]
+}

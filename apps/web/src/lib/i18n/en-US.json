@@ -1,0 +1,139 @@
+{
+  "_locale": "en-US",
+  "_label": "en-US",
+  "app_name": "Mi Banquito",
+  "admin": {
+    "audit": "Audit log",
+    "cronRuns": "Cron status",
+    "drift": "Substrate status",
+    "home": "Home",
+    "orgsNew": "New organization"
+  },
+  "nav": {
+    "accounts": "Group accounts",
+    "arrears": "Overdue",
+    "balance": "Balance sheet",
+    "base_fund_quota": "Base fund quota",
+    "contributions": "Contributions",
+    "group_settings": "My group",
+    "history": "History",
+    "home": "Home",
+    "liquidity": "Projected liquidity",
+    "loans": "Loans",
+    "members": "Members",
+    "monthly_close": "Monthly close",
+    "solidarity": "Solidarity collection",
+    "statements": "Statements",
+    "year_end": "Year-end share-out"
+  },
+  "pages": {
+    "admin": {
+      "title": "Admin Inicio"
+    },
+    "admin/audit": {
+      "title": "Bitácora"
+    },
+    "admin/cron-runs": {
+      "title": "Estado de crons"
+    },
+    "admin/drift": {
+      "title": "Estado del substrato"
+    },
+    "admin/orgs/[id]": {
+      "title": "Detalle de org"
+    },
+    "admin/orgs/[id]/business-rules": {
+      "title": "Reglas del grupo"
+    },
+    "admin/orgs/[id]/config": {
+      "title": "Configuración de reglas"
+    },
+    "admin/orgs/[id]/export": {
+      "title": "Exportar datos"
+    },
+    "admin/orgs/[id]/impersonate": {
+      "title": "Ver como tesorera"
+    },
+    "admin/orgs/[id]/pilot-log": {
+      "title": "Bitácora del piloto"
+    },
+    "admin/orgs/nueva": {
+      "title": "Nueva organización"
+    },
+    "aportes": {
+      "title": "Aportes"
+    },
+    "aportes/registrar": {
+      "title": "Registrar aporte"
+    },
+    "atrasos": {
+      "title": "Atrasos"
+    },
+    "balance": {
+      "title": "Balance del banquito"
+    },
+    "bienvenida": {
+      "title": "Bienvenida"
+    },
+    "cierre": {
+      "title": "Cierre del mes"
+    },
+    "colectas": {
+      "title": "Colecta solidaria"
+    },
+    "cuentas": {
+      "title": "Cuentas del grupo"
+    },
+    "cuota-base/registrar": {
+      "title": "Registrar cuota base"
+    },
+    "estados": {
+      "title": "Estados de cuenta"
+    },
+    "grupo": {
+      "title": "Mi grupo"
+    },
+    "grupos": {
+      "title": "Mis grupos"
+    },
+    "historial": {
+      "title": "Historial"
+    },
+    "home": {
+      "title": "Inicio"
+    },
+    "liquidez": {
+      "title": "Liquidez proyectada"
+    },
+    "movimientos/registrar": {
+      "title": "Registrar movimiento"
+    },
+    "prestamos": {
+      "title": "Préstamos"
+    },
+    "prestamos/[id]": {
+      "title": "Detalle del préstamo"
+    },
+    "prestamos/[id]/pago": {
+      "title": "Registrar pago"
+    },
+    "prestamos/nuevo": {
+      "title": "Nuevo préstamo"
+    },
+    "reparto": {
+      "title": "Reparto fin de año"
+    },
+    "socias": {
+      "title": "Socias"
+    },
+    "socias/[id]": {
+      "title": "Detalle de socia"
+    },
+    "socias/nueva": {
+      "title": "Agregar socia"
+    },
+    "verify/[hash]": {
+      "title": "Verificar documento"
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "description": "Operator creates a new tenant org per US-016 with Auth0 fallback per OQ-ARCH-2.",
+  "id": "SCR-admin-orgs-new",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "fields": [
+          {
+            "id": "display_name",
+            "label": "Nombre del grupo",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "default": "EC",
+            "id": "country_code",
+            "label": "País",
+            "options": [
+              "EC"
+            ],
+            "type": "select"
+          },
+          {
+            "default": "USD",
+            "id": "currency_code",
+            "label": "Moneda",
+            "options": [
+              "USD"
+            ],
+            "type": "select"
+          },
+          {
+            "default": "America/Guayaquil",
+            "id": "timezone",
+            "label": "Zona horaria",
+            "options": [
+              "America/Guayaquil"
+            ],
+            "type": "select"
+          },
+          {
+            "default": "es-EC",
+            "id": "default_language",
+            "label": "Idioma",
+            "options": [
+              "es-EC"
+            ],
+            "type": "select"
+          },
+          {
+            "id": "branding_logo",
+            "label": "Logo (opcional)",
+            "type": "file"
+          }
+        ],
+        "id": "new_org_form",
+        "submit": {
+          "action": "server_action:createOrg",
+          "id": "btn_create_org",
+          "label": "Crear organización",
+          "navigate_to": "SCR-admin-org-detail"
+        },
+        "type": "form"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-016"
+    ]
+  },
+  "roles": [
+    "platform_operator"
+  ],
+  "route": "/admin/orgs/nueva",
+  "title": "Nueva organización"
+}

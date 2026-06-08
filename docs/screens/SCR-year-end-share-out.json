@@ -1,0 +1,148 @@
+{
+  "description": "Two-pool year-end share-out wizard (loan-activity pool + savings pool) with Assembly governance step (reparto vs reserva) + exact reconciliation + 24h reversal grace per US-051/052/053/084/110-114 (CHG-004).",
+  "id": "SCR-year-end-share-out",
+  "layout": {
+    "kind": "wizard",
+    "sections": [
+      {
+        "cards": [
+          {
+            "title": "Excedente distribuible",
+            "value": ":computed:",
+            "subtitle": "interés + solicitudes + mora − CxC anterior"
+          },
+          {
+            "title": "Reparto (Asamblea)",
+            "value": ":computed:"
+          },
+          {
+            "title": "Reserva",
+            "value": ":computed:",
+            "subtitle": "disposición: reserva / capital"
+          }
+        ],
+        "id": "step0_governance",
+        "type": "metric-cards",
+        "title": "Paso 0 — Decisión de la Asamblea (reparto vs reserva)"
+      },
+      {
+        "cards": [
+          {
+            "title": "Bolsa préstamos",
+            "value": ":computed:",
+            "subtitle": "alícuota × (A+B capital cobrado, propios + garantizados)"
+          },
+          {
+            "title": "Bolsa ahorros",
+            "value": ":computed:",
+            "subtitle": "alícuota × saldo ponderado (USD-días)"
+          },
+          {
+            "title": "Alícuota préstamos",
+            "value": ":computed:"
+          },
+          {
+            "title": "Alícuota ahorros",
+            "value": ":computed:"
+          }
+        ],
+        "id": "step1_group_summary",
+        "type": "metric-cards",
+        "title": "Paso 1 — Las dos bolsas del reparto"
+      },
+      {
+        "columns": [
+          "acumulado",
+          "saldo_ponderado_usd_dias",
+          "loan_activity_basis",
+          "loan_bonus_c",
+          "savings_interest",
+          "total_borrador",
+          "ajuste",
+          "total_final",
+          "motivo_ajuste",
+          "disposicion",
+          "motivo_disposicion"
+        ],
+        "id": "step2_per_member_table",
+        "row_editable_columns": [
+          "ajuste",
+          "motivo_ajuste",
+          "disposicion",
+          "motivo_disposicion"
+        ],
+        "type": "editable-grid",
+        "title": "Reparto por socia"
+      },
+      {
+        "content": "Tu participación es proporcional al tiempo que tu dinero estuvo en el fondo durante el año, no al saldo acumulado.",
+        "id": "step1_explanation",
+        "type": "info-banner"
+      },
+      {
+        "content": "El fondo cubre el reparto proyectado para las 7 socias. No hay déficit de liquidez.",
+        "id": "step1_a5_gate",
+        "kind": "warning",
+        "type": "info-banner",
+        "visible_when": "a5_alert_active"
+      },
+      {
+        "id": "step3_summary",
+        "type": "info-banner",
+        "kind": "success",
+        "icon": "check-circle",
+        "title": "Resumen del reparto a aprobar",
+        "content": "Se repartirá el total aprobado por la Asamblea entre las socias: bono por préstamos (sobre el capital cobrado — propios + garantizados) + interés sobre ahorros (saldo ponderado por tiempo). La suma cuadra exactamente con el reparto (con línea de ajuste). Al aprobar, se registran los pagos, se hace el corte del año (snapshot inmutable) y se generan los PDFs. Tienes una ventana de gracia para revertirlo."
+      },
+      {
+        "actions": [
+          {
+            "action": "modal:approval_confirm",
+            "id": "btn_approve",
+            "kind": "primary",
+            "label": "Aprobar reparto"
+          }
+        ],
+        "id": "step3_approve",
+        "type": "action-bar",
+        "title": "Aprobar y cerrar"
+      },
+      {
+        "actions": [
+          {
+            "action": "modal:reverse_confirm",
+            "id": "btn_reverse",
+            "kind": "danger",
+            "label": "Revertir reparto",
+            "visible_when": "within_24h_grace"
+          }
+        ],
+        "id": "step3_grace_window",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "CHG-001",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-051",
+      "US-052",
+      "US-053",
+      "US-084",
+      "US-099",
+      "US-110",
+      "US-111",
+      "US-112",
+      "US-113",
+      "US-114",
+      "US-115"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/reparto",
+  "title": "Reparto fin de año"
+}

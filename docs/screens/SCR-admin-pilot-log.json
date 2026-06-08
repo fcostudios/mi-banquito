@@ -1,0 +1,87 @@
+{
+  "description": "Design-partner observation log + parity check + 3-month pilot exit checklist per US-087.",
+  "id": "SCR-admin-pilot-log",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "fields": [
+          {
+            "id": "observed_on",
+            "label": "Fecha",
+            "type": "date"
+          },
+          {
+            "id": "duration_minutes",
+            "label": "Duración (min)",
+            "type": "integer"
+          },
+          {
+            "id": "observations",
+            "label": "Observaciones",
+            "type": "textarea"
+          },
+          {
+            "id": "vocabulary_validation",
+            "label": "Validación de vocabulario",
+            "type": "textarea"
+          },
+          {
+            "id": "parity_check",
+            "label": "Paridad papel ↔ sistema",
+            "type": "textarea"
+          }
+        ],
+        "id": "observation_form",
+        "submit": {
+          "action": "server_action:logPilotObservation",
+          "id": "btn_log",
+          "label": "Guardar entrada"
+        },
+        "type": "form"
+      },
+      {
+        "id": "exit_checklist",
+        "items": [
+          {
+            "id": "three_clean_closes",
+            "label": "3 cierres consecutivos sin discrepancia"
+          },
+          {
+            "id": "no_paper_confirmation",
+            "label": "Tesorera dice: 'no volvería al cuaderno'"
+          },
+          {
+            "id": "vocab_validated",
+            "label": "Vocabulario validado por la diseñadora-socia"
+          }
+        ],
+        "type": "checklist"
+      },
+      {
+        "actions": [
+          {
+            "action": "download:pilot_exit_report_pdf",
+            "id": "btn_report",
+            "label": "Generar reporte de salida del piloto"
+          }
+        ],
+        "id": "export_report",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-087"
+    ]
+  },
+  "roles": [
+    "platform_operator"
+  ],
+  "route": "/admin/orgs/[id]/pilot-log",
+  "title": "Bitácora del piloto"
+}

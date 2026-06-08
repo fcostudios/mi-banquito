@@ -1,0 +1,112 @@
+{
+  "description": "BALANCE BANQUITO al 31/dic — year-end balance sheet (ACTIVOS = PASIVOS) sourced from the immutable YearEndBalanceSnapshot (CHG-003) + the year's surplus/reparto (CHG-004), per US-118 / BR-24 (CHG-007).",
+  "i18n": {
+    "es-EC": {
+      "title": "Balance del banquito",
+      "subtitle": "Lo que el grupo tiene y lo que debe, al cierre del año"
+    }
+  },
+  "id": "SCR-balance-banquito",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "id": "balance_intro",
+        "type": "info-banner",
+        "kind": "info",
+        "icon": "scale",
+        "title": "BALANCE BANQUITO · al 31/dic/2025",
+        "body": "Tomado del corte inmutable del año. Los activos (lo que el grupo tiene por cobrar y en el banco) deben cuadrar con los pasivos (ahorros de las socias, cuotas y el excedente del año)."
+      },
+      {
+        "id": "activos",
+        "type": "metric-cards",
+        "title": "Activos",
+        "cards": [
+          {
+            "id": "prestamos_por_cobrar",
+            "title": "Préstamos por cobrar",
+            "value": "$18,930.00"
+          },
+          {
+            "id": "intereses_por_cobrar",
+            "title": "Intereses por cobrar",
+            "value": "$0.00"
+          },
+          {
+            "id": "banco",
+            "title": "Banco + caja",
+            "value": "$415.20"
+          },
+          {
+            "id": "total_activos",
+            "title": "Total activos",
+            "value": "$19,345.20"
+          }
+        ]
+      },
+      {
+        "id": "pasivos",
+        "type": "metric-cards",
+        "title": "Pasivos y patrimonio",
+        "cards": [
+          {
+            "id": "ahorros",
+            "title": "Ahorros de las socias",
+            "value": "$16,410.00"
+          },
+          {
+            "id": "cuota_acumulada",
+            "title": "Cuota anual acumulada",
+            "value": "$2,281.00"
+          },
+          {
+            "id": "excedente",
+            "title": "Excedente del año",
+            "value": "$654.20",
+            "subtitle": "reparto + reserva"
+          },
+          {
+            "id": "total_pasivos",
+            "title": "Total pasivos",
+            "value": "$19,345.20"
+          }
+        ]
+      },
+      {
+        "id": "balance_check",
+        "type": "info-banner",
+        "kind": "success",
+        "icon": "check-circle",
+        "title": "El balance cuadra",
+        "content": "Activos $19,345.20 = Pasivos $19,345.20. El balance se calcula del corte inmutable del año (no se puede editar) — BR-24."
+      },
+      {
+        "actions": [
+          {
+            "action": "server_action:generateBalanceBanquitoPdf",
+            "id": "btn_export_pdf",
+            "kind": "primary",
+            "label": "Exportar PDF",
+            "icon": "download"
+          }
+        ],
+        "id": "export_action",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-118"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/balance",
+  "title": "Balance del banquito"
+}

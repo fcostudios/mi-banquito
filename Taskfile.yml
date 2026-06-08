@@ -1,0 +1,55 @@
+version: "3"
+
+tasks:
+  setup:
+    desc: "Full project setup (install + push schema)"
+    cmds:
+      - bash infra/scripts/setup.sh
+
+  dev:
+    desc: "Run the Next.js app (frontend + serverless API routes)"
+    cmds:
+      - bash infra/scripts/run-all.sh
+
+  web:
+    desc: "Run the Next.js dev server"
+    dir: apps/web
+    cmds:
+      - pnpm dev
+
+  build:
+    desc: "Build the Next.js app"
+    dir: .
+    cmds:
+      - turbo run build
+
+  migrate:
+    desc: "Push the Drizzle schema (fails loud on a silent no-op)"
+    dir: packages/db
+    cmds:
+      # push exits 0 even on an unreachable DATABASE_URL; verify-schema.mjs
+      # counts the applied tables and fails non-zero on 0 (IMP-259).
+      - pnpm drizzle-kit push
+      - node scripts/verify-schema.mjs
+
+  seed:
+    desc: "Seed the development database"
+    cmds:
+      - bash infra/scripts/seed-db.sh
+
+  reset-db:
+    desc: "Drop and re-push the database schema"
+    cmds:
+      - bash infra/scripts/reset-db.sh
+
+  test:web:
+    desc: "Run frontend type-check and lint"
+    dir: apps/web
+    cmds:
+      - pnpm type-check
+      - pnpm lint
+
+  sync:
+    desc: "Sync specs and stories from Nous"
+    cmds:
+      - bash infra/scripts/sync-from-nous.sh

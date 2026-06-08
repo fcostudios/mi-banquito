@@ -1,0 +1,75 @@
+{
+  "description": "Member list with filter + search per US-026/031.",
+  "id": "SCR-members-list",
+  "layout": {
+    "kind": "listing",
+    "sections": [
+      {
+        "fields": [
+          {
+            "id": "status",
+            "label": "Estado",
+            "options": [
+              "activo",
+              "en_pausa",
+              "baja"
+            ],
+            "type": "select"
+          }
+        ],
+        "id": "filter_bar",
+        "type": "filters"
+      },
+      {
+        "fields": [
+          {
+            "id": "q",
+            "label": "Buscar socia",
+            "type": "text"
+          }
+        ],
+        "id": "search",
+        "type": "form"
+      },
+      {
+        "columns": [
+          "display_name",
+          "role",
+          "balance",
+          "status"
+        ],
+        "id": "members_table",
+        "row_on_click": "navigate:SCR-member-detail",
+        "type": "data-table"
+      },
+      {
+        "actions": [
+          {
+            "action": "navigate:SCR-add-member",
+            "id": "btn_add",
+            "kind": "primary",
+            "label": "Agregar socia",
+            "navigate_to": "SCR-add-member",
+            "icon": "user-plus"
+          }
+        ],
+        "id": "fab_add",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-026",
+      "US-031"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/socias",
+  "title": "Socias"
+}

@@ -1,0 +1,41 @@
+{
+  "description": "Start read-only impersonation with required reason per US-020.",
+  "id": "SCR-admin-impersonation",
+  "layout": {
+    "kind": "modal",
+    "sections": [
+      {
+        "fields": [
+          {
+            "id": "reason",
+            "label": "Motivo (obligatorio)",
+            "min_length": 10,
+            "required": true,
+            "type": "textarea"
+          }
+        ],
+        "id": "impersonation_form",
+        "submit": {
+          "action": "server_action:startImpersonation",
+          "id": "btn_start",
+          "label": "Comenzar impersonación",
+          "navigate_to": "SCR-treasurer-home"
+        },
+        "type": "form"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-020"
+    ]
+  },
+  "roles": [
+    "platform_operator"
+  ],
+  "route": "/admin/orgs/[id]/impersonate",
+  "title": "Ver como tesorera"
+}

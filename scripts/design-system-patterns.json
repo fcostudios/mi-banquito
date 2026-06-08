@@ -1,0 +1,35 @@
+{
+  "_note": "Step-6 patterns_to_enforce. Mechanizable ones map to a lint hook; the rest are a review checklist — TODO: mechanize as the extract gains per-pattern selectors.",
+  "patterns": [
+    {
+      "id": "pattern.confirmation_as_full_spanish_sentence",
+      "mechanizable": false,
+      "enforcement": "review-checklist (not yet mechanizable)"
+    },
+    {
+      "id": "pattern.empty_state_one_line_plus_single_cta",
+      "mechanizable": true,
+      "enforcement": "lint: empty-state must pair copy + a single CTA"
+    },
+    {
+      "id": "pattern.pre_flight_block_with_explanation_and_path_forward",
+      "mechanizable": false,
+      "enforcement": "review-checklist (not yet mechanizable)"
+    },
+    {
+      "id": "pattern.reversal_no_destructive_delete",
+      "mechanizable": false,
+      "enforcement": "review-checklist (not yet mechanizable)"
+    },
+    {
+      "id": "pattern.share_via_whatsapp_one_tap",
+      "mechanizable": false,
+      "enforcement": "review-checklist (not yet mechanizable)"
+    },
+    {
+      "id": "pattern.specific_loading_label_never_bare_spinner",
+      "mechanizable": true,
+      "enforcement": "lint: no bare <Spinner/> without a label prop"
+    }
+  ]
+}

@@ -1,0 +1,159 @@
+{
+  "description": "Member profile with tabs Resumen / Aportes / Préstamos / Historial / Acciones (Pausar/Baja per US-027).",
+  "id": "SCR-member-detail",
+  "layout": {
+    "kind": "tabs-card",
+    "sections": [
+      {
+        "id": "member_header",
+        "type": "session-header-card"
+      },
+      {
+        "id": "tabs",
+        "tabs": [
+          {
+            "id": "resumen",
+            "label": "Resumen",
+            "sections": [
+              {
+                "id": "sum_metrics",
+                "type": "metric-cards",
+                "cards": [
+                  {
+                    "id": "m_balance",
+                    "title": "Saldo de aportes",
+                    "value": "$320.00"
+                  },
+                  {
+                    "id": "m_loans",
+                    "title": "Préstamos activos",
+                    "value": "1"
+                  },
+                  {
+                    "id": "m_status",
+                    "title": "Estado",
+                    "value": "Al día"
+                  },
+                  {
+                    "id": "m_joined",
+                    "title": "Ingresó",
+                    "value": "2024-08-12"
+                  }
+                ]
+              },
+              {
+                "id": "sum_contacts",
+                "type": "info-card",
+                "title": "Datos de contacto",
+                "description": "WhatsApp: +593 099 123 4567 · Cédula: ····5678"
+              }
+            ]
+          },
+          {
+            "id": "aportes",
+            "label": "Aportes",
+            "sections": [
+              {
+                "id": "mem_aportes_table",
+                "type": "data-table",
+                "title": "Aportes registrados",
+                "columns": [
+                  "period",
+                  "amount",
+                  "status"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "prestamos",
+            "label": "Préstamos",
+            "sections": [
+              {
+                "id": "mem_loans_table",
+                "type": "data-table",
+                "title": "Préstamos de la socia",
+                "columns": [
+                  "principal",
+                  "outstanding",
+                  "next_due_on",
+                  "status"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "historial",
+            "label": "Historial",
+            "sections": [
+              {
+                "id": "mem_timeline",
+                "type": "timeline",
+                "title": "Cronología",
+                "fields": [
+                  "narrated_text",
+                  "at"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "acciones",
+            "label": "Acciones",
+            "sections": [
+              {
+                "id": "mem_actions",
+                "type": "action-bar",
+                "actions": [
+                  {
+                    "id": "btn_freeze",
+                    "label": "Pausar",
+                    "kind": "secondary",
+                    "icon": "pause-circle"
+                  },
+                  {
+                    "id": "btn_offboard",
+                    "label": "Dar de baja",
+                    "kind": "danger",
+                    "icon": "user-x"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "type": "tabs"
+      },
+      {
+        "actions": [
+          {
+            "action": "modal:pause_confirm",
+            "id": "btn_pause",
+            "label": "Pausar"
+          },
+          {
+            "action": "modal:baja_with_refund",
+            "id": "btn_baja",
+            "label": "Dar de baja"
+          }
+        ],
+        "id": "action_pause_baja",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-027",
+      "US-106"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/socias/[id]",
+  "title": "Detalle de socia"
+}

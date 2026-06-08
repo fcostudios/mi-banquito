@@ -1,0 +1,92 @@
+{
+  "description": "Deposit recording with payment source per US-074 + slip photo + offline-queue chip per US-077.",
+  "id": "SCR-record-contribution",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "fields": [
+          {
+            "id": "member_id",
+            "label": "Socia",
+            "required": true,
+            "type": "autocomplete:Member"
+          },
+          {
+            "id": "amount",
+            "label": "Monto (USD)",
+            "required": true,
+            "type": "currency"
+          },
+          {
+            "default": "today",
+            "id": "dated_on",
+            "label": "Fecha",
+            "type": "date"
+          },
+          {
+            "added_per": "US-074",
+            "default": "banco",
+            "id": "payment_source",
+            "label": "¿De dónde viene la plata?",
+            "options": [
+              "banco",
+              "efectivo en reunión",
+              "caja chica"
+            ],
+            "type": "select"
+          },
+          {
+            "added_per": "CHG-001 / US-094",
+            "id": "account_id",
+            "label": "¿En qué cuenta entró?",
+            "required": true,
+            "type": "autocomplete:Account",
+            "help": "Si la socia te depositó en tu cuenta personal, escógela aquí: el aporte queda \"pendiente de regularizar\" hasta que lo pases a una cuenta del grupo."
+          },
+          {
+            "conditional_required": "payment_source == 'banco'",
+            "id": "slip_photo",
+            "label": "Foto de comprobante",
+            "type": "file"
+          },
+          {
+            "id": "notes",
+            "label": "Notas (opcional)",
+            "type": "textarea"
+          }
+        ],
+        "id": "form",
+        "submit": {
+          "action": "server_action:recordContribution",
+          "client_request_id": true,
+          "id": "btn_save",
+          "label": "Guardar aporte"
+        },
+        "type": "form"
+      },
+      {
+        "content": ":computed:offline_status",
+        "id": "offline_chip",
+        "type": "info-banner",
+        "visible_when": "offline_queue_count > 0"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "CHG-001",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-029",
+      "US-074",
+      "US-077",
+      "US-094"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/aportes/registrar",
+  "title": "Registrar aporte"
+}

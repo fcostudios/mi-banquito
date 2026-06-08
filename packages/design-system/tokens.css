@@ -1,0 +1,20 @@
+/* Generated from tokens.json — DO NOT hand-edit */
+:root {
+  --color-accent: #C45F36;
+  --color-background: #F8F4E9;
+  --color-border: #CBD5E1;
+  --color-primary: #2D7A4F;
+  --color-secondary: #1E5180;
+  --color-surface: #FFFFFF;
+  --color-surface-muted: #E2E8F0;
+  --color-text-on-primary: #F8F4E9;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-error-bg: #FECACA;
+  --color-error-text: #B91C1C;
+  --color-info-bg: #FDE68A;
+  --color-info-text: #B45309;
+  --color-success: #15803D;
+  --color-warning-bg: #FED7AA;
+  --color-warning-text: #C2410C;
+}

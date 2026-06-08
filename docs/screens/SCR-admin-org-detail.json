@@ -1,0 +1,95 @@
+{
+  "description": "Org hub: links to config / business-rules / impersonate / export / audit / pilot-log + lifecycle (freeze/archive) per US-080.",
+  "id": "SCR-admin-org-detail",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "id": "org_header",
+        "type": "session-header-card"
+      },
+      {
+        "fields": [
+          {
+            "id": "treasurer_email",
+            "label": "Email de la tesorera",
+            "required": true,
+            "type": "email"
+          },
+          {
+            "id": "treasurer_display_name",
+            "label": "Nombre",
+            "required": true,
+            "type": "text"
+          }
+        ],
+        "id": "treasurer_invite",
+        "submit": {
+          "action": "server_action:inviteTreasurer",
+          "id": "btn_invite",
+          "label": "Invitar a la tesorera"
+        },
+        "type": "form"
+      },
+      {
+        "actions": [
+          {
+            "action": "modal:freeze_confirm",
+            "id": "btn_freeze",
+            "kind": "warning",
+            "label": "Pausar"
+          },
+          {
+            "action": "modal:archive_confirm",
+            "id": "btn_archive",
+            "kind": "danger",
+            "label": "Archivar"
+          }
+        ],
+        "id": "lifecycle_actions",
+        "type": "action-bar"
+      },
+      {
+        "cards": [
+          {
+            "navigate_to": "SCR-admin-org-config",
+            "title": "Configuración de reglas"
+          },
+          {
+            "navigate_to": "SCR-admin-business-rules",
+            "title": "Reglas del grupo (read-only)"
+          },
+          {
+            "navigate_to": "SCR-admin-impersonation",
+            "title": "Ver como tesorera"
+          },
+          {
+            "navigate_to": "SCR-admin-export",
+            "title": "Exportar datos"
+          },
+          {
+            "navigate_to": "SCR-admin-pilot-log",
+            "title": "Bitácora del piloto"
+          }
+        ],
+        "id": "nav_links",
+        "type": "cards-grid"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-016",
+      "US-018",
+      "US-080"
+    ]
+  },
+  "roles": [
+    "platform_operator"
+  ],
+  "route": "/admin/orgs/[id]",
+  "title": "Detalle de org"
+}

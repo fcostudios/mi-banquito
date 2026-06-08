@@ -1,0 +1,65 @@
+{
+  "description": "Loans list with status + outstanding per US-037.",
+  "id": "SCR-loans-list",
+  "layout": {
+    "kind": "listing",
+    "sections": [
+      {
+        "fields": [
+          {
+            "id": "status",
+            "label": "Estado",
+            "options": [
+              "activo",
+              "pagado",
+              "en_mora",
+              "cancelado"
+            ],
+            "type": "select"
+          }
+        ],
+        "id": "filter_bar",
+        "type": "filters"
+      },
+      {
+        "columns": [
+          "member",
+          "principal",
+          "outstanding",
+          "next_due_on",
+          "status"
+        ],
+        "id": "loans_table",
+        "row_on_click": "navigate:SCR-loan-detail",
+        "type": "data-table"
+      },
+      {
+        "actions": [
+          {
+            "action": "navigate:SCR-originate-loan",
+            "id": "btn_new_loan",
+            "kind": "primary",
+            "label": "Nuevo préstamo",
+            "navigate_to": "SCR-originate-loan",
+            "icon": "plus"
+          }
+        ],
+        "id": "fab_new",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-037"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/prestamos",
+  "title": "Préstamos"
+}

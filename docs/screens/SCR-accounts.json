@@ -1,0 +1,165 @@
+{
+  "accessibility": {
+    "ariaLandmarks": true,
+    "skipToContent": true
+  },
+  "description": "Group accounts registry (banco del grupo, caja chica, cuenta personal de la tesorera, externa) per US-091 + BR-12. Foundation for the multi-account model: every movement records which account it touched, and only is_group_fund accounts count as the real fund.",
+  "i18n": {
+    "es-EC": {
+      "subtitle": "Las cuentas donde entra y sale la plata del grupo",
+      "title": "Cuentas del grupo"
+    }
+  },
+  "id": "SCR-accounts",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "id": "accounts_table",
+        "type": "data-table",
+        "title": "Cuentas registradas",
+        "columns": [
+          {
+            "id": "name",
+            "label": "Cuenta"
+          },
+          {
+            "id": "type",
+            "label": "Tipo"
+          },
+          {
+            "id": "last4",
+            "label": "Terminación"
+          },
+          {
+            "id": "institucion",
+            "label": "Institución"
+          },
+          {
+            "id": "producto",
+            "label": "Producto"
+          },
+          {
+            "id": "fund_status",
+            "label": "Estado",
+            "type": "badge"
+          }
+        ],
+        "rows": [
+          {
+            "name": "Banco Pichincha — Banquito El Valle",
+            "type": "Banco del grupo",
+            "last4": "4821",
+            "institucion": "Banco Pichincha",
+            "producto": "Ahorros",
+            "fund_status": "Dentro del fondo"
+          },
+          {
+            "name": "Caja chica (efectivo)",
+            "type": "Caja chica",
+            "last4": "—",
+            "institucion": "—",
+            "producto": "—",
+            "fund_status": "Dentro del fondo"
+          },
+          {
+            "name": "Cuenta personal de la tesorera",
+            "type": "Personal",
+            "last4": "7733",
+            "institucion": "Banco Guayaquil",
+            "producto": "Corriente",
+            "fund_status": "Fuera del fondo"
+          }
+        ]
+      },
+      {
+        "id": "fund_note",
+        "type": "info-banner",
+        "kind": "info",
+        "icon": "info",
+        "title": "Qué cuenta como fondo del grupo",
+        "content": "Solo las cuentas marcadas \"dentro del fondo\" cuentan como dinero del grupo. Una cuenta personal de la tesorera está \"fuera del fondo\": el dinero que llegue ahí queda pendiente hasta que lo transfieras a una cuenta del grupo (regularizar)."
+      },
+      {
+        "id": "form_account",
+        "type": "form",
+        "title": "Agregar o editar una cuenta",
+        "fields": [
+          {
+            "id": "name",
+            "label": "Nombre de la cuenta",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "type",
+            "label": "Tipo de cuenta",
+            "required": true,
+            "type": "select",
+            "options": [
+              "banco del grupo",
+              "caja chica",
+              "cuenta personal de la tesorera",
+              "externa"
+            ]
+          },
+          {
+            "id": "last4",
+            "label": "Terminación (4 dígitos, opcional)",
+            "type": "text"
+          },
+          {
+            "id": "institucion",
+            "label": "Institución (banco/cooperativa)",
+            "type": "select",
+            "options": [
+              "Banco Pichincha",
+              "Banco Guayaquil",
+              "Banco Produbanco",
+              "Cooperativa Andalucía",
+              "Cooperativa 29 de Octubre"
+            ]
+          },
+          {
+            "id": "producto",
+            "label": "Tipo de producto",
+            "type": "select",
+            "options": [
+              "Ahorros",
+              "Corriente"
+            ]
+          },
+          {
+            "id": "is_group_fund",
+            "label": "¿Esta cuenta es parte del fondo del grupo?",
+            "type": "toggle",
+            "default": true
+          }
+        ],
+        "submit": {
+          "action": "server_action:saveAccount",
+          "client_request_id": true,
+          "id": "btn_save_account",
+          "label": "Guardar cuenta"
+        }
+      }
+    ],
+    "titleBar": {
+      "subtitle": "Las cuentas donde entra y sale la plata del grupo"
+    }
+  },
+  "meta": {
+    "change_id": "CHG-001",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-091",
+      "US-116"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/cuentas",
+  "title": "Cuentas del grupo"
+}

@@ -1,0 +1,52 @@
+{
+  "description": "Active cycle view with per-member compliance grid (parcial/al_día/atrasado/en_mora) per US-031 + US-075.",
+  "id": "SCR-contributions-cycle",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "id": "cycle_header",
+        "type": "session-header-card"
+      },
+      {
+        "columns": [
+          "member",
+          "expected",
+          "paid_to_date",
+          "status"
+        ],
+        "id": "compliance_grid",
+        "row_on_click": "navigate:SCR-member-detail",
+        "type": "data-table"
+      },
+      {
+        "actions": [
+          {
+            "action": "navigate:SCR-record-contribution",
+            "id": "btn_record",
+            "kind": "primary",
+            "label": "Registrar aporte",
+            "navigate_to": "SCR-record-contribution",
+            "icon": "plus"
+          }
+        ],
+        "id": "fab_record",
+        "type": "action-bar"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-031",
+      "US-075"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/aportes",
+  "title": "Aportes"
+}

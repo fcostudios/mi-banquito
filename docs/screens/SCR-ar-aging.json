@@ -1,0 +1,76 @@
+{
+  "description": "Live A/R aging sorted by days late descending per US-040 + US-042 chase action.",
+  "id": "SCR-ar-aging",
+  "layout": {
+    "kind": "listing",
+    "sections": [
+      {
+        "fields": [
+          {
+            "id": "reason_kind",
+            "label": "Tipo",
+            "options": [
+              {
+                "value": "all",
+                "label": "Todos"
+              },
+              {
+                "value": "aporte",
+                "label": "Aporte"
+              },
+              {
+                "value": "préstamo",
+                "label": "Préstamo"
+              }
+            ],
+            "type": "select"
+          }
+        ],
+        "id": "filter_bar",
+        "type": "filters"
+      },
+      {
+        "columns": [
+          "member",
+          "reason",
+          "amount",
+          "days_late",
+          "mora",
+          "last_action"
+        ],
+        "id": "aging_table",
+        "row_actions": [
+          {
+            "action": "modal:promise_picker",
+            "id": "btn_mark_promise",
+            "label": "Marcar promesa"
+          },
+          {
+            "action": "share_intent:whatsapp_chase",
+            "id": "btn_whatsapp",
+            "label": "Avisar por WhatsApp"
+          }
+        ],
+        "type": "data-table",
+        "row_on_click": "navigate:SCR-member-detail"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-040",
+      "US-041",
+      "US-042",
+      "US-078",
+      "US-103"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/atrasos",
+  "title": "Atrasos"
+}

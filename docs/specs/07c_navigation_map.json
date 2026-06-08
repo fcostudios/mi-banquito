@@ -1,0 +1,1499 @@
+{
+  "$schema": "https://nous-pipeline.local/schemas/07c_navigation_map.v1.json",
+  "project_id": "fcostudios__mi-banquito",
+  "generated_at": "2026-05-28",
+  "generated_by": "step_7_screens_agent",
+  "report_language": "en-US",
+  "product_ui_language": "es-EC",
+  "hr_30_compliant": true,
+  "app_shell": {
+    "header": {
+      "wordmark": "Mi Banquito",
+      "show_locale_toggle": false,
+      "show_notifications_bell": true,
+      "show_user_menu": true,
+      "endorsement": "por FcoStudios",
+      "active_context": {
+        "enabled": true,
+        "icon": "Users",
+        "switch_label_es": "Cambiar grupo",
+        "switch_label_en": "Switch group",
+        "current": {
+          "label_es": "Banquito El Valle",
+          "label_en": "Banquito El Valle"
+        },
+        "items": [
+          {
+            "label_es": "Banquito El Valle",
+            "active": true
+          },
+          {
+            "label_es": "Banquito Las Peñas"
+          },
+          {
+            "label_es": "Banquito La Dolorosa"
+          }
+        ]
+      }
+    },
+    "command_palette": {
+      "enabled_at_release": "R2",
+      "invocation_keys": [
+        "Cmd+K",
+        "Ctrl+K"
+      ]
+    },
+    "mobile_bottom_bar": {
+      "items": [
+        {
+          "id": "nav-home",
+          "label": "Inicio",
+          "label_en": "Home",
+          "icon": "Home",
+          "route": "/",
+          "screen": "SCR-treasurer-home",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "1"
+        },
+        {
+          "id": "nav-members",
+          "label": "Socias",
+          "label_en": "Members",
+          "icon": "Users",
+          "route": "/socias",
+          "screen": "SCR-members-list",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "2"
+        },
+        {
+          "id": "nav-contributions",
+          "label": "Aportes",
+          "label_en": "Contributions",
+          "icon": "Wallet",
+          "route": "/aportes",
+          "screen": "SCR-contributions-cycle",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "3"
+        },
+        {
+          "id": "nav-loans",
+          "label": "Préstamos",
+          "label_en": "Loans",
+          "icon": "HandCoins",
+          "route": "/prestamos",
+          "screen": "SCR-loans-list",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "4"
+        },
+        {
+          "id": "nav-history",
+          "label": "Historial",
+          "label_en": "History",
+          "icon": "History",
+          "route": "/historial",
+          "screen": "SCR-history",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "5"
+        }
+      ]
+    },
+    "sidebar": {
+      "id_css_hook": "mi-banquito-sidebar",
+      "section_dividers": [
+        {
+          "after_item_id": "nav-history",
+          "label_es": "Cierre del mes",
+          "label_en": "Monthly close"
+        },
+        {
+          "after_item_id": "nav-share-out",
+          "label_es": "Configuración",
+          "label_en": "Settings"
+        }
+      ],
+      "items": [
+        {
+          "id": "nav-home",
+          "label": "Inicio",
+          "label_en": "Home",
+          "labelKey": "nav.home",
+          "icon": "Home",
+          "route": "/",
+          "screen": "SCR-treasurer-home",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "nav-members",
+          "label": "Socias",
+          "label_en": "Members",
+          "labelKey": "nav.members",
+          "icon": "Users",
+          "route": "/socias",
+          "screen": "SCR-members-list",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "nav-contributions",
+          "label": "Aportes",
+          "label_en": "Contributions",
+          "labelKey": "nav.contributions",
+          "icon": "Wallet",
+          "route": "/aportes",
+          "screen": "SCR-contributions-cycle",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "nav-base-fund-quota",
+          "label": "Cuota base",
+          "label_en": "Base fund quota",
+          "labelKey": "nav.base_fund_quota",
+          "icon": "Banknote",
+          "route": "/cuota-base/registrar",
+          "screen": "SCR-record-base-fund-quota",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "nav-loans",
+          "label": "Préstamos",
+          "label_en": "Loans",
+          "labelKey": "nav.loans",
+          "icon": "HandCoins",
+          "route": "/prestamos",
+          "screen": "SCR-loans-list",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "nav-arrears",
+          "label": "Atrasos",
+          "label_en": "Overdue",
+          "labelKey": "nav.arrears",
+          "icon": "AlertCircle",
+          "route": "/atrasos",
+          "screen": "SCR-ar-aging",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "top",
+          "badge": {
+            "source": "alerts_count_severity_high"
+          }
+        },
+        {
+          "id": "nav-history",
+          "label": "Historial",
+          "label_en": "History",
+          "labelKey": "nav.history",
+          "icon": "History",
+          "route": "/historial",
+          "screen": "SCR-history",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "nav-close",
+          "label": "Cierre del mes",
+          "label_en": "Monthly close",
+          "labelKey": "nav.monthly_close",
+          "icon": "CheckCircle2",
+          "route": "/cierre",
+          "screen": "SCR-monthly-close",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "middle"
+        },
+        {
+          "id": "nav-statements",
+          "label": "Estados de cuenta",
+          "label_en": "Statements",
+          "labelKey": "nav.statements",
+          "icon": "FileText",
+          "route": "/estados",
+          "screen": "SCR-statements-archive",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "middle"
+        },
+        {
+          "id": "nav-liquidity",
+          "label": "Liquidez proyectada",
+          "label_en": "Projected liquidity",
+          "labelKey": "nav.liquidity",
+          "icon": "LineChart",
+          "route": "/liquidez",
+          "screen": "SCR-cash-flow-projection",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "middle"
+        },
+        {
+          "id": "nav-share-out",
+          "label": "Reparto fin de año",
+          "label_en": "Year-end share-out",
+          "labelKey": "nav.year_end",
+          "icon": "PiggyBank",
+          "route": "/reparto",
+          "screen": "SCR-year-end-share-out",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "middle"
+        },
+        {
+          "id": "nav-group",
+          "label": "Mi grupo",
+          "label_en": "My group",
+          "labelKey": "nav.group_settings",
+          "icon": "Settings",
+          "route": "/grupo",
+          "screen": "SCR-group-config",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "bottom"
+        },
+        {
+          "id": "admin-home",
+          "label": "Inicio",
+          "label_en": "Home",
+          "labelKey": "admin.home",
+          "icon": "Home",
+          "route": "/admin",
+          "screen": "SCR-admin-home",
+          "roles": [
+            "platform_operator"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "admin-orgs-new",
+          "label": "Nueva organización",
+          "label_en": "New organization",
+          "labelKey": "admin.orgsNew",
+          "icon": "PlusCircle",
+          "route": "/admin/orgs/new",
+          "screen": "SCR-admin-orgs-new",
+          "roles": [
+            "platform_operator"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "admin-cron-runs",
+          "label": "Estado de crons",
+          "label_en": "Cron status",
+          "labelKey": "admin.cronRuns",
+          "icon": "Activity",
+          "route": "/admin/cron-runs",
+          "screen": "SCR-admin-cron-runs",
+          "roles": [
+            "platform_operator"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "admin-audit",
+          "label": "Bitácora",
+          "label_en": "Audit log",
+          "labelKey": "admin.audit",
+          "icon": "ScrollText",
+          "route": "/admin/audit",
+          "screen": "SCR-admin-audit",
+          "roles": [
+            "platform_operator"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "admin-drift",
+          "label": "Estado del substrato",
+          "label_en": "Substrate status",
+          "labelKey": "admin.drift",
+          "icon": "ShieldAlert",
+          "route": "/admin/drift",
+          "screen": "SCR-admin-drift",
+          "roles": [
+            "platform_operator"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "nav-accounts",
+          "label": "Cuentas del grupo",
+          "label_en": "Group accounts",
+          "labelKey": "nav.accounts",
+          "icon": "Banknote",
+          "route": "/cuentas",
+          "screen": "SCR-accounts",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "nav-solidarity",
+          "label": "Colecta solidaria",
+          "label_en": "Solidarity collection",
+          "labelKey": "nav.solidarity",
+          "icon": "HandCoins",
+          "route": "/colectas",
+          "screen": "SCR-solidarity-collection",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "nav-balance",
+          "label": "Balance del banquito",
+          "label_en": "Balance sheet",
+          "labelKey": "nav.balance",
+          "icon": "Scale",
+          "route": "/balance",
+          "screen": "SCR-balance-banquito",
+          "roles": [
+            "tesorera"
+          ],
+          "position": "middle"
+        }
+      ]
+    }
+  },
+  "admin_app_shell": {
+    "header": {
+      "wordmark": "Mi Banquito · /admin",
+      "show_drift_badge": true,
+      "show_env_badge": true
+    },
+    "sidebar": {
+      "id_css_hook": "mi-banquito-admin-sidebar",
+      "items": [
+        {
+          "id": "admin-home",
+          "label": "Inicio",
+          "label_en": "Home",
+          "labelKey": "admin.nav.home",
+          "icon": "Home",
+          "route": "/admin",
+          "screen": "SCR-admin-home",
+          "roles": [
+            "platform_operator"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "admin-orgs-new",
+          "label": "Nueva organización",
+          "label_en": "New org",
+          "labelKey": "admin.nav.new_org",
+          "icon": "Plus",
+          "route": "/admin/orgs/nueva",
+          "screen": "SCR-admin-orgs-new",
+          "roles": [
+            "platform_operator"
+          ],
+          "position": "top"
+        },
+        {
+          "id": "admin-cron-runs",
+          "label": "Estado de crons",
+          "label_en": "Cron runs",
+          "labelKey": "admin.nav.cron_runs",
+          "icon": "RefreshCw",
+          "route": "/admin/cron-runs",
+          "screen": "SCR-admin-cron-runs",
+          "roles": [
+            "platform_operator"
+          ],
+          "position": "middle"
+        },
+        {
+          "id": "admin-audit",
+          "label": "Bitácora",
+          "label_en": "Audit log",
+          "labelKey": "admin.nav.audit",
+          "icon": "History",
+          "route": "/admin/audit",
+          "screen": "SCR-admin-audit",
+          "roles": [
+            "platform_operator"
+          ],
+          "position": "middle"
+        },
+        {
+          "id": "admin-drift",
+          "label": "Estado del substrato",
+          "label_en": "Substrate drift",
+          "labelKey": "admin.nav.drift",
+          "icon": "AlertTriangle",
+          "route": "/admin/drift",
+          "screen": "SCR-admin-drift",
+          "roles": [
+            "platform_operator"
+          ],
+          "position": "bottom"
+        }
+      ]
+    }
+  },
+  "routes": [
+    {
+      "route": "/",
+      "screen_id": "SCR-treasurer-home",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/bienvenida",
+      "screen_id": "SCR-first-run-wizard",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/socias",
+      "screen_id": "SCR-members-list",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/socias/nueva",
+      "screen_id": "SCR-add-member",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/socias/[id]",
+      "screen_id": "SCR-member-detail",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true,
+      "dynamic_params": [
+        "id"
+      ]
+    },
+    {
+      "route": "/aportes",
+      "screen_id": "SCR-contributions-cycle",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/aportes/registrar",
+      "screen_id": "SCR-record-contribution",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/cuota-base/registrar",
+      "screen_id": "SCR-record-base-fund-quota",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/prestamos",
+      "screen_id": "SCR-loans-list",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/prestamos/nuevo",
+      "screen_id": "SCR-originate-loan",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/prestamos/[id]",
+      "screen_id": "SCR-loan-detail",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true,
+      "dynamic_params": [
+        "id"
+      ]
+    },
+    {
+      "route": "/prestamos/[id]/pago",
+      "screen_id": "SCR-record-repayment",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true,
+      "dynamic_params": [
+        "id"
+      ]
+    },
+    {
+      "route": "/atrasos",
+      "screen_id": "SCR-ar-aging",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/cierre",
+      "screen_id": "SCR-monthly-close",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/liquidez",
+      "screen_id": "SCR-cash-flow-projection",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/estados",
+      "screen_id": "SCR-statements-archive",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/reparto",
+      "screen_id": "SCR-year-end-share-out",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/historial",
+      "screen_id": "SCR-history",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/grupo",
+      "screen_id": "SCR-group-config",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/admin",
+      "screen_id": "SCR-admin-home",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/admin/orgs/nueva",
+      "screen_id": "SCR-admin-orgs-new",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/admin/orgs/[id]",
+      "screen_id": "SCR-admin-org-detail",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true,
+      "dynamic_params": [
+        "id"
+      ]
+    },
+    {
+      "route": "/admin/orgs/[id]/config",
+      "screen_id": "SCR-admin-org-config",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true,
+      "dynamic_params": [
+        "id"
+      ]
+    },
+    {
+      "route": "/admin/orgs/[id]/business-rules",
+      "screen_id": "SCR-admin-business-rules",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true,
+      "dynamic_params": [
+        "id"
+      ]
+    },
+    {
+      "route": "/admin/orgs/[id]/impersonate",
+      "screen_id": "SCR-admin-impersonation",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true,
+      "dynamic_params": [
+        "id"
+      ]
+    },
+    {
+      "route": "/admin/orgs/[id]/export",
+      "screen_id": "SCR-admin-export",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true,
+      "dynamic_params": [
+        "id"
+      ]
+    },
+    {
+      "route": "/admin/orgs/[id]/pilot-log",
+      "screen_id": "SCR-admin-pilot-log",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true,
+      "dynamic_params": [
+        "id"
+      ]
+    },
+    {
+      "route": "/admin/audit",
+      "screen_id": "SCR-admin-audit",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/admin/drift",
+      "screen_id": "SCR-admin-drift",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/admin/cron-runs",
+      "screen_id": "SCR-admin-cron-runs",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/verify/[hash]",
+      "screen_id": "SCR-public-verify-pdf",
+      "roles": [
+        "public"
+      ],
+      "release": "R1",
+      "auth_required": false,
+      "dynamic_params": [
+        "hash"
+      ]
+    },
+    {
+      "route": "/cuentas",
+      "screen_id": "SCR-accounts",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/movimientos/registrar",
+      "screen_id": "SCR-record-movement",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/colectas",
+      "screen_id": "SCR-solidarity-collection",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/balance",
+      "screen_id": "SCR-balance-banquito",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/grupos",
+      "screen_id": "SCR-group-picker",
+      "roles": [
+        "tesorera"
+      ],
+      "release": "R1",
+      "auth_required": true
+    }
+  ],
+  "dynamic_route_params": {
+    "id": {
+      "entity": "polymorphic_member_or_loan_or_org",
+      "column": "id",
+      "description": "Primary key (UUID v7 for ledger entities, UUID v4 elsewhere)",
+      "fk_to_table_resolved_at_runtime_per_route": true
+    },
+    "hash": {
+      "entity": "StatementArchive",
+      "column": "canonical_payload_hash",
+      "description": "SHA-256 over canonical JSON of the statement payload — public route US-085",
+      "semantic_name": "integrity_hash"
+    }
+  },
+  "navigation_graph": {
+    "nodes": [
+      {
+        "id": "SCR-treasurer-home",
+        "label": "Inicio"
+      },
+      {
+        "id": "SCR-first-run-wizard",
+        "label": "Bienvenida"
+      },
+      {
+        "id": "SCR-members-list",
+        "label": "Socias"
+      },
+      {
+        "id": "SCR-add-member",
+        "label": "Agregar socia"
+      },
+      {
+        "id": "SCR-member-detail",
+        "label": "Detalle de socia"
+      },
+      {
+        "id": "SCR-contributions-cycle",
+        "label": "Aportes"
+      },
+      {
+        "id": "SCR-record-contribution",
+        "label": "Registrar aporte"
+      },
+      {
+        "id": "SCR-record-base-fund-quota",
+        "label": "Registrar cuota base"
+      },
+      {
+        "id": "SCR-loans-list",
+        "label": "Préstamos"
+      },
+      {
+        "id": "SCR-originate-loan",
+        "label": "Nuevo préstamo"
+      },
+      {
+        "id": "SCR-loan-detail",
+        "label": "Detalle del préstamo"
+      },
+      {
+        "id": "SCR-record-repayment",
+        "label": "Registrar pago"
+      },
+      {
+        "id": "SCR-ar-aging",
+        "label": "Atrasos"
+      },
+      {
+        "id": "SCR-monthly-close",
+        "label": "Cierre del mes"
+      },
+      {
+        "id": "SCR-cash-flow-projection",
+        "label": "Liquidez proyectada"
+      },
+      {
+        "id": "SCR-statements-archive",
+        "label": "Estados de cuenta"
+      },
+      {
+        "id": "SCR-year-end-share-out",
+        "label": "Reparto fin de año"
+      },
+      {
+        "id": "SCR-history",
+        "label": "Historial"
+      },
+      {
+        "id": "SCR-group-config",
+        "label": "Mi grupo"
+      },
+      {
+        "id": "SCR-admin-home",
+        "label": "Admin Inicio"
+      },
+      {
+        "id": "SCR-admin-orgs-new",
+        "label": "Nueva organización"
+      },
+      {
+        "id": "SCR-admin-org-detail",
+        "label": "Detalle de org"
+      },
+      {
+        "id": "SCR-admin-org-config",
+        "label": "Configuración de reglas"
+      },
+      {
+        "id": "SCR-admin-business-rules",
+        "label": "Reglas del grupo"
+      },
+      {
+        "id": "SCR-admin-impersonation",
+        "label": "Ver como tesorera"
+      },
+      {
+        "id": "SCR-admin-export",
+        "label": "Exportar datos"
+      },
+      {
+        "id": "SCR-admin-audit",
+        "label": "Bitácora"
+      },
+      {
+        "id": "SCR-admin-drift",
+        "label": "Estado del substrato"
+      },
+      {
+        "id": "SCR-admin-cron-runs",
+        "label": "Estado de crons"
+      },
+      {
+        "id": "SCR-admin-pilot-log",
+        "label": "Bitácora del piloto"
+      },
+      {
+        "id": "SCR-public-verify-pdf",
+        "label": "Verificar documento"
+      },
+      {
+        "id": "SCR-accounts",
+        "label": "Cuentas del grupo"
+      },
+      {
+        "id": "SCR-record-movement",
+        "label": "Registrar movimiento"
+      },
+      {
+        "id": "SCR-solidarity-collection",
+        "label": "Colecta solidaria"
+      },
+      {
+        "id": "SCR-balance-banquito",
+        "label": "Balance del banquito"
+      },
+      {
+        "id": "SCR-group-picker",
+        "label": "Mis grupos"
+      }
+    ],
+    "edges": [
+      {
+        "from": "SCR-treasurer-home",
+        "to": "SCR-record-contribution",
+        "label": "Registrar aporte",
+        "kind": "primary_action"
+      },
+      {
+        "from": "SCR-treasurer-home",
+        "to": "SCR-loans-list",
+        "label": "Registrar pago de préstamo",
+        "kind": "primary_action"
+      },
+      {
+        "from": "SCR-treasurer-home",
+        "to": "SCR-ar-aging",
+        "label": "Ver atrasos",
+        "kind": "primary_action"
+      },
+      {
+        "from": "SCR-treasurer-home",
+        "to": "SCR-member-detail",
+        "label": "¿Cuánto tiene...?",
+        "kind": "search_result"
+      },
+      {
+        "from": "SCR-treasurer-home",
+        "to": "SCR-cash-flow-projection",
+        "label": "Liquidez",
+        "kind": "tile_navigate"
+      },
+      {
+        "from": "SCR-members-list",
+        "to": "SCR-member-detail",
+        "label": "Tap socia",
+        "kind": "row_click"
+      },
+      {
+        "from": "SCR-members-list",
+        "to": "SCR-add-member",
+        "label": "Agregar socia",
+        "kind": "fab"
+      },
+      {
+        "from": "SCR-add-member",
+        "to": "SCR-member-detail",
+        "label": "Guardar",
+        "kind": "form_submit_navigate"
+      },
+      {
+        "from": "SCR-add-member",
+        "to": "SCR-members-list",
+        "label": "Cancelar",
+        "kind": "cancel"
+      },
+      {
+        "from": "SCR-member-detail",
+        "to": "SCR-history",
+        "label": "Ver historial",
+        "kind": "tab_or_link"
+      },
+      {
+        "from": "SCR-contributions-cycle",
+        "to": "SCR-record-contribution",
+        "label": "Registrar aporte",
+        "kind": "fab"
+      },
+      {
+        "from": "SCR-contributions-cycle",
+        "to": "SCR-member-detail",
+        "label": "Tap socia",
+        "kind": "row_click"
+      },
+      {
+        "from": "SCR-record-contribution",
+        "to": "SCR-contributions-cycle",
+        "label": "Cancelar",
+        "kind": "cancel"
+      },
+      {
+        "from": "SCR-record-contribution",
+        "to": "SCR-treasurer-home",
+        "label": "Guardar (vuelve a inicio)",
+        "kind": "form_submit_navigate"
+      },
+      {
+        "from": "SCR-record-base-fund-quota",
+        "to": "SCR-treasurer-home",
+        "label": "Guardar cuota",
+        "kind": "form_submit_navigate"
+      },
+      {
+        "from": "SCR-loans-list",
+        "to": "SCR-originate-loan",
+        "label": "Nuevo préstamo",
+        "kind": "fab"
+      },
+      {
+        "from": "SCR-loans-list",
+        "to": "SCR-loan-detail",
+        "label": "Tap préstamo",
+        "kind": "row_click"
+      },
+      {
+        "from": "SCR-originate-loan",
+        "to": "SCR-loan-detail",
+        "label": "Crear préstamo",
+        "kind": "form_submit_navigate"
+      },
+      {
+        "from": "SCR-loan-detail",
+        "to": "SCR-record-repayment",
+        "label": "Registrar pago",
+        "kind": "primary_action"
+      },
+      {
+        "from": "SCR-record-repayment",
+        "to": "SCR-loan-detail",
+        "label": "Guardar pago",
+        "kind": "form_submit_navigate"
+      },
+      {
+        "from": "SCR-ar-aging",
+        "to": "SCR-member-detail",
+        "label": "Tap socia atrasada",
+        "kind": "row_click"
+      },
+      {
+        "from": "SCR-monthly-close",
+        "to": "SCR-statements-archive",
+        "label": "Cerrar (genera PDFs)",
+        "kind": "form_submit_navigate"
+      },
+      {
+        "from": "SCR-cash-flow-projection",
+        "to": "SCR-originate-loan",
+        "label": "Considerar préstamo (sandbox → real)",
+        "kind": "tile_navigate"
+      },
+      {
+        "from": "SCR-statements-archive",
+        "to": "SCR-member-detail",
+        "label": "Ver socia del estado",
+        "kind": "row_click"
+      },
+      {
+        "from": "SCR-year-end-share-out",
+        "to": "SCR-statements-archive",
+        "label": "Aprobar (genera PDFs)",
+        "kind": "form_submit_navigate"
+      },
+      {
+        "from": "SCR-history",
+        "to": "SCR-member-detail",
+        "label": "Tap entrada relativa a socia",
+        "kind": "row_click"
+      },
+      {
+        "from": "SCR-history",
+        "to": "SCR-loan-detail",
+        "label": "Tap entrada relativa a préstamo",
+        "kind": "row_click"
+      },
+      {
+        "from": "SCR-group-config",
+        "to": "SCR-history",
+        "label": "Ver cambios de configuración",
+        "kind": "tab_or_link"
+      },
+      {
+        "from": "SCR-first-run-wizard",
+        "to": "SCR-add-member",
+        "label": "Vamos a registrar las socias",
+        "kind": "form_submit_navigate"
+      },
+      {
+        "from": "SCR-admin-home",
+        "to": "SCR-admin-orgs-new",
+        "label": "Nueva organización",
+        "kind": "primary_action"
+      },
+      {
+        "from": "SCR-admin-home",
+        "to": "SCR-admin-org-detail",
+        "label": "Tap org",
+        "kind": "row_click"
+      },
+      {
+        "from": "SCR-admin-home",
+        "to": "SCR-admin-drift",
+        "label": "Drift badge",
+        "kind": "tile_navigate"
+      },
+      {
+        "from": "SCR-admin-orgs-new",
+        "to": "SCR-admin-org-detail",
+        "label": "Crear organización",
+        "kind": "form_submit_navigate"
+      },
+      {
+        "from": "SCR-admin-org-detail",
+        "to": "SCR-admin-org-config",
+        "label": "Configurar reglas",
+        "kind": "tile_navigate"
+      },
+      {
+        "from": "SCR-admin-org-detail",
+        "to": "SCR-admin-business-rules",
+        "label": "Ver reglas activas (read-only)",
+        "kind": "tile_navigate"
+      },
+      {
+        "from": "SCR-admin-org-detail",
+        "to": "SCR-admin-impersonation",
+        "label": "Ver como tesorera",
+        "kind": "tile_navigate"
+      },
+      {
+        "from": "SCR-admin-org-detail",
+        "to": "SCR-admin-export",
+        "label": "Exportar datos",
+        "kind": "tile_navigate"
+      },
+      {
+        "from": "SCR-admin-org-detail",
+        "to": "SCR-admin-pilot-log",
+        "label": "Bitácora del piloto",
+        "kind": "tile_navigate"
+      },
+      {
+        "from": "SCR-admin-impersonation",
+        "to": "SCR-treasurer-home",
+        "label": "Comenzar (impersonated)",
+        "kind": "form_submit_navigate"
+      },
+      {
+        "from": "SCR-admin-drift",
+        "to": "SCR-admin-cron-runs",
+        "label": "Ver historial de crons",
+        "kind": "tile_navigate"
+      },
+      {
+        "from": "SCR-treasurer-home",
+        "to": "SCR-record-movement",
+        "label": "Registrar movimiento",
+        "kind": "primary_action"
+      },
+      {
+        "from": "SCR-treasurer-home",
+        "to": "SCR-accounts",
+        "label": "Cuentas del grupo",
+        "kind": "link"
+      },
+      {
+        "from": "SCR-treasurer-home",
+        "to": "SCR-solidarity-collection",
+        "label": "Colecta solidaria",
+        "kind": "link"
+      },
+      {
+        "from": "SCR-monthly-close",
+        "to": "SCR-record-movement",
+        "label": "Regularizar",
+        "kind": "link"
+      },
+      {
+        "from": "SCR-record-movement",
+        "to": "SCR-history",
+        "label": "Guardar movimiento",
+        "kind": "primary_action"
+      },
+      {
+        "from": "SCR-statements-archive",
+        "to": "SCR-balance-banquito",
+        "label": "Ver balance del año",
+        "kind": "link"
+      },
+      {
+        "from": "SCR-treasurer-home",
+        "to": "SCR-group-picker",
+        "label": "Cambiar grupo",
+        "kind": "link"
+      }
+    ]
+  },
+  "role_based_views": {
+    "tesorera": {
+      "sidebar": [
+        "nav-home",
+        "nav-members",
+        "nav-contributions",
+        "nav-base-fund-quota",
+        "nav-loans",
+        "nav-arrears",
+        "nav-history",
+        "nav-close",
+        "nav-statements",
+        "nav-liquidity",
+        "nav-share-out",
+        "nav-group",
+        "nav-accounts",
+        "nav-solidarity",
+        "nav-balance"
+      ],
+      "screens": [
+        "SCR-treasurer-home",
+        "SCR-first-run-wizard",
+        "SCR-members-list",
+        "SCR-add-member",
+        "SCR-member-detail",
+        "SCR-contributions-cycle",
+        "SCR-record-contribution",
+        "SCR-record-base-fund-quota",
+        "SCR-loans-list",
+        "SCR-originate-loan",
+        "SCR-loan-detail",
+        "SCR-record-repayment",
+        "SCR-ar-aging",
+        "SCR-monthly-close",
+        "SCR-cash-flow-projection",
+        "SCR-statements-archive",
+        "SCR-year-end-share-out",
+        "SCR-history",
+        "SCR-group-config",
+        "SCR-accounts",
+        "SCR-record-movement",
+        "SCR-solidarity-collection",
+        "SCR-balance-banquito",
+        "SCR-group-picker"
+      ]
+    },
+    "platform_operator": {
+      "sidebar": [
+        "admin-home",
+        "admin-orgs-new",
+        "admin-cron-runs",
+        "admin-audit",
+        "admin-drift"
+      ],
+      "screens": [
+        "SCR-admin-home",
+        "SCR-admin-orgs-new",
+        "SCR-admin-org-detail",
+        "SCR-admin-org-config",
+        "SCR-admin-business-rules",
+        "SCR-admin-impersonation",
+        "SCR-admin-export",
+        "SCR-admin-audit",
+        "SCR-admin-drift",
+        "SCR-admin-cron-runs",
+        "SCR-admin-pilot-log"
+      ]
+    },
+    "public": {
+      "sidebar": [],
+      "screens": [
+        "SCR-public-verify-pdf"
+      ]
+    },
+    "presidente": {
+      "sidebar": [],
+      "screens": [],
+      "note": "No app login R1. Consumes monthly close PDF via WhatsApp from treasurer + may use /verify/[hash] for integrity check."
+    },
+    "miembro": {
+      "sidebar": [],
+      "screens": [],
+      "note": "No app login R1. Receives per-member PDF statement via WhatsApp from treasurer + may use /verify/[hash] for integrity check."
+    }
+  },
+  "user_flows": {
+    "F-T1_treasurer_records_aporte": [
+      "SCR-treasurer-home",
+      "SCR-record-contribution",
+      "SCR-treasurer-home"
+    ],
+    "F-T2_treasurer_originates_loan_member": [
+      "SCR-loans-list",
+      "SCR-originate-loan",
+      "SCR-loan-detail"
+    ],
+    "F-T3_treasurer_originates_loan_non_member": [
+      "SCR-loans-list",
+      "SCR-originate-loan_non_member_branch",
+      "SCR-loan-detail"
+    ],
+    "F-T4_treasurer_records_repayment": [
+      "SCR-loan-detail",
+      "SCR-record-repayment",
+      "SCR-loan-detail"
+    ],
+    "F-T5_treasurer_chases_arrears": [
+      "SCR-treasurer-home",
+      "SCR-ar-aging",
+      "share_intent_whatsapp"
+    ],
+    "F-T6_monthly_close": [
+      "SCR-monthly-close",
+      "SCR-statements-archive"
+    ],
+    "F-T7_year_end_share_out": [
+      "SCR-year-end-share-out",
+      "SCR-statements-archive"
+    ],
+    "F-T8_records_base_fund_quota": [
+      "SCR-treasurer-home",
+      "SCR-record-base-fund-quota"
+    ],
+    "F-O1_operator_creates_org": [
+      "SCR-admin-home",
+      "SCR-admin-orgs-new",
+      "SCR-admin-org-detail"
+    ],
+    "F-O2_operator_configures_rules": [
+      "SCR-admin-org-detail",
+      "SCR-admin-org-config"
+    ],
+    "F-O3_operator_invites_treasurer": [
+      "SCR-admin-org-detail"
+    ],
+    "F-O4_operator_impersonates": [
+      "SCR-admin-org-detail",
+      "SCR-admin-impersonation",
+      "SCR-treasurer-home"
+    ],
+    "F-O5_operator_exports_data": [
+      "SCR-admin-org-detail",
+      "SCR-admin-export"
+    ],
+    "F-O6_operator_files_imp_from_drift": [
+      "SCR-admin-drift",
+      "modal:imp_template"
+    ],
+    "F-O7_operator_replays_cron": [
+      "SCR-admin-cron-runs"
+    ],
+    "F-O8_operator_logs_pilot_observation": [
+      "SCR-admin-org-detail",
+      "SCR-admin-pilot-log"
+    ],
+    "F-P1_public_verifies_pdf": [
+      "SCR-public-verify-pdf"
+    ]
+  },
+  "breadcrumbs_pattern_per_dynamic_param_route": {
+    "/socias/[id]": [
+      "Inicio",
+      "Socias",
+      "{member.display_name}"
+    ],
+    "/prestamos/[id]": [
+      "Inicio",
+      "Préstamos",
+      "Préstamo de {borrower}"
+    ],
+    "/prestamos/[id]/pago": [
+      "Inicio",
+      "Préstamos",
+      "Préstamo de {borrower}",
+      "Registrar pago"
+    ],
+    "/admin/orgs/[id]": [
+      "Admin",
+      "Organizaciones",
+      "{organization.display_name}"
+    ],
+    "/admin/orgs/[id]/config": [
+      "Admin",
+      "Organizaciones",
+      "{organization.display_name}",
+      "Configuración de reglas"
+    ],
+    "/admin/orgs/[id]/business-rules": [
+      "Admin",
+      "Organizaciones",
+      "{organization.display_name}",
+      "Reglas del grupo"
+    ],
+    "/admin/orgs/[id]/impersonate": [
+      "Admin",
+      "Organizaciones",
+      "{organization.display_name}",
+      "Ver como tesorera"
+    ],
+    "/admin/orgs/[id]/export": [
+      "Admin",
+      "Organizaciones",
+      "{organization.display_name}",
+      "Exportar datos"
+    ],
+    "/admin/orgs/[id]/pilot-log": [
+      "Admin",
+      "Organizaciones",
+      "{organization.display_name}",
+      "Bitácora del piloto"
+    ],
+    "/verify/[hash]": [
+      "Verificar documento"
+    ]
+  },
+  "screen_count": 36,
+  "route_count": 36,
+  "edge_count": 47,
+  "user_flow_count": 16,
+  "validation_status": {
+    "every_screen_in_navigation_graph_nodes": true,
+    "every_route_matches_screen_catalog": true,
+    "every_role_in_routes_consistent_with_role_based_views": true,
+    "no_invented_routes": true,
+    "no_orphan_routes": true,
+    "sidebar_items_traceable_to_screens": true,
+    "hr_30_compliant_sidebar_keys_per_item": true,
+    "hr_31_dynamic_route_params_documented": true
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "description": "Annual base-fund quota recording per BR-08 + US-032.",
+  "id": "SCR-record-base-fund-quota",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "content": "La cuota base es independiente de los aportes mensuales y no recibe interés a fin de año.",
+        "id": "info",
+        "type": "info-banner"
+      },
+      {
+        "fields": [
+          {
+            "id": "member_id",
+            "label": "Socia",
+            "type": "autocomplete:Member:pending_quota_this_fiscal_year"
+          },
+          {
+            "default": ":auto:base_fund_quota_config",
+            "id": "amount",
+            "label": "Monto (USD)",
+            "type": "currency"
+          },
+          {
+            "default": "today",
+            "id": "paid_on",
+            "label": "Fecha",
+            "type": "date"
+          },
+          {
+            "id": "slip_photo",
+            "label": "Foto de comprobante (opcional)",
+            "type": "file"
+          }
+        ],
+        "id": "form",
+        "submit": {
+          "action": "server_action:collectBaseFundQuota",
+          "id": "btn_save",
+          "label": "Guardar cuota"
+        },
+        "type": "form"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-032"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/cuota-base/registrar",
+  "title": "Registrar cuota base"
+}

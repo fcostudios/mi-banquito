@@ -1,0 +1,115 @@
+{
+  "description": "Repayment with automatic split (interest-first per OQ-BR-06) + overpayment/underpayment/multi-cuota per F47.",
+  "id": "SCR-record-repayment",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "id": "loan_header",
+        "type": "info-banner",
+        "kind": "warning",
+        "icon": "hand-coins",
+        "title": "Préstamo de Manuela Quishpe",
+        "content": "Saldo pendiente $420.00 · Cuota mensual $42.00 · Estado: en mora (1 cuota vencida). Estás registrando un pago para este préstamo."
+      },
+      {
+        "fields": [
+          {
+            "id": "amount",
+            "label": "Monto recibido (USD)",
+            "required": true,
+            "type": "currency"
+          },
+          {
+            "default": "today",
+            "id": "dated_on",
+            "label": "Fecha",
+            "type": "date"
+          },
+          {
+            "id": "slip_photo",
+            "label": "Foto de comprobante (opcional)",
+            "type": "file"
+          }
+        ],
+        "id": "form",
+        "type": "form"
+      },
+      {
+        "content": "Pago normal: $40.00 a capital + $2.00 a interés. Con esto la cuota de este mes queda cubierta.",
+        "id": "split_preview",
+        "type": "info-banner",
+        "kind": "info",
+        "title": "Cómo se aplica el pago"
+      },
+      {
+        "id": "edge_cases",
+        "tabs": [
+          {
+            "id": "pago_normal",
+            "label": "Pago normal",
+            "sections": [
+              {
+                "id": "pago_normal_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "El pago cubre la cuota del mes (capital + interés). Es el caso más común."
+              }
+            ]
+          },
+          {
+            "id": "sobre_pago_excedente",
+            "label": "Sobre-pago (excedente)",
+            "sections": [
+              {
+                "id": "sobre_pago_excedente_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "El monto supera la cuota; el excedente se abona a capital o queda como saldo a favor de la socia."
+              }
+            ]
+          },
+          {
+            "id": "pago_parcial",
+            "label": "Pago parcial",
+            "sections": [
+              {
+                "id": "pago_parcial_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "El monto no cubre la cuota completa; se registra lo recibido y el resto queda pendiente."
+              }
+            ]
+          },
+          {
+            "id": "varias_cuotas",
+            "label": "Varias cuotas",
+            "sections": [
+              {
+                "id": "varias_cuotas_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "Un solo pago cubre dos o más cuotas; se aplican en orden de vencimiento."
+              }
+            ]
+          }
+        ],
+        "type": "tabs"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-036"
+    ],
+    "preselect_query": "first_arrears"
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/prestamos/[id]/pago",
+  "title": "Registrar pago"
+}

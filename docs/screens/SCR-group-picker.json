@@ -1,0 +1,73 @@
+{
+  "description": "Group picker — a treasurer who manages multiple banquitos chooses the active group (CHG-008 / US-124). Shown at login when >1 group; auto-selected/skipped when exactly 1. Selecting sets the active org, re-validated server-side per BR-25.",
+  "i18n": {
+    "es-EC": {
+      "title": "Mis grupos",
+      "subtitle": "Elige el banquito que quieres administrar"
+    }
+  },
+  "id": "SCR-group-picker",
+  "layout": {
+    "kind": "page",
+    "sections": [
+      {
+        "id": "picker_intro",
+        "type": "info-banner",
+        "kind": "info",
+        "icon": "users",
+        "title": "¿Qué grupo vas a administrar?",
+        "body": "Manejas más de un banquito. Elige uno para entrar — todo lo que registres quedará dentro de ese grupo. Puedes cambiar de grupo en cualquier momento desde la barra superior."
+      },
+      {
+        "id": "groups_table",
+        "type": "data-table",
+        "title": "Tus banquitos",
+        "columns": [
+          {
+            "id": "grupo",
+            "label": "Grupo"
+          },
+          {
+            "id": "rol",
+            "label": "Tu rol"
+          },
+          {
+            "id": "ultima_actividad",
+            "label": "Última actividad"
+          }
+        ],
+        "row_on_click": "navigate:SCR-treasurer-home",
+        "rows": [
+          {
+            "grupo": "Banquito El Valle",
+            "rol": "Tesorera",
+            "ultima_actividad": "2026-05-28"
+          },
+          {
+            "grupo": "Banquito Las Peñas",
+            "rol": "Tesorera",
+            "ultima_actividad": "2026-05-26"
+          },
+          {
+            "grupo": "Banquito La Dolorosa",
+            "rol": "Tesorera",
+            "ultima_actividad": "2026-05-20"
+          }
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-124"
+    ]
+  },
+  "roles": [
+    "tesorera"
+  ],
+  "route": "/grupos",
+  "title": "Mis grupos"
+}

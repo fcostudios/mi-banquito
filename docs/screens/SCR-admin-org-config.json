@@ -1,0 +1,237 @@
+{
+  "description": "Operator configures all 11 BRs across 4 tabs per F34 split.",
+  "id": "SCR-admin-org-config",
+  "layout": {
+    "kind": "tabs-card",
+    "sections": [
+      {
+        "id": "tabs",
+        "tabs": [
+          {
+            "id": "ciclo_y_atrasos",
+            "label": "Ciclo y atrasos",
+            "sections": [
+              {
+                "id": "ciclo_y_atrasos_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "Reglas del ciclo mensual y umbrales de atraso (cuándo se marca en mora)."
+              }
+            ]
+          },
+          {
+            "id": "pr_stamos_br_01_06",
+            "label": "Préstamos (BR-01..06)",
+            "sections": [
+              {
+                "id": "pr_stamos_br_01_06_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "Tasas de interés, plazos máximos, cargos administrativos y políticas de préstamo."
+              }
+            ]
+          },
+          {
+            "id": "tesorera_y_fondo_base_br",
+            "label": "Tesorera y fondo base (BR-07/08)",
+            "sections": [
+              {
+                "id": "tesorera_y_fondo_base_br_info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "Compensación de la tesorera y monto de la cuota del fondo base."
+              }
+            ]
+          },
+          {
+            "id": "a_o_fiscal_y_reparto_br_",
+            "label": "Año fiscal y reparto (BR-09/10/11)",
+            "sections": [
+              {
+                "id": "a_o_fiscal_y_reparto_br__info",
+                "type": "info-banner",
+                "kind": "info",
+                "content": "Cierre del año fiscal y fórmula de reparto proporcional al tiempo."
+              }
+            ]
+          }
+        ],
+        "type": "tabs"
+      },
+      {
+        "fields": [
+          {
+            "default": "monthly",
+            "id": "contribution_cycle_kind",
+            "label": "Cadencia",
+            "options": [
+              "monthly",
+              "weekly"
+            ],
+            "type": "select"
+          },
+          {
+            "id": "contribution_amount",
+            "label": "Aporte por miembro",
+            "type": "currency"
+          },
+          {
+            "default": 14,
+            "id": "late_threshold_days",
+            "label": "Días para 'atrasado'",
+            "type": "integer"
+          },
+          {
+            "default": 30,
+            "id": "mora_threshold_days",
+            "label": "Días para 'en mora'",
+            "type": "integer"
+          }
+        ],
+        "id": "tab_cycle",
+        "type": "form"
+      },
+      {
+        "fields": [
+          {
+            "default": "declining_balance",
+            "id": "loan_rate_model",
+            "label": "Modelo de interés",
+            "options": [
+              "declining_balance",
+              "flat_per_period"
+            ],
+            "type": "select"
+          },
+          {
+            "default": "monthly",
+            "id": "loan_rate_period_unit",
+            "label": "Periodicidad",
+            "options": [
+              "monthly",
+              "weekly"
+            ],
+            "type": "select"
+          },
+          {
+            "id": "loan_rate_value_member",
+            "label": "Tasa socias (%)",
+            "type": "decimal"
+          },
+          {
+            "id": "loan_rate_value_non_member",
+            "label": "Tasa no-socias (%)",
+            "type": "decimal"
+          },
+          {
+            "default": 0,
+            "id": "loan_grace_periods",
+            "label": "Periodos de gracia",
+            "type": "integer"
+          },
+          {
+            "default": "3.00",
+            "id": "loan_to_savings_cap_ratio",
+            "label": "Cap préstamo / ahorros",
+            "type": "decimal"
+          },
+          {
+            "default": "0.01",
+            "id": "admin_fee_pct",
+            "label": "Cargo administrativo (% sobre principal, cobrado en cuota 1)",
+            "type": "decimal"
+          },
+          {
+            "default": "5.00",
+            "id": "referral_commission_amount",
+            "label": "Comisión por referido (USD)",
+            "type": "currency"
+          }
+        ],
+        "id": "tab_loans",
+        "type": "form"
+      },
+      {
+        "fields": [
+          {
+            "default": "fixed_periodic",
+            "id": "treasurer_compensation.kind",
+            "label": "Compensación de tesorera — tipo",
+            "options": [
+              "fixed_periodic"
+            ],
+            "type": "select"
+          },
+          {
+            "id": "treasurer_compensation.amount",
+            "label": "Monto",
+            "type": "currency"
+          },
+          {
+            "id": "treasurer_compensation.period",
+            "label": "Periodo",
+            "options": [
+              "monthly",
+              "yearly"
+            ],
+            "type": "select"
+          },
+          {
+            "id": "base_fund_quota_amount",
+            "label": "Cuota base por miembro (año fiscal en curso)",
+            "type": "currency"
+          }
+        ],
+        "id": "tab_treasurer_base",
+        "type": "form"
+      },
+      {
+        "fields": [
+          {
+            "default": 1,
+            "id": "fiscal_year_start_month",
+            "label": "Mes de inicio del año fiscal",
+            "type": "integer"
+          },
+          {
+            "default": 1,
+            "id": "fiscal_year_start_day",
+            "label": "Día de inicio",
+            "type": "integer"
+          },
+          {
+            "id": "year_end_share_out_formula",
+            "label": "Fórmula de reparto",
+            "options": [
+              "proportional_to_savings",
+              "equal_per_member",
+              "hybrid"
+            ],
+            "type": "select"
+          },
+          {
+            "default": "1.00",
+            "id": "reconciliation_tolerance_amount",
+            "label": "Tolerancia de conciliación (USD)",
+            "type": "currency"
+          }
+        ],
+        "id": "tab_fiscal_share_out",
+        "type": "form"
+      }
+    ]
+  },
+  "meta": {
+    "change_id": "",
+    "owner": "fcostudios__mi-banquito",
+    "release": "R1",
+    "stories": [
+      "US-017"
+    ]
+  },
+  "roles": [
+    "platform_operator"
+  ],
+  "route": "/admin/orgs/[id]/config",
+  "title": "Configuración de reglas"
+}
