@@ -27,6 +27,19 @@ test("manifest is reachable and names the app", async ({ request }) => {
   expect(response.status()).toBe(200);
   const manifest = await response.json();
   expect(manifest.name).toContain("Mi Banquito");
+  expect(manifest.icons).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ src: "/icons/icon-192.png", sizes: "192x192" }),
+      expect.objectContaining({ src: "/icons/icon-512.png", sizes: "512x512" }),
+      expect.objectContaining({ src: "/icons/apple-touch-icon.png", sizes: "180x180" }),
+    ]),
+  );
+
+  for (const icon of manifest.icons) {
+    const iconResponse = await request.get(icon.src);
+    expect(iconResponse.status()).toBe(200);
+    expect(iconResponse.headers()["content-type"]).toContain("image/png");
+  }
 });
 
 test("service worker asset is generated", async ({ request }) => {

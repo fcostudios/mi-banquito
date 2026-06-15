@@ -1,10 +1,19 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthSessionProvider } from "@/lib/auth/session-provider";
+import { uiColors } from "@mi-banquito/ui";
 
 export const metadata: Metadata = {
   title: "Mi Banquito",
   description: "Mi Banquito",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: uiColors.primary,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

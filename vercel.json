@@ -4,5 +4,19 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm build",
   "devCommand": "pnpm --filter mi-banquito-web dev",
-  "outputDirectory": "apps/web/.next"
+  "outputDirectory": "apps/web/.next",
+  "crons": [
+    {
+      "path": "/api/cron/accrue-interest",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/award-treasurer-compensation",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/drift-check",
+      "schedule": "0 7 * * *"
+    }
+  ]
 }

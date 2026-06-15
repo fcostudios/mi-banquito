@@ -2,4 +2,4 @@ import { createCronHandler } from "@/lib/cron/handler";
 
 export const runtime = "nodejs";
 
-export const GET = createCronHandler("daily");
+export const GET = createCronHandler("award-treasurer-compensation");

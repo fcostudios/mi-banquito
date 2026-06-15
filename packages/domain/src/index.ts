@@ -7,3 +7,4 @@ export * from "./loan";
 export * from "./platform";
 export * from "./reconciliation";
 export * from "./reporting";
+export * from "./rules/loans/declining-balance";

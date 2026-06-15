@@ -4,22 +4,26 @@
 // migration carries RLS policies and triggers. This script applies that SQL and
 // then installs update timestamp triggers derived from the current migration.
 import { config } from "dotenv";
-import { readFile } from "node:fs/promises";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import pg from "pg";
 import {
   collectSchemaHealth,
   evaluateSchemaHealth,
+  EXPECTED_FORCED_RLS_TABLE_NAMES,
   EXPECTED_UPDATED_AT_TABLES,
+  readMigrationSql,
 } from "./verify-schema.mjs";
 
-config({ path: ".env.local" });
-config({ path: ".env" });
-
-const MIGRATION_URL = new URL(
-  "../src/migrations/V20260202151603__init_schema.sql",
-  import.meta.url
-);
+for (const path of [
+  new URL("../../../.env", import.meta.url),
+  new URL("../../../.env.local", import.meta.url),
+  new URL("../.env", import.meta.url),
+  new URL("../.env.local", import.meta.url),
+  new URL("../../../apps/web/.env", import.meta.url),
+  new URL("../../../apps/web/.env.local", import.meta.url),
+]) {
+  config({ path: fileURLToPath(path), override: true });
+}
 
 function assertLocalDatabaseUrl(databaseUrl) {
   const parsed = new URL(databaseUrl);
@@ -71,6 +75,18 @@ $$ LANGUAGE plpgsql;`,
   await pool.query(statements.join("\n"));
 }
 
+async function forceRls(pool) {
+  if (EXPECTED_FORCED_RLS_TABLE_NAMES.length === 0) {
+    return;
+  }
+
+  await pool.query(
+    EXPECTED_FORCED_RLS_TABLE_NAMES
+      .map((tableName) => `ALTER TABLE ${tableName} FORCE ROW LEVEL SECURITY;`)
+      .join("\n"),
+  );
+}
+
 export async function main() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -95,6 +111,9 @@ export async function main() {
   const onlyMissingUpdatedAtTriggers =
     existingHealth?.errors.length === 1 &&
     existingHealth.errors[0].startsWith("missing updated_at update triggers on:");
+  const onlyMissingForcedRls =
+    existingHealth?.errors.length > 0 &&
+    existingHealth.errors.every((error) => error.includes("forced RLS tables"));
 
   if (onlyMissingUpdatedAtTriggers) {
     try {
@@ -108,8 +127,20 @@ export async function main() {
       await pool.end();
     }
   }
+  if (onlyMissingForcedRls) {
+    try {
+      await forceRls(pool);
+      console.log("local forced RLS applied");
+      return 0;
+    } catch (err) {
+      console.error(`✗ local forced RLS apply failed: ${err.message}`);
+      return 1;
+    } finally {
+      await pool.end();
+    }
+  }
 
-  const sql = await readFile(MIGRATION_URL, "utf8");
+  const sql = readMigrationSql();
   try {
     await pool.query(sql);
     await installUpdatedAtTriggers(pool);

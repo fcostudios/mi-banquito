@@ -1,0 +1,89 @@
+{
+  "rule": "BR-01",
+  "input": {
+    "principal": 1000,
+    "ratePerPeriod": 0.04,
+    "termPeriods": 10,
+    "adminFeeRate": 0.01
+  },
+  "expected": {
+    "installments": [
+      {
+        "periodIndex": 1,
+        "principalDue": "100.00",
+        "interestDue": "40.00",
+        "feeDue": "10.00",
+        "installmentTotal": "150.00"
+      },
+      {
+        "periodIndex": 2,
+        "principalDue": "100.00",
+        "interestDue": "36.00",
+        "feeDue": "0.00",
+        "installmentTotal": "136.00"
+      },
+      {
+        "periodIndex": 3,
+        "principalDue": "100.00",
+        "interestDue": "32.00",
+        "feeDue": "0.00",
+        "installmentTotal": "132.00"
+      },
+      {
+        "periodIndex": 4,
+        "principalDue": "100.00",
+        "interestDue": "28.00",
+        "feeDue": "0.00",
+        "installmentTotal": "128.00"
+      },
+      {
+        "periodIndex": 5,
+        "principalDue": "100.00",
+        "interestDue": "24.00",
+        "feeDue": "0.00",
+        "installmentTotal": "124.00"
+      },
+      {
+        "periodIndex": 6,
+        "principalDue": "100.00",
+        "interestDue": "20.00",
+        "feeDue": "0.00",
+        "installmentTotal": "120.00"
+      },
+      {
+        "periodIndex": 7,
+        "principalDue": "100.00",
+        "interestDue": "16.00",
+        "feeDue": "0.00",
+        "installmentTotal": "116.00"
+      },
+      {
+        "periodIndex": 8,
+        "principalDue": "100.00",
+        "interestDue": "12.00",
+        "feeDue": "0.00",
+        "installmentTotal": "112.00"
+      },
+      {
+        "periodIndex": 9,
+        "principalDue": "100.00",
+        "interestDue": "8.00",
+        "feeDue": "0.00",
+        "installmentTotal": "108.00"
+      },
+      {
+        "periodIndex": 10,
+        "principalDue": "100.00",
+        "interestDue": "4.00",
+        "feeDue": "0.00",
+        "installmentTotal": "104.00"
+      }
+    ],
+    "totals": {
+      "principalDue": "1000.00",
+      "interestDue": "220.00",
+      "feeDue": "10.00",
+      "installmentTotal": "1230.00"
+    }
+  }
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateSchemaHealth,
   EXPECTED_POLICY_TABLES,
+  EXPECTED_FORCED_RLS_TABLE_NAMES,
   EXPECTED_RLS_TABLE_NAMES,
   EXPECTED_TABLE_NAMES,
   EXPECTED_TABLES,
@@ -14,6 +15,7 @@ describe("schema verifier", () => {
     const result = evaluateSchemaHealth({
       tableNames: EXPECTED_TABLE_NAMES,
       rlsTableNames: EXPECTED_RLS_TABLE_NAMES,
+      forcedRlsTableNames: EXPECTED_FORCED_RLS_TABLE_NAMES,
       policyTables: EXPECTED_POLICY_TABLES,
       triggerTables: EXPECTED_TRIGGER_TABLES,
       updatedAtTables: EXPECTED_UPDATED_AT_TABLES,
@@ -36,6 +38,7 @@ describe("schema verifier", () => {
 
     expect(result.ok).toBe(false);
     expect(result.errors).toContain("expected 29 RLS-enabled tables, found 0");
+    expect(result.errors).toContain("expected 29 forced RLS tables, found 0");
     expect(result.errors).toContain("expected 29 policies on tables, found 0");
     expect(result.errors).toContain("expected 14 triggers on tables, found 0");
   });
@@ -44,6 +47,7 @@ describe("schema verifier", () => {
     const result = evaluateSchemaHealth({
       tableNames: EXPECTED_TABLE_NAMES,
       rlsTableNames: EXPECTED_RLS_TABLE_NAMES,
+      forcedRlsTableNames: EXPECTED_FORCED_RLS_TABLE_NAMES,
       policyTables: EXPECTED_POLICY_TABLES,
       triggerTables: EXPECTED_TRIGGER_TABLES,
       updatedAtTables: ["member", "loan"],

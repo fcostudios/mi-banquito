@@ -7,7 +7,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./src/schema.ts"
+    "./schema": "./src/schema.ts",
+    "./tenant": "./src/tenant.ts"
   },
   "scripts": {
     "db:push": "drizzle-kit push",

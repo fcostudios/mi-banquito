@@ -8,6 +8,10 @@
 - Build command: `pnpm build`
 - Install command: `pnpm install --frozen-lockfile`
 - Config file: root `vercel.json`
+- Cron config in root `vercel.json`:
+  - `/api/cron/accrue-interest` at `0 5 * * *`
+  - `/api/cron/award-treasurer-compensation` at `0 6 * * *`
+  - `/api/cron/drift-check` at `0 7 * * *`
 - Deployment protection is enabled for preview deployments. Plain unauthenticated
   `curl` receives Vercel `401`; use an authenticated browser session or
   `npx vercel curl <path> --deployment <deployment-id>` from this linked repo.
@@ -49,6 +53,10 @@
   - `SENTRY_DSN`
   - `NEXT_PUBLIC_SENTRY_DSN`
   - `VERCEL_BLOB_READ_WRITE_TOKEN`
+- Local PWA verification:
+  - Lighthouse `11.7.1` PWA category score: `1.00`
+  - Lighthouse `13.x` no longer exposes the legacy `pwa` category; use 11.x
+    for the Sprint 0 acceptance check as written.
 
 ## Neon
 
@@ -60,6 +68,10 @@
   `preview/feature-sprint0-foundation-completion` (`br-summer-bird-ai0g8tui`)
 - Target strategy: one database branch per Vercel preview/PR.
 - Required schema command before acceptance: `cd packages/db && node scripts/apply-local-schema.mjs && node scripts/verify-schema.mjs` against the target database URL.
+- Current schema verifier expectation: 34 tables, 29 RLS tables, 29 forced RLS
+  tables, 29 policy tables, 14 trigger tables, and 5 `updated_at` trigger
+  tables. Forced RLS is intentional because the app role may be a table owner
+  locally/under Neon role ownership, and tenant policies must still apply.
 
 ## Auth0
 

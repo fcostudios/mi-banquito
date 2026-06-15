@@ -5,11 +5,11 @@
 // migration, then checks the target database for tables, RLS, policies, and
 // triggers.
 import { config } from "dotenv";
-import { readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const MIGRATION_URL = new URL(
-  "../src/migrations/V20260202151603__init_schema.sql",
+const MIGRATIONS_URL = new URL(
+  "../src/migrations/",
   import.meta.url
 );
 
@@ -48,6 +48,10 @@ export function parseExpectedSchema(sql) {
       (match) => match[1]
     )
   );
+  const forcedRlsTableNames = uniqueSorted(
+    [...sql.matchAll(/ALTER TABLE\s+([a-z_]+)\s+FORCE ROW LEVEL SECURITY;/g)]
+      .map((match) => match[1])
+  );
   const triggerTables = uniqueSorted(
     [...sql.matchAll(/CREATE TRIGGER\s+[a-z_]+[\s\S]*?\bON\s+([a-z_]+)/g)]
       .map((match) => match[1])
@@ -61,22 +65,33 @@ export function parseExpectedSchema(sql) {
   return {
     tableNames,
     rlsTableNames,
+    forcedRlsTableNames,
     policyTables,
     triggerTables,
     updatedAtTables,
   };
 }
 
-const migrationSql = readFileSync(MIGRATION_URL, "utf8");
+export function readMigrationSql() {
+  return readdirSync(MIGRATIONS_URL)
+    .filter((fileName) => fileName.endsWith(".sql"))
+    .sort()
+    .map((fileName) => readFileSync(new URL(fileName, MIGRATIONS_URL), "utf8"))
+    .join("\n");
+}
+
+const migrationSql = readMigrationSql();
 export const EXPECTED_SCHEMA = parseExpectedSchema(migrationSql);
 export const EXPECTED_TABLE_NAMES = EXPECTED_SCHEMA.tableNames;
 export const EXPECTED_RLS_TABLE_NAMES = EXPECTED_SCHEMA.rlsTableNames;
+export const EXPECTED_FORCED_RLS_TABLE_NAMES = EXPECTED_SCHEMA.forcedRlsTableNames;
 export const EXPECTED_POLICY_TABLES = EXPECTED_SCHEMA.policyTables;
 export const EXPECTED_TRIGGER_TABLES = EXPECTED_SCHEMA.triggerTables;
 export const EXPECTED_UPDATED_AT_TABLES = EXPECTED_SCHEMA.updatedAtTables;
 
 export const EXPECTED_TABLES = EXPECTED_TABLE_NAMES.length;
 export const EXPECTED_RLS_TABLES = EXPECTED_RLS_TABLE_NAMES.length;
+export const EXPECTED_FORCED_RLS_TABLES = EXPECTED_FORCED_RLS_TABLE_NAMES.length;
 export const EXPECTED_POLICIES = EXPECTED_POLICY_TABLES.length;
 export const EXPECTED_TRIGGERS = EXPECTED_TRIGGER_TABLES.length;
 export const EXPECTED_UPDATED_AT_TRIGGERS = EXPECTED_UPDATED_AT_TABLES.length;
@@ -130,6 +145,12 @@ export function evaluateSchemaHealth(actual, expected = EXPECTED_SCHEMA) {
     errors,
   });
   assertExpectedObjects({
+    label: "forced RLS tables",
+    expectedNames: expected.forcedRlsTableNames,
+    actualValue: actual.forcedRlsTableNames ?? actual.forcedRlsTableCount,
+    errors,
+  });
+  assertExpectedObjects({
     label: "policies on tables",
     expectedNames: expected.policyTables,
     actualValue: actual.policyTables ?? actual.policyCount,
@@ -162,8 +183,18 @@ export function evaluateSchemaHealth(actual, expected = EXPECTED_SCHEMA) {
 }
 
 function loadEnv() {
-  config({ path: ".env.local" });
-  config({ path: ".env" });
+  const paths = [
+    new URL("../../../.env", import.meta.url),
+    new URL("../../../.env.local", import.meta.url),
+    new URL("../.env", import.meta.url),
+    new URL("../.env.local", import.meta.url),
+    new URL("../../../apps/web/.env", import.meta.url),
+    new URL("../../../apps/web/.env.local", import.meta.url),
+  ];
+
+  for (const path of paths) {
+    config({ path: fileURLToPath(path), override: true });
+  }
 }
 
 const HEALTH_SQL = `
@@ -184,6 +215,15 @@ SELECT
         AND c.relrowsecurity),
     ARRAY[]::text[]
   ) AS rls_table_names,
+  COALESCE(
+    (SELECT array_agg(c.relname::text ORDER BY c.relname::text)
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relkind = 'r'
+        AND c.relforcerowsecurity),
+    ARRAY[]::text[]
+  ) AS forced_rls_table_names,
   COALESCE(
     (SELECT array_agg(DISTINCT tablename::text ORDER BY tablename::text)
        FROM pg_policies
@@ -242,6 +282,7 @@ function normalizeHealthRow(row = {}) {
   return {
     tableNames: parsePgArray(row.table_names),
     rlsTableNames: parsePgArray(row.rls_table_names),
+    forcedRlsTableNames: parsePgArray(row.forced_rls_table_names),
     policyTables: parsePgArray(row.policy_tables),
     triggerTables: parsePgArray(row.trigger_tables),
     updatedAtTables: parsePgArray(row.updated_at_tables),
@@ -282,6 +323,7 @@ export async function main() {
       "✓ migrate verify:",
       `${EXPECTED_TABLES} tables,`,
       `${EXPECTED_RLS_TABLES} RLS tables,`,
+      `${EXPECTED_FORCED_RLS_TABLES} forced RLS tables,`,
       `${EXPECTED_POLICIES} policy tables,`,
       `${EXPECTED_TRIGGERS} trigger tables,`,
       `${EXPECTED_UPDATED_AT_TRIGGERS} updated_at trigger tables`,
