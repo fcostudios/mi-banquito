@@ -26,3 +26,6 @@
 {"story":"US-012","event":"ac_verify","ac":1,"method":"unit test","pass":true,"notes":"Cron route rejects missing CRON_SECRET"}
 {"story":"US-012","event":"ac_verify","ac":2,"method":"unit test","pass":true,"notes":"Cron route rejects wrong bearer token and accepts correct token"}
 {"story":"US-012","event":"deviation","notes":"Sprint 0 cron route is a secured no-op returning {ran:true}; business cron jobs remain feature-story work."}
+{"story":"US-002","event":"blocked","reason":"Vercel project details are external to repo","needs":"Production and preview Vercel project URLs plus env confirmation"}
+{"story":"US-003","event":"blocked","reason":"Neon project details are external to repo","needs":"Neon project connection URL and preview branch strategy confirmation"}
+{"story":"US-005","event":"blocked","reason":"Blob/Sentry/Better Stack details are external to repo","needs":"Vercel Blob token, Sentry project, Better Stack monitor confirmation"}

@@ -31,6 +31,12 @@ Sprint 0 is partially scaffolded. The repository builds, local Postgres can run,
 - US-007: The app keeps the current `app/(authenticated)` route group with nested admin paths instead of splitting into `app/(treasurer)` and `app/(admin)` during Sprint 0. The current route generation, Auth0 session proxy, and navigation map already target this structure; role scope is enforced in shell navigation.
 - US-009: `packages/design-system/tokens.json` remains the canonical token source. `packages/ui` exports a typed token projection for package consumers and tests it against the canonical source instead of duplicating a second locked token JSON file.
 
+## External Blockers
+
+- US-002: Vercel project URLs and environment variable confirmation are external to the repository.
+- US-003: Neon project connection details and branch strategy are external to the repository.
+- US-005: Vercel Blob, Sentry, and Better Stack project details are external to the repository.
+
 ## Local Evidence Commands
 
 ```bash
