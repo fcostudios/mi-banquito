@@ -1,0 +1,6 @@
+{"story":"US-001","event":"started","agent":"codex","notes":"Sprint 0 status audit started"}
+{"story":"US-006","event":"started","agent":"codex","notes":"Local env and preview/prod env audit started"}
+{"story":"US-008","event":"started","agent":"codex","notes":"DB schema and RLS verification audit started"}
+{"story":"US-011","event":"started","agent":"codex","notes":"Auth0 session and RLS session-var audit started"}
+{"story":"US-013","event":"started","agent":"codex","notes":"CI verification audit started"}
+{"story":"US-014","event":"started","agent":"codex","notes":"Test infrastructure audit started"}
