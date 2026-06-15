@@ -1,17 +1,19 @@
 // Projection of packages/design-system/tokens.json for UI package consumers.
 // Keep this aligned with the canonical source through src/tokens.test.ts.
+import designTokens from "../../design-system/tokens.json";
+
 export const uiTokens = {
   color: {
-    accent: "#C45F36",
-    background: "#F8F4E9",
-    border: "#CBD5E1",
-    primary: "#2D7A4F",
-    secondary: "#1E5180",
-    surface: "#FFFFFF",
-    surfaceMuted: "#E2E8F0",
-    textOnPrimary: "#F8F4E9",
-    textPrimary: "#0F172A",
-    textSecondary: "#475569",
+    accent: designTokens.color.accent,
+    background: designTokens.color.background,
+    border: designTokens.color.border,
+    primary: designTokens.color.primary,
+    secondary: designTokens.color.secondary,
+    surface: designTokens.color.surface,
+    surfaceMuted: designTokens.color.surface_muted,
+    textOnPrimary: designTokens.color.text_on_primary,
+    textPrimary: designTokens.color.text_primary,
+    textSecondary: designTokens.color.text_secondary,
   },
 } as const;
 
