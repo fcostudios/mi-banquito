@@ -33,3 +33,14 @@
 {"story":"US-072","event":"ac_verify","ac":1,"method":"schema verifier","pass":true,"notes":"RLS presence is verified; cross-tenant behavioral test remains required before US-072 done"}
 {"story":"US-006","event":"ac_verify","ac":2,"method":"local seed script","pass":true,"notes":"infra/scripts/seed-db.sh creates local org 11111111-1111-4111-8111-111111111111 and verifies schema"}
 {"story":"US-013","event":"ac_verify","ac":1,"method":"CI workflow inspection + local equivalent commands","pass":true,"notes":"CI runs install, schema apply/verify, type-check, lint, tests, build, and Playwright smoke"}
+{"story":"US-001","event":"build_pass","notes":"type-check + lint + test + build + db verify + Playwright passed for Sprint 0 foundation"}
+{"story":"US-006","event":"build_pass","notes":"env-dependent local checks passed without committing secrets"}
+{"story":"US-007","event":"build_pass","notes":"App Router shell builds and browser smoke tests pass"}
+{"story":"US-008","event":"build_pass","notes":"DB schema verifier passed with table/RLS/policy/trigger assertions"}
+{"story":"US-009","event":"build_pass","notes":"Design-system contract tests and lint passed"}
+{"story":"US-010","event":"build_pass","notes":"PWA manifest and service worker browser checks passed"}
+{"story":"US-011","event":"build_pass","notes":"Auth claim helper, unauth redirect, and shell role tests passed"}
+{"story":"US-012","event":"build_pass","notes":"Cron route security tests passed"}
+{"story":"US-013","event":"build_pass","notes":"CI workflow mirrors local verification gate"}
+{"story":"US-014","event":"build_pass","notes":"Vitest, Playwright, and adversarial audit scripts are active"}
+{"story":"US-015","event":"build_pass","notes":"Auth0 SDK login route is mounted and redirects to tenant"}

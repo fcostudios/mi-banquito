@@ -37,6 +37,20 @@ Sprint 0 is partially scaffolded. The repository builds, local Postgres can run,
 - US-003: Neon project connection details and branch strategy are external to the repository.
 - US-005: Vercel Blob, Sentry, and Better Stack project details are external to the repository.
 
+## Final Local Verification
+
+Passed on 2026-06-15:
+
+- `rtk pnpm type-check`
+- `rtk pnpm lint`
+- `rtk pnpm test`
+- `rtk pnpm build`
+- `rtk zsh -lc 'cd packages/db && node scripts/verify-schema.mjs'`
+- `rtk zsh -lc 'cd apps/web && pnpm test:e2e'`
+- `rtk pnpm audit:sprint0`
+
+Known non-fatal warnings: the Auth0 SDK emits a DPoP dynamic dependency webpack warning, and Next dev logs an HMR allowed-origin warning for Playwright's `127.0.0.1` base URL.
+
 ## Local Evidence Commands
 
 ```bash
