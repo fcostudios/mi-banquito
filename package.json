@@ -8,7 +8,8 @@
     "type-check": "turbo run type-check",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "test:e2e": "pnpm --filter mi-banquito-web test:e2e"
+    "test:e2e": "pnpm --filter mi-banquito-web test:e2e",
+    "audit:sprint0": "node scripts/sprint0-ac-audit.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

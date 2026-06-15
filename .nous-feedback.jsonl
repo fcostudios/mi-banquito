@@ -1,9 +1,18 @@
 {"story":"US-001","event":"started","agent":"codex","notes":"Sprint 0 status audit started"}
+{"story":"US-002","event":"started","agent":"codex","notes":"Vercel readiness audit started"}
+{"story":"US-003","event":"started","agent":"codex","notes":"Neon readiness audit started"}
+{"story":"US-004","event":"started","agent":"codex","notes":"Auth0 tenant setup audit started"}
+{"story":"US-005","event":"started","agent":"codex","notes":"Blob/Sentry/Better Stack readiness audit started"}
 {"story":"US-006","event":"started","agent":"codex","notes":"Local env and preview/prod env audit started"}
+{"story":"US-007","event":"started","agent":"codex","notes":"App Router shell foundation audit started"}
 {"story":"US-008","event":"started","agent":"codex","notes":"DB schema and RLS verification audit started"}
+{"story":"US-009","event":"started","agent":"codex","notes":"Design-system foundation audit started"}
+{"story":"US-010","event":"started","agent":"codex","notes":"PWA foundation audit started"}
 {"story":"US-011","event":"started","agent":"codex","notes":"Auth0 session and RLS session-var audit started"}
+{"story":"US-012","event":"started","agent":"codex","notes":"Cron route security audit started"}
 {"story":"US-013","event":"started","agent":"codex","notes":"CI verification audit started"}
 {"story":"US-014","event":"started","agent":"codex","notes":"Test infrastructure audit started"}
+{"story":"US-015","event":"started","agent":"codex","notes":"Auth0 SDK route audit started"}
 {"story":"US-004","event":"ac_verify","ac":6,"method":"unit test + Auth0 runbook review","pass":true,"notes":"DB UUID is read from namespaced custom claim; native Auth0 org_ id is rejected"}
 {"story":"US-011","event":"ac_verify","ac":5,"method":"Playwright unauthenticated /socias check","pass":true,"notes":"No session redirects before tenant-scoped DB query"}
 {"story":"US-015","event":"ac_verify","ac":1,"method":"Playwright /auth/login redirect smoke + production build","pass":true,"notes":"Auth0 SDK route is mounted through Next proxy.ts; middleware deprecation warning removed"}
