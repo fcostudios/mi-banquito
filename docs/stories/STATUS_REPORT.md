@@ -39,6 +39,28 @@ Use `Local Verified` for work proven by this repository and local commands. Use 
 - US-003: Neon project exists and schema verifies; a manual preview branch exists for this feature branch, but automatic per-PR branch automation/strategy still needs confirmation.
 - US-005: Vercel Blob, Sentry, and Better Stack project details are external to the repository.
 
+## Sprint 0 Full Verification Checklist
+
+These are the remaining items needed before every Sprint 0 story can honestly be marked fully verified:
+
+| Story | Needed to mark verified |
+|---|---|
+| US-001 | Team accepts current scaffold evidence as complete. |
+| US-002 | Confirm production alias/custom domain, TLS on that domain, and chosen public/bypass policy for Deployment Protection. |
+| US-003 | Prove automatic Neon preview branch lifecycle from a real PR/preview deploy, including cleanup policy. |
+| US-004 | Capture Auth0 tenant evidence: organization, passwordless email connection, app callback/logout allow-list, and Post-Login Action emitting the DB UUID org claim. |
+| US-005 | Provision Vercel Blob, Sentry, and Better Stack; store required Vercel env vars; verify Better Stack hits `/api/health`. |
+| US-006 | Add missing `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, and `VERCEL_BLOB_READ_WRITE_TOKEN`; add/verify boot-time env validation and env example coverage. |
+| US-007 | Accept documented route-group deviation or refactor to literal `(treasurer)` and `(admin)` route groups. |
+| US-008 | Decide whether Sprint 0 accepts schema-substrate verification only, or add deeper append-only/audit/period-lock behavior tests now. |
+| US-009 | Accept documented token-source deviation or implement literal story file paths for locked tokens/strings/icon allow-list. |
+| US-010 | Run Lighthouse PWA score >= 90, verify install prompt/iOS install behavior, and verify offline behavior. |
+| US-011 | Add DB wrapper/transaction evidence for `SET LOCAL app.current_org` and cross-tenant RLS behavioral tests. |
+| US-012 | Add Vercel Cron config for the three named jobs or formally accept the current secured no-op route as a Sprint 0 deviation; verify plan cron limit. |
+| US-013 | Create/confirm default `main` branch, branch protection, required checks, and PR Neon migration dry-run target. |
+| US-014 | Add business-rule golden fixtures and property-based tests to `pnpm test`. |
+| US-015 | Complete real Auth0 magic-link/passwordless email E2E through callback/session, including expiry/error handling and treasurer email evidence. |
+
 ## Final Local Verification
 
 Passed on 2026-06-15:
