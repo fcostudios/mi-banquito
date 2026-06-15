@@ -6,9 +6,12 @@
 // import (a Server Component CANNOT call the client `useLocale()` hook) — never a
 // bare JSX string. Copy this shape for every `[id]` detail page.
 import { auth0 } from "@/lib/auth0";
+import { getDbOrgIdFromUser } from "@/lib/auth/session-claims";
+import { ROUTE_LOGIN } from "@/lib/routes";
 import { createLedgerService } from "@mi-banquito/domain";
 import { Tag } from "@mi-banquito/ui";
 import messages from "@/lib/i18n/en-US.json";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +22,11 @@ export default async function MemberDetailPage(
 ) {
   const { id } = await params;
   const session = await auth0.getSession();
-  const orgId = (session?.user?.org_id ?? "") as string;
+  const orgId = getDbOrgIdFromUser(session?.user);
+  if (!orgId) {
+    redirect(ROUTE_LOGIN);
+  }
+
   const row = await createLedgerService().getMember(orgId, id);
 
   if (!row) {
