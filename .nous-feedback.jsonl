@@ -31,3 +31,4 @@
 {"story":"US-005","event":"blocked","reason":"Blob/Sentry/Better Stack details are external to repo","needs":"Vercel Blob token, Sentry project, Better Stack monitor confirmation"}
 {"story":"US-008","event":"ac_verify","ac":1,"method":"schema verifier","pass":true,"notes":"Verifier asserts 34 tables, 29 RLS tables, 29 policy tables, 14 trigger tables, and 5 updated_at trigger tables"}
 {"story":"US-072","event":"ac_verify","ac":1,"method":"schema verifier","pass":true,"notes":"RLS presence is verified; cross-tenant behavioral test remains required before US-072 done"}
+{"story":"US-006","event":"ac_verify","ac":2,"method":"local seed script","pass":true,"notes":"infra/scripts/seed-db.sh creates local org 11111111-1111-4111-8111-111111111111 and verifies schema"}

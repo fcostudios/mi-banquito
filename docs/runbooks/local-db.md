@@ -73,3 +73,29 @@ for shared, preview, staging, or production databases.
   `postgresql://postgres:postgres@localhost:5433/app`.
 - If `verify-schema.mjs` fails on RLS or policies, the database was probably
   created with `drizzle-kit push` instead of the committed SQL migration.
+
+## Local Seed
+
+From the repo root:
+
+```bash
+rtk bash infra/scripts/seed-db.sh
+```
+
+This creates a local organization, operator, user account, membership, and one
+treasurer member fixture. The fixed local organization id is:
+
+```txt
+11111111-1111-4111-8111-111111111111
+```
+
+## Local Auth0 Organization Metadata
+
+For local smoke tests, set the Auth0 Organization metadata field:
+
+```txt
+db_org_id=11111111-1111-4111-8111-111111111111
+```
+
+The app reads this value from the namespaced claim emitted by the Auth0
+Post-Login Action.
