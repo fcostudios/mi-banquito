@@ -14,3 +14,6 @@
 {"story":"US-010","event":"ac_verify","ac":1,"method":"Playwright request","pass":true,"notes":"manifest.webmanifest is reachable and names Mi Banquito"}
 {"story":"US-010","event":"ac_verify","ac":2,"method":"Playwright request","pass":true,"notes":"sw.js is generated and served"}
 {"story":"US-010","event":"ac_verify","ac":3,"method":"mobile viewport render","pass":true,"notes":"app shell renders on Pixel-size viewport"}
+{"story":"US-012","event":"ac_verify","ac":1,"method":"unit test","pass":true,"notes":"Cron route rejects missing CRON_SECRET"}
+{"story":"US-012","event":"ac_verify","ac":2,"method":"unit test","pass":true,"notes":"Cron route rejects wrong bearer token and accepts correct token"}
+{"story":"US-012","event":"deviation","notes":"Sprint 0 cron route is a secured no-op returning {ran:true}; business cron jobs remain feature-story work."}
