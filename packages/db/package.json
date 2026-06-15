@@ -14,7 +14,8 @@
     "verify": "node scripts/verify-schema.mjs",
     "type-check": "tsc --noEmit",
     "lint": "echo 'no lint'",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.38.3",

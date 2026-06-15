@@ -11,7 +11,8 @@
   "scripts": {
     "type-check": "tsc --noEmit",
     "lint": "echo 'no lint'",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "echo 'no tests yet'"
   },
   "dependencies": {
     "drizzle-zod": "^0.7.0",
