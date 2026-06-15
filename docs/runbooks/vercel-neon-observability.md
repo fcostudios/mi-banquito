@@ -52,7 +52,7 @@
 - Still missing envs until US-005 resources exist:
   - `SENTRY_DSN`
   - `NEXT_PUBLIC_SENTRY_DSN`
-  - `VERCEL_BLOB_READ_WRITE_TOKEN`
+  - `BLOB_READ_WRITE_TOKEN`
 - Local PWA verification:
   - Lighthouse `11.7.1` PWA category score: `1.00`
   - Lighthouse `13.x` no longer exposes the legacy `pwa` category; use 11.x
@@ -91,8 +91,16 @@
 ## Vercel Blob
 
 - Store slip photos and generated PDF artifacts.
-- Required env name: `VERCEL_BLOB_READ_WRITE_TOKEN`.
-- Sprint 0 readiness check: token is configured in Vercel but not used by the no-op scaffold.
+- Store: `mi-banquito-artifacts` (`store_io0PnZdqgZSFmHEy`), private,
+  region `iad1`, status active.
+- Required env name: `BLOB_READ_WRITE_TOKEN`.
+- Sprint 0 readiness check: token is configured in Vercel Production,
+  Preview, and Development. A temporary private blob upload/list/delete smoke
+  verifies the store connection.
+- Local CLI note: Vercel may also pull `VERCEL_OIDC_TOKEN` into `.env.local`.
+  For ad-hoc Blob CLI smoke tests outside Vercel runtime, pass
+  `--rw-token "$BLOB_READ_WRITE_TOKEN"` and clear `VERCEL_OIDC_TOKEN` for that
+  command, or provide the complete OIDC pair.
 
 ## Sentry
 

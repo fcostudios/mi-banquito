@@ -17,7 +17,7 @@ export const serverEnvSchema = z.object({
 export const externalProviderEnvSchema = z.object({
   NEXT_PUBLIC_SENTRY_DSN: z.string().url(),
   SENTRY_DSN: z.string().url(),
-  VERCEL_BLOB_READ_WRITE_TOKEN: nonEmpty,
+  BLOB_READ_WRITE_TOKEN: nonEmpty,
 });
 
 export const publicEnvSchema = z.object({
