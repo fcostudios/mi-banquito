@@ -20,7 +20,7 @@ const requiredExampleKeys = [
   "NEXT_PUBLIC_API_URL",
   "NEXT_PUBLIC_SENTRY_DSN",
   "SENTRY_DSN",
-  "VERCEL_BLOB_READ_WRITE_TOKEN",
+  "BLOB_READ_WRITE_TOKEN",
 ];
 
 describe("environment validation", () => {
@@ -52,6 +52,13 @@ describe("environment validation", () => {
 
   it("tracks external provider variables separately until US-005 provisions them", () => {
     expect(() => parseExternalProviderEnv({})).toThrow(/SENTRY_DSN/);
+    expect(
+      parseExternalProviderEnv({
+        NEXT_PUBLIC_SENTRY_DSN: "https://public@example.ingest.sentry.io/1",
+        SENTRY_DSN: "https://public@example.ingest.sentry.io/1",
+        BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_example",
+      }),
+    ).toMatchObject({ BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_example" });
   });
 
   it(".env.example documents every Sprint 0 key and .env.local is ignored", () => {

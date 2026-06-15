@@ -644,7 +644,7 @@ mi-banquito/                     # Turborepo + pnpm workspaces root
 
 ### Configuration & feature flags
 
-- **Environment variables (per Vercel project):** `DATABASE_URL` (Neon connection string), `AUTH0_*` (issuer, client id, client secret, audience, scope), `CRON_SECRET` (shared bearer for cron route handlers), `SENTRY_DSN`, `VERCEL_BLOB_READ_WRITE_TOKEN`.
+- **Environment variables (per Vercel project):** `DATABASE_URL` (Neon connection string), `AUTH0_*` (issuer, client id, client secret, audience, scope), `CRON_SECRET` (shared bearer for cron route handlers), `SENTRY_DSN`, `BLOB_READ_WRITE_TOKEN`.
 - **Feature flags:** R1 ships without a feature-flag service; toggleable behaviors live in `GroupConfig` (e.g., `interest_resolution = daily | per_period`). R2 may adopt a lightweight flag service if needed.
 
 ---
@@ -844,7 +844,7 @@ R1 has **no separate analytics store** — analytical queries (per-org KPIs for 
 ### Secrets management
 
 - All secrets stored as Vercel environment variables (encrypted at rest by Vercel).
-- `DATABASE_URL`, `AUTH0_*`, `CRON_SECRET`, `SENTRY_DSN`, `VERCEL_BLOB_READ_WRITE_TOKEN` — never committed to source.
+- `DATABASE_URL`, `AUTH0_*`, `CRON_SECRET`, `SENTRY_DSN`, `BLOB_READ_WRITE_TOKEN` — never committed to source.
 - Local development uses `.env.local` (gitignored).
 
 ### Encryption
@@ -1543,4 +1543,3 @@ Country/Institution reference data is **admin-owned**; the **maintenance UI is d
 
 ### Open questions — resolved
 O1–O13 + D-ARCH-1/2/3 resolved (see `GAP_ANALYSIS_eoy_2026-05-31.md` §6 + `BR_CONFIG_ARCH_REVIEW_2026-05-31.md`); `ctx_liquidation` = not split for R1.
-
