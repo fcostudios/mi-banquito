@@ -13,7 +13,7 @@ Use `Local Verified` for work proven by this repository and local commands. Use 
 | Story | Status | Evidence | Remaining Work |
 |---|---|---|---|
 | US-001 | Local Verified | Turborepo, package scripts, lockfile, type-check/lint/test/build all pass. | Official story can be marked done after team accepts local evidence. |
-| US-002 | Partial / Deployment Pending | Vercel project `prj_QMN7SAslw9mlL8C5JqLXOBrQI8hJ` exists; GitHub integration produced deployment `dpl_BifN5dtinuHpCQtUvEVVAjFWKTSH`; local `vercel build --prod` passes after adding `vercel.json`. | Push deployment-config commit and verify Vercel deployment reaches READY; custom domain/TLS still need confirmation. |
+| US-002 | Verified / Public Access Pending | Vercel project `prj_QMN7SAslw9mlL8C5JqLXOBrQI8hJ` exists; GitHub integration produced READY preview deployment `dpl_5GsQYNbzGDSi8Hka692x11cTVJNC`; local `vercel build --prod` passes. | Public HTTP smoke is blocked by Vercel Deployment Protection (`401`); custom domain, production alias, env confirmation, and bypass/public access policy still need confirmation. |
 | US-003 | Verified / Preview Strategy Pending | Neon project `cool-shape-96550274` exists; default branch `br-bold-cake-aiq95mz3` is reachable. Local Docker flow also works with schema apply/verify/seed. | Confirm per-PR preview branch automation/strategy. |
 | US-004 | Partial / External Blocked | Auth0 app config documented; `/auth/login` redirects; DB UUID claim mapping tested. | Real Auth0 tenant/org/passwordless connection and account-side Action configuration evidence. |
 | US-005 | External Blocked | Observability/blob runbook exists; `/api/health` is verified. | Real Vercel Blob token, Sentry project/DSN, Better Stack monitor, and env confirmation. |
@@ -35,7 +35,7 @@ Use `Local Verified` for work proven by this repository and local commands. Use 
 
 ## External Blockers
 
-- US-002: Vercel project exists and local Vercel build passes; READY production/preview deployment, custom domain, TLS, and env confirmation still need verification.
+- US-002: Vercel project exists, GitHub-triggered preview deployment is READY, and TLS responds. Public app smoke is blocked by Vercel Deployment Protection (`401`); custom domain, production alias, env confirmation, and bypass/public access policy still need verification.
 - US-003: Neon project exists and schema verifies; per-PR preview branch automation/strategy still needs confirmation.
 - US-005: Vercel Blob, Sentry, and Better Stack project details are external to the repository.
 

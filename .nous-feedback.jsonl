@@ -47,3 +47,4 @@
 {"story":"US-003","event":"ac_verify","ac":1,"method":"Neon connector","pass":true,"notes":"Neon project cool-shape-96550274 exists for mi-banquito on branch br-bold-cake-aiq95mz3"}
 {"story":"US-008","event":"ac_verify","ac":8,"method":"Neon schema verifier","pass":true,"notes":"Committed schema applied and verified on Neon neondb: 34 tables, 29 RLS tables, 29 policy tables, 14 migration trigger tables, 5 updated_at trigger tables"}
 {"story":"US-002","event":"ac_verify","ac":6,"method":"Vercel build","pass":true,"notes":"Vercel project prj_QMN7SAslw9mlL8C5JqLXOBrQI8hJ builds locally with vercel build --prod after adding vercel.json"}
+{"story":"US-002","event":"ac_verify","ac":6,"method":"Vercel/GitHub deployment","pass":true,"notes":"GitHub-triggered Vercel preview deployment dpl_5GsQYNbzGDSi8Hka692x11cTVJNC for commit c96628b reached READY; public HTTP smoke returns 401 due Vercel Deployment Protection"}
