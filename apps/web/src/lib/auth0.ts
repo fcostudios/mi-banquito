@@ -10,6 +10,6 @@ export const auth0 = new Auth0Client({
   secret: process.env.AUTH0_SECRET,
   authorizationParameters: {
     // Organizations: prompt for org selection at login.
-    organization: process.env.AUTH0_ORGANIZATION,
+    ...(process.env.AUTH0_ORGANIZATION ? { organization: process.env.AUTH0_ORGANIZATION } : {}),
   },
 });
