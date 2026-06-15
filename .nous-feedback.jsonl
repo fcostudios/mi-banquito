@@ -11,3 +11,6 @@
 {"story":"US-009","event":"deviation","notes":"packages/design-system/tokens.json remains canonical; packages/ui exports a typed token projection from src/tokens.ts instead of introducing a duplicate tokens.v1.json."}
 {"story":"US-009","event":"ac_verify","ac":2,"method":"unit test","pass":true,"notes":"packages/ui/src/tokens.test.ts compares exported uiTokens.color against packages/design-system/tokens.json"}
 {"story":"US-009","event":"build_pass","notes":"rtk pnpm --filter @mi-banquito/ui test and type-check passed"}
+{"story":"US-010","event":"ac_verify","ac":1,"method":"Playwright request","pass":true,"notes":"manifest.webmanifest is reachable and names Mi Banquito"}
+{"story":"US-010","event":"ac_verify","ac":2,"method":"Playwright request","pass":true,"notes":"sw.js is generated and served"}
+{"story":"US-010","event":"ac_verify","ac":3,"method":"mobile viewport render","pass":true,"notes":"app shell renders on Pixel-size viewport"}

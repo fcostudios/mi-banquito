@@ -28,3 +28,15 @@ test("manifest is reachable and names the app", async ({ request }) => {
   const manifest = await response.json();
   expect(manifest.name).toContain("Mi Banquito");
 });
+
+test("service worker asset is generated", async ({ request }) => {
+  const response = await request.get("/sw.js");
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("javascript");
+});
+
+test("app shell renders on mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Inicio" })).toBeVisible();
+});
