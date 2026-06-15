@@ -8,3 +8,6 @@
 {"story":"US-011","event":"ac_verify","ac":5,"method":"Playwright unauthenticated /socias check","pass":true,"notes":"No session redirects before tenant-scoped DB query"}
 {"story":"US-015","event":"ac_verify","ac":1,"method":"Playwright /auth/login redirect smoke + production build","pass":true,"notes":"Auth0 SDK route is mounted through Next proxy.ts; middleware deprecation warning removed"}
 {"story":"US-007","event":"deviation","notes":"Current app uses a single (authenticated) route group with nested admin paths instead of story text app/(treasurer) and app/(admin). This is accepted for now because Auth0/session proxy, route generation, and nav map already target the current structure."}
+{"story":"US-009","event":"deviation","notes":"packages/design-system/tokens.json remains canonical; packages/ui exports a typed token projection from src/tokens.ts instead of introducing a duplicate tokens.v1.json."}
+{"story":"US-009","event":"ac_verify","ac":2,"method":"unit test","pass":true,"notes":"packages/ui/src/tokens.test.ts compares exported uiTokens.color against packages/design-system/tokens.json"}
+{"story":"US-009","event":"build_pass","notes":"rtk pnpm --filter @mi-banquito/ui test and type-check passed"}

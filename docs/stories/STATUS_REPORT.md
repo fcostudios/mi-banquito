@@ -29,6 +29,7 @@ Sprint 0 is partially scaffolded. The repository builds, local Postgres can run,
 ## Accepted Deviations
 
 - US-007: The app keeps the current `app/(authenticated)` route group with nested admin paths instead of splitting into `app/(treasurer)` and `app/(admin)` during Sprint 0. The current route generation, Auth0 session proxy, and navigation map already target this structure; role scope is enforced in shell navigation.
+- US-009: `packages/design-system/tokens.json` remains the canonical token source. `packages/ui` exports a typed token projection for package consumers and tests it against the canonical source instead of duplicating a second locked token JSON file.
 
 ## Local Evidence Commands
 
