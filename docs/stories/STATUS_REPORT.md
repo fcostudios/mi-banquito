@@ -26,6 +26,10 @@ Sprint 0 is partially scaffolded. The repository builds, local Postgres can run,
 | US-014 | Pending | No test runner/test files. | Add Vitest/Playwright/adversarial tests. |
 | US-015 | Partial | Auth0 SDK route works. | Verify passwordless or record login-method deviation. |
 
+## Accepted Deviations
+
+- US-007: The app keeps the current `app/(authenticated)` route group with nested admin paths instead of splitting into `app/(treasurer)` and `app/(admin)` during Sprint 0. The current route generation, Auth0 session proxy, and navigation map already target this structure; role scope is enforced in shell navigation.
+
 ## Local Evidence Commands
 
 ```bash

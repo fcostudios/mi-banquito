@@ -4,18 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUser } from "@auth0/nextjs-auth0";
 import { navItems } from "@/components/shell/nav-items.gen";
+import { getRolesFromUser } from "@/lib/auth/session-claims";
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
-  const userRoles = ((user as { roles?: string[] } | undefined)?.roles) ?? [];
-  const visible = navItems.filter(
-    (item) =>
-      !item.roles ||
-      item.roles.length === 0 ||
-      userRoles.length === 0 ||
-      item.roles.some((r) => userRoles.includes(r)),
-  );
+  const userRoles = getRolesFromUser(user as Record<string, unknown> | undefined);
+  const visible = navItems.filter((item) => {
+    if (!item.roles || item.roles.length === 0) return true;
+    return item.roles.some((role) => userRoles.includes(role));
+  });
   return (
     <aside className="hidden md:flex w-60 flex-col border-r bg-white">
       <div className="flex h-14 items-center px-4 font-bold text-lg">
