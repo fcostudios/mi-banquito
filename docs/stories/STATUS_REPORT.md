@@ -13,9 +13,9 @@ Use `Local Verified` for work proven by this repository and local commands. Use 
 | Story | Status | Evidence | Remaining Work |
 |---|---|---|---|
 | US-001 | Local Verified | Turborepo, package scripts, lockfile, type-check/lint/test/build all pass. | Official story can be marked done after team accepts local evidence. |
-| US-002 | Verified / Public Access Pending | Vercel project `prj_QMN7SAslw9mlL8C5JqLXOBrQI8hJ` exists; GitHub integration produced READY preview deployment `dpl_5GsQYNbzGDSi8Hka692x11cTVJNC`; production and branch-preview env vars are configured. | Public HTTP smoke is blocked by Vercel Deployment Protection (`401`); custom domain, production alias, and bypass/public access policy still need confirmation. |
+| US-002 | Verified / Production Alias Pending | Vercel project `prj_QMN7SAslw9mlL8C5JqLXOBrQI8hJ` exists; latest preview deployment `dpl_7Y2Jy3GZL4NQXDgM65zNWrXpTGhG` is READY; protected preview smoke verifies `/`, `/api/health`, and `/auth/login`. | Unauthenticated CLI access is still blocked by Vercel Deployment Protection (`401`); custom domain, production alias, and public/bypass policy still need confirmation. |
 | US-003 | Verified / Auto Preview Strategy Pending | Neon project `cool-shape-96550274` exists; production branch `br-bold-cake-aiq95mz3` and manual preview branch `br-summer-bird-ai0g8tui` are ready. Local Docker flow also works with schema apply/verify/seed. | Confirm automatic per-PR Neon branch lifecycle and 7-day cleanup strategy. |
-| US-004 | Partial / External Blocked | Auth0 app config documented; `/auth/login` redirects; DB UUID claim mapping tested. | Real Auth0 tenant/org/passwordless connection and account-side Action configuration evidence. |
+| US-004 | Partial / Auth0 Redirect Verified | Auth0 app config documented; deployed preview `GET /auth/login` redirects to the real Auth0 tenant with organization and callback URI; DB UUID claim mapping tested. | Passwordless connection, account-side Action claim configuration, and full callback/session evidence remain. |
 | US-005 | External Blocked | Observability/blob runbook exists; `/api/health` is verified. | Real Vercel Blob token, Sentry project/DSN, Better Stack monitor, and env confirmation. |
 | US-006 | Vercel Env Partially Verified | `.env.local` remains ignored; Vercel Production and branch Preview have `DATABASE_URL`, `DB_DRIVER`, `NEXT_PUBLIC_API_URL`, `APP_BASE_URL`, `CRON_SECRET`, and `AUTH0_*` configured as encrypted vars. | `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, and `VERCEL_BLOB_READ_WRITE_TOKEN` remain pending because US-005 resources are not provisioned. |
 | US-007 | Local Verified With Deviation | App Router shell renders; role-scoped nav tests and Playwright pass. | Original `app/(treasurer)` and `app/(admin)` route-group wording is intentionally deferred/accepted as a deviation. |
@@ -26,7 +26,7 @@ Use `Local Verified` for work proven by this repository and local commands. Use 
 | US-012 | Partial | Secured cron route rejects missing/wrong bearer and accepts correct bearer. | Actual Vercel cron schedules and real job stubs for all named jobs are not complete. |
 | US-013 | Local Verified / External Blocked | GitHub remote is configured, branch is pushed, GitHub Actions CI workflow is added, and local equivalent gate passes. | Required branch protection and real Neon preview migration target remain external. |
 | US-014 | Partial | Vitest, Playwright, and adversarial evidence audit are active. | Business-rule golden fixtures and property-based tests are not implemented yet. |
-| US-015 | Partial / External Blocked | Auth0 SDK route mounts and redirects to tenant. | Real magic-link passwordless email flow, expiry handling, and treasurer-email E2E verification remain. |
+| US-015 | Partial / Auth0 Redirect Verified | Auth0 SDK route mounts locally and on deployed preview; `/auth/login` returns a real Auth0 authorize redirect. | Real magic-link passwordless email flow, callback session establishment, expiry handling, and treasurer-email E2E verification remain. |
 
 ## Accepted Deviations
 
@@ -35,7 +35,7 @@ Use `Local Verified` for work proven by this repository and local commands. Use 
 
 ## External Blockers
 
-- US-002: Vercel project exists, GitHub-triggered preview deployment is READY, env vars are configured, and TLS responds. Public app smoke is blocked by Vercel Deployment Protection (`401`); custom domain, production alias, and bypass/public access policy still need verification.
+- US-002: Vercel project exists, latest preview deployment is READY, env vars are configured, and protected preview smoke passes. Unauthenticated CLI smoke is blocked by Vercel Deployment Protection (`401`); custom domain, production alias, and public/bypass access policy still need verification.
 - US-003: Neon project exists and schema verifies; a manual preview branch exists for this feature branch, but automatic per-PR branch automation/strategy still needs confirmation.
 - US-005: Vercel Blob, Sentry, and Better Stack project details are external to the repository.
 
