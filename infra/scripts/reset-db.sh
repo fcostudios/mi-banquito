@@ -15,8 +15,8 @@ node --input-type=module <<'NODE'
 import { config } from "dotenv";
 import pg from "pg";
 
+config({ path: ".env.local" });
 config({ path: ".env" });
-config({ path: ".env.local", override: true });
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

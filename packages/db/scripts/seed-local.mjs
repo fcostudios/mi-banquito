@@ -3,8 +3,8 @@ import { pathToFileURL } from "node:url";
 import pg from "pg";
 import { main as verifySchema } from "./verify-schema.mjs";
 
+config({ path: ".env.local" });
 config({ path: ".env" });
-config({ path: ".env.local", override: true });
 
 export const LOCAL_ORG_ID = "11111111-1111-4111-8111-111111111111";
 const PLATFORM_OPERATOR_ID = "22222222-2222-4222-8222-222222222222";

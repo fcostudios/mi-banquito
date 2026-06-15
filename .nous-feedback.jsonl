@@ -44,3 +44,5 @@
 {"story":"US-013","event":"build_pass","notes":"CI workflow mirrors local verification gate"}
 {"story":"US-014","event":"build_pass","notes":"Vitest, Playwright, and adversarial audit scripts are active"}
 {"story":"US-015","event":"build_pass","notes":"Auth0 SDK login route is mounted and redirects to tenant"}
+{"story":"US-003","event":"ac_verify","ac":1,"method":"Neon connector","pass":true,"notes":"Neon project cool-shape-96550274 exists for mi-banquito on branch br-bold-cake-aiq95mz3"}
+{"story":"US-008","event":"ac_verify","ac":8,"method":"Neon schema verifier","pass":true,"notes":"Committed schema applied and verified on Neon neondb: 34 tables, 29 RLS tables, 29 policy tables, 14 migration trigger tables, 5 updated_at trigger tables"}

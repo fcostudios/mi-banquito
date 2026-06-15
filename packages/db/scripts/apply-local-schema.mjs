@@ -13,8 +13,8 @@ import {
   EXPECTED_UPDATED_AT_TABLES,
 } from "./verify-schema.mjs";
 
+config({ path: ".env.local" });
 config({ path: ".env" });
-config({ path: ".env.local", override: true });
 
 const MIGRATION_URL = new URL(
   "../src/migrations/V20260202151603__init_schema.sql",

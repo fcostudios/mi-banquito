@@ -162,8 +162,8 @@ export function evaluateSchemaHealth(actual, expected = EXPECTED_SCHEMA) {
 }
 
 function loadEnv() {
+  config({ path: ".env.local" });
   config({ path: ".env" });
-  config({ path: ".env.local", override: true });
 }
 
 const HEALTH_SQL = `
