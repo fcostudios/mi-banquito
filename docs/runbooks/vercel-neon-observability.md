@@ -26,6 +26,15 @@
   - `GET /` -> `200`
   - `GET /api/health` -> `{"status":"ok"}`
   - `GET /auth/login` -> `307` to Auth0 authorize URL
+- Latest verified production deployment:
+  - Deployment: `dpl_ETstPbBc5aSNWLoMaV2NwPSdxuAG`
+  - URL: `https://mi-banquito-1pnq7u0m6-francisco-lomas-projects.vercel.app`
+  - Aliases: `https://mi-banquito.vercel.app`,
+    `https://mi-banquito-francisco-lomas-projects.vercel.app`,
+    `https://mi-banquito-git-main-francisco-lomas-projects.vercel.app`
+  - `GET /api/health` -> `{"status":"ok"}`
+  - `GET /auth/login` -> `307` to Auth0 authorize URL with production callback
+  - Deployed config includes all three cron schedules from root `vercel.json`
 - Production envs configured in Vercel:
   - `DATABASE_URL`
   - `DB_DRIVER=neon`
@@ -52,7 +61,6 @@
 - Still missing envs until US-005 resources exist:
   - `SENTRY_DSN`
   - `NEXT_PUBLIC_SENTRY_DSN`
-  - `BLOB_READ_WRITE_TOKEN`
 - Local PWA verification:
   - Lighthouse `11.7.1` PWA category score: `1.00`
   - Lighthouse `13.x` no longer exposes the legacy `pwa` category; use 11.x
@@ -64,8 +72,10 @@
 - Database: `neondb`
 - Role used for app/migrations: `neondb_owner`
 - Production branch: `production` (`br-bold-cake-aiq95mz3`)
+- Production branch compute: `ep-morning-shape-aisj4r2h`
 - Manual preview branch for `feature/sprint0/foundation-completion`:
   `preview/feature-sprint0-foundation-completion` (`br-summer-bird-ai0g8tui`)
+- Manual preview branch compute: `ep-wild-forest-ai3cqehm`
 - Target strategy: one database branch per Vercel preview/PR.
 - Required schema command before acceptance: `cd packages/db && node scripts/apply-local-schema.mjs && node scripts/verify-schema.mjs` against the target database URL.
 - Current schema verifier expectation: 34 tables, 29 RLS tables, 29 forced RLS

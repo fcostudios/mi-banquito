@@ -53,3 +53,30 @@
 {"story":"US-002","event":"ac_verify","ac":6,"method":"Vercel runtime logs and vercel curl","pass":true,"notes":"Deployment dpl_7Y2Jy3GZL4NQXDgM65zNWrXpTGhG returns / 200 and /api/health 200 behind Vercel protection; unauthenticated curl still returns Vercel protection 401"}
 {"story":"US-004","event":"ac_verify","ac":5,"method":"Vercel authenticated curl","pass":true,"notes":"Deployed preview GET /auth/login returns 307 to real Auth0 tenant with organization parameter and branch-alias callback URI"}
 {"story":"US-015","event":"ac_verify","ac":1,"method":"Vercel authenticated curl","pass":true,"notes":"Auth0 SDK login route is mounted on deployed preview and redirects to Auth0; passwordless email/callback session flow remains unverified"}
+{"story":"US-001","event":"build_pass","notes":"2026-06-29 closure gate: type-check, lint, test, build, fresh Docker DB drizzle push/apply/verify, Playwright chromium smoke, Lighthouse PWA, and sprint0 audit passed"}
+{"story":"US-006","event":"build_pass","notes":"2026-06-29 closure gate passed; CI placeholder env corrected to BLOB_READ_WRITE_TOKEN"}
+{"story":"US-007","event":"build_pass","notes":"2026-06-29 closure gate passed; accepted route-group deviation remains documented"}
+{"story":"US-008","event":"build_pass","notes":"2026-06-29 fresh Docker DB drizzle push/apply/verify passed: 34 tables, 29 RLS tables, 29 forced RLS tables, 29 policy tables, 14 trigger tables, 5 updated_at trigger tables"}
+{"story":"US-009","event":"build_pass","notes":"2026-06-29 closure gate passed; accepted token-source deviation remains documented"}
+{"story":"US-010","event":"build_pass","notes":"2026-06-29 Playwright chromium smoke passed and Lighthouse 11.7.1 PWA score was 1.00"}
+{"story":"US-011","event":"build_pass","notes":"2026-06-29 closure gate passed; full Auth0 session-to-tenant DB E2E remains pending"}
+{"story":"US-012","event":"build_pass","notes":"2026-06-29 closure gate passed; production deployment contains cron config and cron lambdas"}
+{"story":"US-013","event":"build_pass","notes":"2026-06-29 closure gate passed; latest main CI and design-system GitHub Actions runs are green"}
+{"story":"US-014","event":"build_pass","notes":"2026-06-29 closure gate passed; business-rule tests remain active in pnpm test"}
+{"story":"US-015","event":"build_pass","notes":"2026-06-29 closure gate passed; production Auth0 login route redirects to tenant authorize URL"}
+{"story":"US-002","event":"ac_verify","ac":6,"method":"Vercel inspect + vercel curl","pass":true,"notes":"Production deployment dpl_ETstPbBc5aSNWLoMaV2NwPSdxuAG is READY; aliases include mi-banquito.vercel.app, mi-banquito-francisco-lomas-projects.vercel.app, and mi-banquito-git-main-francisco-lomas-projects.vercel.app; /api/health returns ok"}
+{"story":"US-002","event":"blocked","notes":"Separate custom-domain requirement remains a product/account decision if the Vercel domain is not acceptable for Sprint 0"}
+{"story":"US-003","event":"ac_verify","ac":1,"method":"Neon connector","pass":true,"notes":"Neon project cool-shape-96550274 exists; production branch br-bold-cake-aiq95mz3 has compute ep-morning-shape-aisj4r2h; manual preview branch br-summer-bird-ai0g8tui has compute ep-wild-forest-ai3cqehm"}
+{"story":"US-003","event":"blocked","notes":"Automatic per-PR Neon branch lifecycle and cleanup policy remain unproven"}
+{"story":"US-004","event":"ac_verify","ac":5,"method":"Vercel production curl","pass":true,"notes":"Production GET /auth/login returns 307 to Auth0 tenant dev-zr8frrcdoybedlww.us.auth0.com with organization org_Chul6oWgE2ZzCNvE and callback https://mi-banquito-francisco-lomas-projects.vercel.app/auth/callback"}
+{"story":"US-004","event":"blocked","notes":"Passwordless email connection, Post-Login Action org UUID claim, and callback/session E2E require Auth0 account-side evidence and inbox/browser login"}
+{"story":"US-005","event":"ac_verify","ac":1,"method":"Vercel Blob CLI","pass":true,"notes":"Private Blob store mi-banquito-artifacts store_io0PnZdqgZSFmHEy is active in iad1 and BLOB_READ_WRITE_TOKEN is configured in Vercel Production, Preview, and Development"}
+{"story":"US-005","event":"blocked","notes":"Sentry project/DSN and Better Stack monitor are not provisioned in available env/tooling"}
+{"story":"US-006","event":"ac_verify","ac":1,"method":"Vercel env ls","pass":false,"notes":"BLOB_READ_WRITE_TOKEN is configured, but SENTRY_DSN and NEXT_PUBLIC_SENTRY_DSN are still absent from Vercel environments"}
+{"story":"US-010","event":"blocked","notes":"Real-device Android install prompt and iOS Add-to-Home-Screen acceptance evidence remain manual"}
+{"story":"US-012","event":"ac_verify","ac":1,"method":"Vercel inspect","pass":true,"notes":"Production deployed config includes crons for /api/cron/accrue-interest, /api/cron/award-treasurer-compensation, and /api/cron/drift-check"}
+{"story":"US-012","event":"ac_verify","ac":2,"method":"Vercel production curl","pass":true,"notes":"Unauthenticated production /api/cron/accrue-interest returns 401"}
+{"story":"US-012","event":"blocked","notes":"Authenticated production cron invocation could not be proven because production CRON_SECRET value is not available through this session; route unit tests prove bearer success path"}
+{"story":"US-013","event":"ac_verify","ac":1,"method":"GitHub branch protection + runs","pass":true,"notes":"main is protected with strict required checks verify and design-system, admin enforcement, linear history, and conversation resolution; latest main ci and design-system runs for a859e0d are successful"}
+{"story":"US-013","event":"blocked","notes":"CI uses local Postgres; real PR Neon preview migration dry-run remains pending if required literally"}
+{"story":"US-015","event":"blocked","notes":"Magic-link passwordless email callback/session E2E remains pending without inbox/browser-auth evidence"}
