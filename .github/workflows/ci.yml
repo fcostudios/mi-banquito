@@ -34,7 +34,7 @@ jobs:
       NEXT_PUBLIC_API_URL: http://localhost:3000
       NEXT_PUBLIC_SENTRY_DSN: https://public@example.ingest.sentry.io/1
       SENTRY_DSN: https://public@example.ingest.sentry.io/1
-      VERCEL_BLOB_READ_WRITE_TOKEN: ci-vercel-blob-placeholder
+      BLOB_READ_WRITE_TOKEN: ci-vercel-blob-placeholder
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
