@@ -355,7 +355,7 @@ export const organization = pgTable("organization", {
   updatedAt: timestamp("updated_at"),
   updatedBy: uuid("updated_by"),
   platformOperatorId: uuid("platform_operator_id").references((): AnyPgColumn => platformOperator.id),
-  firstRunStep: integer("first_run_step").notNull(),
+  firstRunStep: integer("first_run_step").default(1).notNull(),
   firstRunCompletedAt: timestamp("first_run_completed_at"),
 });
 
@@ -370,7 +370,7 @@ export const groupConfig = pgTable("group_config", {
   currencyCode: text("currency_code").notNull(),
   loanRateModel: text("loan_rate_model").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
   loanRateValue: numeric("loan_rate_value", { precision: 8, scale: 4 }).notNull(),
-  loanRatePeriodUnit: text("loan_rate_period_unit").notNull(),
+  loanRatePeriodUnit: text("loan_rate_period_unit").default("monthly").notNull(),
   loanGracePeriods: integer("loan_grace_periods").notNull(),
   loanToSavingsCapRatio: numeric("loan_to_savings_cap_ratio", { precision: 4, scale: 2 }).notNull(),
   interestResolution: text("interest_resolution").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
@@ -382,8 +382,8 @@ export const groupConfig = pgTable("group_config", {
   reconciliationToleranceAmount: numeric("reconciliation_tolerance_amount", { precision: 18, scale: 4 }).notNull(),
   lateThresholdDays: integer("late_threshold_days").notNull(),
   moraThresholdDays: integer("mora_threshold_days").notNull(),
-  fiscalYearStartMonth: integer("fiscal_year_start_month").notNull(),
-  fiscalYearStartDay: integer("fiscal_year_start_day").notNull(),
+  fiscalYearStartMonth: integer("fiscal_year_start_month").default(1).notNull(),
+  fiscalYearStartDay: integer("fiscal_year_start_day").default(1).notNull(),
   config: jsonb("config").notNull(),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
