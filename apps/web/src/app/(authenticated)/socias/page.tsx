@@ -1,43 +1,48 @@
-// SCR-members-list — TEMPLATE worked example (IMP-268): the READ leg of the
-// central seam. A force-dynamic Server Component that resolves the tenant from the
-// session (the SECURITY.md pattern — never from the request) and delegates the
-// org-scoped query to the @mi-banquito/domain Ledger service. Copy this shape; the dev
-// team owns the real list UI. One shape of many.
-import { auth0 } from "@/lib/auth0";
-import { getDbOrgIdFromUser } from "@/lib/auth/session-claims";
-import { ROUTE_LOGIN } from "@/lib/routes";
+import Link from "next/link";
 import { createLedgerService } from "@mi-banquito/domain";
-import { Tag } from "@mi-banquito/ui";
+import { ButtonPrimary, StatusPill } from "@mi-banquito/ui";
+import { requireTreasurer } from "@/lib/auth/require-session";
 import messages from "@/lib/i18n/en-US.json";
-import { redirect } from "next/navigation";
 
-// A page that reads request-time tenant data must opt out of prerender.
 export const dynamic = "force-dynamic";
 
-const pages = (messages as { pages?: Record<string, { title?: string }> }).pages ?? {};
+const copy = messages.sprint1.members;
 
-export default async function MemberListPage() {
-  const session = await auth0.getSession();
-  const orgId = getDbOrgIdFromUser(session?.user); // tenant from the session claim
-  if (!orgId) {
-    redirect(ROUTE_LOGIN);
-  }
-
-  const rows = await createLedgerService().listMembers(orgId);
-  const title = pages["socias"]?.title ?? "Members";
+export default async function MemberListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ nueva?: string }>;
+}) {
+  const session = await requireTreasurer();
+  const rows = await createLedgerService().listMembersWithCompliance(session.orgId);
+  const { nueva } = await searchParams;
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <ul className="mt-4 space-y-1">
+    <main className="flex w-full flex-col gap-6 p-6">
+      <header className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-text-primary">{copy.title}</h1>
+        <Link href="/socias/nueva">
+          <ButtonPrimary labelKey={copy.add} />
+        </Link>
+      </header>
+      <div className="grid gap-2">
+        {rows.length === 0 ? <p className="text-text-secondary">{copy.empty}</p> : null}
         {rows.map((row) => (
-          // the @mi-banquito/ui render leg — a real shared component (a presentational
-          // atom; the read page is a Server Component, so no event handlers).
-          <li key={row.id}>
-            <Tag label={row.displayName ?? row.id} />
-          </li>
+          <Link
+            key={row.id}
+            href={`/socias/${row.id}`}
+            className={`grid gap-2 rounded-md border border-border bg-surface p-4 text-text-primary ${nueva === row.id ? "ring-2 ring-primary" : ""}`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <strong>{row.displayName}</strong>
+              <StatusPill tone={row.complianceTone} label={row.complianceState} />
+            </div>
+            <div className="text-sm text-text-secondary">
+              {row.whatsappNumber ?? ""} {row.role} {row.status}
+            </div>
+          </Link>
         ))}
-      </ul>
-    </div>
+      </div>
+    </main>
   );
 }

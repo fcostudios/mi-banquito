@@ -1,49 +1,56 @@
-// Member detail — TEMPLATE worked example (IMP-269): a DYNAMIC-ROUTE leg of
-// the seam. Next 16 passes route params as a Promise, so the signature is
-// `params: Promise<{ id: string }>` and you MUST `await params`. force-dynamic
-// (it reads the session). Org-scoped by id via the @mi-banquito/domain Ledger service; the
-// @mi-banquito/ui Tag is the render leg. User-facing text comes from the i18n `messages`
-// import (a Server Component CANNOT call the client `useLocale()` hook) — never a
-// bare JSX string. Copy this shape for every `[id]` detail page.
-import { auth0 } from "@/lib/auth0";
-import { getDbOrgIdFromUser } from "@/lib/auth/session-claims";
-import { ROUTE_LOGIN } from "@/lib/routes";
-import { createLedgerService } from "@mi-banquito/domain";
-import { Tag } from "@mi-banquito/ui";
+import { notFound } from "next/navigation";
+import { ButtonDestructive, ButtonPrimary, FormField, InputNumber, InputText, StatusPill } from "@mi-banquito/ui";
+import { requireTreasurer } from "@/lib/auth/require-session";
+import { createLedgerService, mapComplianceStatusToTone } from "@mi-banquito/domain";
 import messages from "@/lib/i18n/en-US.json";
-import { redirect } from "next/navigation";
+import { transitionMemberStatusAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-const pages = (messages as { pages?: Record<string, { title?: string }> }).pages ?? {};
+const copy = messages.sprint1;
 
-export default async function MemberDetailPage(
-  { params }: { params: Promise<{ id: string }> },
-) {
+export default async function ScrMemberDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const session = await requireTreasurer();
   const { id } = await params;
-  const session = await auth0.getSession();
-  const orgId = getDbOrgIdFromUser(session?.user);
-  if (!orgId) {
-    redirect(ROUTE_LOGIN);
-  }
-
-  const row = await createLedgerService().getMember(orgId, id);
-
-  if (!row) {
-    const notFound = pages["socias/[id]"]?.title ?? "Not found";
-    return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold">{notFound}</h1>
-      </div>
-    );
-  }
+  const row = await createLedgerService().getMember(session.orgId, id);
+  if (!row) notFound();
+  const state = row.status === "activo" ? "al_dia" : "atrasado";
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold">{row.displayName ?? row.id}</h1>
-      <div className="mt-4">
-        <Tag label={row.id} />
+    <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6">
+      <header>
+        <h1 className="text-2xl font-bold text-text-primary">{row.displayName}</h1>
+        <p className="mt-2 text-text-secondary">{copy.members.detailTitle}</p>
+        <div className="mt-3">
+          <StatusPill tone={mapComplianceStatusToTone(state)} label={row.status} />
+        </div>
+      </header>
+      <p className="text-text-secondary">{copy.members.preserve}</p>
+      <div className="grid gap-4 md:grid-cols-2">
+        <form action={transitionMemberStatusAction} className="grid gap-3 rounded-md border border-border bg-surface p-4">
+          <input type="hidden" name="memberId" value={row.id} />
+          <input type="hidden" name="nextStatus" value="en_pausa" />
+          <FormField labelKey={copy.common.reason}>
+            <InputText labelKey={copy.common.reason} name="reason" required />
+          </FormField>
+          <ButtonPrimary type="submit" labelKey={copy.members.pause} />
+        </form>
+        <form action={transitionMemberStatusAction} className="grid gap-3 rounded-md border border-border bg-surface p-4">
+          <input type="hidden" name="memberId" value={row.id} />
+          <input type="hidden" name="nextStatus" value="baja" />
+          <FormField labelKey={copy.common.reason}>
+            <InputText labelKey={copy.common.reason} name="reason" required />
+          </FormField>
+          <FormField labelKey={copy.members.refund}>
+            <InputNumber name="refundAmount" defaultValue={row.initialSavingsBalance} min="0" step="0.01" />
+          </FormField>
+          <ButtonDestructive type="submit" labelKey={copy.members.deactivate} />
+        </form>
       </div>
-    </div>
+    </main>
   );
 }
