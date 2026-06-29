@@ -2,6 +2,7 @@
 // One direction: packages/db/schema.ts is the SSOT; these zod schemas
 // derive from it, so validation can't drift from the tables.
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import { z } from "zod";
 import {
   alert,
   auditLogEntry,
@@ -107,3 +108,100 @@ export const insertYearEndBalanceSnapshotSchema = createInsertSchema(yearEndBala
 export const selectYearEndBalanceSnapshotSchema = createSelectSchema(yearEndBalanceSnapshot);
 export const insertYearEndBalanceSnapshotLineSchema = createInsertSchema(yearEndBalanceSnapshotLine);
 export const selectYearEndBalanceSnapshotLineSchema = createSelectSchema(yearEndBalanceSnapshotLine);
+
+const moneyString = z.string().regex(/^\d+(\.\d{1,4})?$/, "Use a non-negative decimal amount");
+const uuidString = z.string().uuid();
+const e164 = z.string().regex(/^\+[1-9]\d{7,14}$/, "Use E.164 format, for example +593987654321");
+
+export const organizationCreateFormSchema = z.object({
+  displayName: z.string().trim().min(1),
+  countryCode: z.string().default("EC"),
+  currencyCode: z.string().default("USD"),
+  timezone: z.string().default("America/Guayaquil"),
+  defaultLanguage: z.string().default("es-EC"),
+  brandingLogoUri: z.string().url().optional().or(z.literal("")),
+});
+
+export const groupConfigFormSchema = z.object({
+  contributionCycleKind: z.enum(["monthly", "weekly"]),
+  contributionAmount: moneyString,
+  opensOnDay: z.coerce.number().int().min(1).max(31),
+  loanRateModel: z.literal("declining_balance"),
+  memberLoanRateValue: moneyString,
+  nonMemberLoanRateValue: moneyString,
+  loanRatePeriodUnit: z.enum(["monthly", "weekly"]),
+  loanGracePeriods: z.coerce.number().int().min(0).max(12),
+  loanToSavingsCapRatio: moneyString,
+  adminFeePct: moneyString,
+  referralCommissionAmount: moneyString,
+  treasurerCompensationKind: z.enum(["fixed", "percentage"]),
+  treasurerCompensationAmount: moneyString,
+  treasurerCompensationPeriod: z.enum(["monthly", "cycle"]),
+  baseFundQuotaFiscalYear: z.coerce.number().int().min(2000).max(2100),
+  baseFundQuotaAmount: moneyString,
+  fiscalYearStartMonth: z.coerce.number().int().min(1).max(12),
+  fiscalYearStartDay: z.coerce.number().int().min(1).max(31),
+  yearEndShareOutFormula: z.enum(["proportional_time_weighted"]),
+  reconciliationToleranceAmount: moneyString,
+  lateThresholdDays: z.coerce.number().int().min(0).max(365),
+  moraThresholdDays: z.coerce.number().int().min(1).max(365),
+}).refine((value) => value.moraThresholdDays >= value.lateThresholdDays, {
+  path: ["moraThresholdDays"],
+  message: "Mora threshold must be greater than or equal to late threshold",
+});
+
+export const firstRunNameFormSchema = z.object({
+  displayName: z.string().trim().min(1),
+  brandingLogoUri: z.string().url().optional().or(z.literal("")),
+  nextStep: z.literal("rules"),
+});
+
+export const firstRunCompleteFormSchema = z.object({
+  confirmed: z.literal("yes"),
+});
+
+export const addMemberFormSchema = z.object({
+  displayName: z.string().trim().min(1),
+  whatsappNumber: e164.optional().or(z.literal("")),
+  role: z.enum(["aportante", "tesorera", "presidente", "secretaria"]).default("aportante"),
+  joinedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  initialSavingsBalance: moneyString.default("0"),
+  notes: z.string().max(500).optional(),
+});
+
+export const memberStatusTransitionFormSchema = z.object({
+  memberId: uuidString,
+  nextStatus: z.enum(["en_pausa", "baja"]),
+  refundAmount: moneyString.optional(),
+  reason: z.string().trim().min(1),
+});
+
+export const contributionFormSchema = z.object({
+  clientRequestId: uuidString,
+  memberId: uuidString,
+  amount: moneyString,
+  datedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  slipPhotoId: uuidString.optional().or(z.literal("")),
+  notes: z.string().max(500).optional(),
+});
+
+export const reverseContributionFormSchema = z.object({
+  contributionId: uuidString,
+  reason: z.string().trim().min(1),
+});
+
+export const baseFundQuotaPaymentFormSchema = z.object({
+  memberId: uuidString,
+  fiscalYear: z.coerce.number().int().min(2000).max(2100),
+  amount: moneyString,
+  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  slipPhotoId: uuidString.optional().or(z.literal("")),
+});
+
+export type OrganizationCreateForm = z.infer<typeof organizationCreateFormSchema>;
+export type GroupConfigForm = z.infer<typeof groupConfigFormSchema>;
+export type AddMemberForm = z.infer<typeof addMemberFormSchema>;
+export type MemberStatusTransitionForm = z.infer<typeof memberStatusTransitionFormSchema>;
+export type ContributionForm = z.infer<typeof contributionFormSchema>;
+export type ReverseContributionForm = z.infer<typeof reverseContributionFormSchema>;
+export type BaseFundQuotaPaymentForm = z.infer<typeof baseFundQuotaPaymentFormSchema>;
