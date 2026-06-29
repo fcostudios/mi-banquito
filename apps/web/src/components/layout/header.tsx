@@ -1,6 +1,7 @@
 "use client";
 
 import { useUser } from "@auth0/nextjs-auth0";
+import { Bell } from "lucide-react";
 
 export function Header() {
   const { user } = useUser();
@@ -12,8 +13,12 @@ export function Header() {
         {/* Page title injected by route */}
       </div>
       <div className="flex items-center gap-4">
-        <button className="relative" aria-label="Notifications">
+        <button
+          className="relative flex h-9 w-9 items-center justify-center rounded-md text-text-secondary hover:bg-surface-muted"
+          aria-label="Notifications"
+        >
           <span className="sr-only">Notifications</span>
+          <Bell className="h-5 w-5" aria-hidden />
           <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
             3
           </span>
