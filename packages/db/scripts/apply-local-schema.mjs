@@ -4,6 +4,7 @@
 // migration carries RLS policies and triggers. This script applies that SQL and
 // then installs update timestamp triggers derived from the current migration.
 import { config } from "dotenv";
+import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import pg from "pg";
 import {
@@ -29,6 +30,15 @@ for (const path of [
   config({ path: fileURLToPath(path), override: true });
 }
 
+const SPRINT_1_ADDITIVE_MIGRATION_URL = new URL(
+  "../src/migrations/V20260629021302__sprint_1_foundation_gaps.sql",
+  import.meta.url
+);
+const SPRINT_1_ADDITIVE_TABLES = new Set([
+  "base_fund_quota_config",
+  "base_fund_quota_payment",
+]);
+
 function assertLocalDatabaseUrl(databaseUrl) {
   const parsed = new URL(databaseUrl);
   const localHosts = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
@@ -41,6 +51,42 @@ function assertLocalDatabaseUrl(databaseUrl) {
   throw new Error(
     `refusing to apply local schema to non-local host ${parsed.hostname}; set ALLOW_NON_LOCAL_SCHEMA_APPLY=1 to override`
   );
+}
+
+function isOnlyMissingSprint1AdditiveSchema(existingHealth) {
+  const errors = existingHealth?.errors ?? [];
+  if (errors.length === 0) {
+    return false;
+  }
+
+  let sawSprint1MissingObject = false;
+  for (const error of errors) {
+    if (
+      /^expected \d+ (tables|RLS-enabled tables|forced RLS tables|policies on tables), found \d+$/.test(
+        error
+      )
+    ) {
+      continue;
+    }
+
+    const missing = /^missing (tables|RLS-enabled tables|forced RLS tables|policies on tables): (.+)$/.exec(
+      error
+    );
+    if (!missing) {
+      return false;
+    }
+
+    const missingNames = missing[2].split(",").map((name) => name.trim());
+    if (
+      missingNames.length === 0 ||
+      !missingNames.every((name) => SPRINT_1_ADDITIVE_TABLES.has(name))
+    ) {
+      return false;
+    }
+    sawSprint1MissingObject = true;
+  }
+
+  return sawSprint1MissingObject;
 }
 
 async function currentSchemaHealth(databaseUrl) {
@@ -197,6 +243,8 @@ export async function main() {
       error.includes("triggers on tables") ||
       error.startsWith("missing updated_at update triggers on:")
     );
+  const onlyMissingSprint1AdditiveSchema =
+    isOnlyMissingSprint1AdditiveSchema(existingHealth);
 
   if (onlyMissingUpdatedAtTriggers) {
     try {
@@ -229,6 +277,20 @@ export async function main() {
       return 0;
     } catch (err) {
       console.error(`✗ local substrate apply failed: ${err.message}`);
+      return 1;
+    } finally {
+      await pool.end();
+    }
+  }
+  if (onlyMissingSprint1AdditiveSchema) {
+    try {
+      const sprint1Sql = readFileSync(SPRINT_1_ADDITIVE_MIGRATION_URL, "utf8");
+      await pool.query(sprint1Sql);
+      await installLocalSubstrate(pool);
+      console.log("local Sprint 1 additive schema applied");
+      return 0;
+    } catch (err) {
+      console.error(`✗ local Sprint 1 additive schema apply failed: ${err.message}`);
       return 1;
     } finally {
       await pool.end();
