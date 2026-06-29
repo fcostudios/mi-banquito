@@ -5,6 +5,7 @@
  */
 
 export const ROUTE_HOME = "/";
+export const ROUTE_ACCESS_DENIED = "/acceso-denegado";
 export const ROUTE_LOGIN = "/auth/login";
 export const ROUTE_SCR_ACCOUNTS = "/cuentas";
 export const ROUTE_SCR_ADD_MEMBER = "/socias/nueva";
@@ -46,6 +47,7 @@ export const ROUTE_SCR_YEAR_END_SHARE_OUT = "/reparto";
 /** All routes as an object for dynamic lookup */
 export const ROUTES = {
   HOME: ROUTE_HOME,
+  ACCESS_DENIED: ROUTE_ACCESS_DENIED,
   LOGIN: ROUTE_LOGIN,
   SCR_ACCOUNTS: ROUTE_SCR_ACCOUNTS,
   SCR_ADD_MEMBER: ROUTE_SCR_ADD_MEMBER,
