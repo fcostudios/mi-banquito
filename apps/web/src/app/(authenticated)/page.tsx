@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { createLedgerService } from "@mi-banquito/domain";
 import { StatusPill } from "@mi-banquito/ui";
-import { requireTreasurer } from "@/lib/auth/require-session";
+import { auth0 } from "@/lib/auth0";
+import { getDbOrgIdFromUser } from "@/lib/auth/session-claims";
 import messages from "@/lib/i18n/en-US.json";
 
 export const dynamic = "force-dynamic";
 
 export default async function ScrTreasurerHomePage() {
-  const session = await requireTreasurer();
-  const rows = await createLedgerService().listComplianceRows(session.orgId);
+  const session = await auth0.getSession();
+  const orgId = getDbOrgIdFromUser(session?.user);
+  const rows = orgId ? await createLedgerService().listComplianceRows(orgId) : [];
   const title = messages.pages.home.title;
 
   return (
