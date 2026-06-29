@@ -355,6 +355,8 @@ export const organization = pgTable("organization", {
   updatedAt: timestamp("updated_at"),
   updatedBy: uuid("updated_by"),
   platformOperatorId: uuid("platform_operator_id").references((): AnyPgColumn => platformOperator.id),
+  firstRunStep: integer("first_run_step").notNull(),
+  firstRunCompletedAt: timestamp("first_run_completed_at"),
 });
 
 export const groupConfig = pgTable("group_config", {
@@ -368,6 +370,7 @@ export const groupConfig = pgTable("group_config", {
   currencyCode: text("currency_code").notNull(),
   loanRateModel: text("loan_rate_model").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
   loanRateValue: numeric("loan_rate_value", { precision: 8, scale: 4 }).notNull(),
+  loanRatePeriodUnit: text("loan_rate_period_unit").notNull(),
   loanGracePeriods: integer("loan_grace_periods").notNull(),
   loanToSavingsCapRatio: numeric("loan_to_savings_cap_ratio", { precision: 4, scale: 2 }).notNull(),
   interestResolution: text("interest_resolution").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
@@ -379,10 +382,38 @@ export const groupConfig = pgTable("group_config", {
   reconciliationToleranceAmount: numeric("reconciliation_tolerance_amount", { precision: 18, scale: 4 }).notNull(),
   lateThresholdDays: integer("late_threshold_days").notNull(),
   moraThresholdDays: integer("mora_threshold_days").notNull(),
+  fiscalYearStartMonth: integer("fiscal_year_start_month").notNull(),
+  fiscalYearStartDay: integer("fiscal_year_start_day").notNull(),
   config: jsonb("config").notNull(),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
   createdByKind: group_config_created_by_kind_enum("created_by_kind").notNull(),
+});
+
+export const baseFundQuotaConfig = pgTable("base_fund_quota_config", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  fiscalYear: integer("fiscal_year").notNull(),
+  perMemberAmount: numeric("per_member_amount", { precision: 18, scale: 4 }).notNull(),
+  currencyCode: text("currency_code").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+  createdBy: uuid("created_by").notNull(),
+  createdByKind: text("created_by_kind").notNull(),
+});
+
+export const baseFundQuotaPayment = pgTable("base_fund_quota_payment", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  memberId: uuid("member_id").references((): AnyPgColumn => member.id).notNull(),
+  fiscalYear: integer("fiscal_year").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 4 }).notNull(),
+  currencyCode: text("currency_code").notNull(),
+  paidOn: date("paid_on").notNull(),
+  slipPhotoId: uuid("slip_photo_id").references((): AnyPgColumn => slipPhoto.id),
+  paidViaContributionId: uuid("paid_via_contribution_id").references((): AnyPgColumn => contribution.id),
+  createdAt: timestamp("created_at").notNull(),
+  createdBy: uuid("created_by").notNull(),
+  createdByKind: text("created_by_kind").notNull(),
 });
 
 export const platformOperator = pgTable("platform_operator", {

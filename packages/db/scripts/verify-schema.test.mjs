@@ -37,10 +37,10 @@ describe("schema verifier", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.errors).toContain("expected 29 RLS-enabled tables, found 0");
-    expect(result.errors).toContain("expected 29 forced RLS tables, found 0");
-    expect(result.errors).toContain("expected 29 policies on tables, found 0");
-    expect(result.errors).toContain("expected 14 triggers on tables, found 0");
+    expect(result.errors).toContain(`expected ${EXPECTED_RLS_TABLE_NAMES.length} RLS-enabled tables, found 0`);
+    expect(result.errors).toContain(`expected ${EXPECTED_FORCED_RLS_TABLE_NAMES.length} forced RLS tables, found 0`);
+    expect(result.errors).toContain(`expected ${EXPECTED_POLICY_TABLES.length} policies on tables, found 0`);
+    expect(result.errors).toContain(`expected ${EXPECTED_TRIGGER_TABLES.length} triggers on tables, found 0`);
   });
 
   it("fails when a table with updated_at is missing an update trigger", () => {
