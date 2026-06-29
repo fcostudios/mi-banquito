@@ -87,3 +87,6 @@
 {"story":"US-017","event":"ac_verify","ac":1,"method":"form inspection","pass":true,"notes":"admin/orgs/[id]/config exposes contribution, loan, base fund quota, fiscal year, share-out, reconciliation, compensation, and mora threshold fields"}
 {"story":"US-017","event":"ac_verify","ac":2,"method":"domain service inspection and unit test","pass":true,"notes":"saveGroupConfig closes the prior current version, inserts the next version, and leaves prior rows append-only"}
 {"story":"US-017","event":"ac_verify","ac":5,"method":"domain service inspection","pass":true,"notes":"saveGroupConfig scopes by route org id and upserts base_fund_quota_config on org_id plus fiscal_year"}
+{"story":"US-026","event":"ac_verify","ac":5,"method":"domain unit test","pass":true,"notes":"member creation ledger plan carries org_id, HR-1 entity version, and audit row; web action/page still pending"}
+{"story":"US-027","event":"ac_verify","ac":1,"method":"domain unit test","pass":true,"notes":"status transition plan supports en_pausa and baja with required reason and refund expense planning; web action/page still pending"}
+{"story":"US-031","event":"ac_verify","ac":2,"method":"domain unit test","pass":true,"notes":"compliance states map to green, amber, and red presentation tones; read-model page wiring still pending"}
