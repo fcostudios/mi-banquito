@@ -80,3 +80,4 @@
 {"story":"US-013","event":"ac_verify","ac":1,"method":"GitHub branch protection + runs","pass":true,"notes":"main is protected with strict required checks verify and design-system, admin enforcement, linear history, and conversation resolution; latest main ci and design-system runs for a859e0d are successful"}
 {"story":"US-013","event":"blocked","notes":"CI uses local Postgres; real PR Neon preview migration dry-run remains pending if required literally"}
 {"story":"US-015","event":"blocked","notes":"Magic-link passwordless email callback/session E2E remains pending without inbox/browser-auth evidence"}
+{"story":"SPRINT-0","event":"deferred_memory_saved","notes":"External blockers and accepted deviations persisted in docs/stories/DEFERRED_EXTERNAL_BLOCKERS.md for future Sprint 0 closure and Sprint 1 planning"}
