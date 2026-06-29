@@ -200,6 +200,8 @@ export const baseFundQuotaPaymentFormSchema = z.object({
 
 export type OrganizationCreateForm = z.infer<typeof organizationCreateFormSchema>;
 export type GroupConfigForm = z.infer<typeof groupConfigFormSchema>;
+export type FirstRunNameForm = z.infer<typeof firstRunNameFormSchema>;
+export type FirstRunCompleteForm = z.infer<typeof firstRunCompleteFormSchema>;
 export type AddMemberForm = z.infer<typeof addMemberFormSchema>;
 export type MemberStatusTransitionForm = z.infer<typeof memberStatusTransitionFormSchema>;
 export type ContributionForm = z.infer<typeof contributionFormSchema>;
