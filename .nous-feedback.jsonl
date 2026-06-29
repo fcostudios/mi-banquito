@@ -81,3 +81,9 @@
 {"story":"US-013","event":"blocked","notes":"CI uses local Postgres; real PR Neon preview migration dry-run remains pending if required literally"}
 {"story":"US-015","event":"blocked","notes":"Magic-link passwordless email callback/session E2E remains pending without inbox/browser-auth evidence"}
 {"story":"SPRINT-0","event":"deferred_memory_saved","notes":"External blockers and accepted deviations persisted in docs/stories/DEFERRED_EXTERNAL_BLOCKERS.md for future Sprint 0 closure and Sprint 1 planning"}
+{"story":"US-016","event":"ac_verify","ac":1,"method":"form inspection","pass":true,"notes":"admin/orgs/nueva captures display name, locale defaults, currency, timezone, language, and branding logo URI"}
+{"story":"US-016","event":"ac_verify","ac":2,"method":"domain service inspection and type-check","pass":true,"notes":"createOrganization inserts Organization, seeds GroupConfig v1, calls Auth0 provisioner seam, and writes audit log in one transaction"}
+{"story":"US-016","event":"ac_verify","ac":5,"method":"role guard inspection","pass":true,"notes":"createOrganizationAction requires PLATFORM_OPERATOR and maps Auth0 subject to platform_operator.id before writing UUID actor fields"}
+{"story":"US-017","event":"ac_verify","ac":1,"method":"form inspection","pass":true,"notes":"admin/orgs/[id]/config exposes contribution, loan, base fund quota, fiscal year, share-out, reconciliation, compensation, and mora threshold fields"}
+{"story":"US-017","event":"ac_verify","ac":2,"method":"domain service inspection and unit test","pass":true,"notes":"saveGroupConfig closes the prior current version, inserts the next version, and leaves prior rows append-only"}
+{"story":"US-017","event":"ac_verify","ac":5,"method":"domain service inspection","pass":true,"notes":"saveGroupConfig scopes by route org id and upserts base_fund_quota_config on org_id plus fiscal_year"}
