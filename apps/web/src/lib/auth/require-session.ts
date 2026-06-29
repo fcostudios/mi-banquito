@@ -23,6 +23,8 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
   const orgId = getDbOrgIdFromUser(session?.user);
   const roles = getRolesFromUser(session?.user);
   const userId = typeof session?.user?.sub === "string" ? session.user.sub : undefined;
+  const email = typeof session?.user?.email === "string" ? session.user.email.toLowerCase() : undefined;
+  const emailVerified = session?.user?.email_verified !== false;
 
   if (!userId) {
     redirect(ROUTE_LOGIN);
@@ -36,7 +38,7 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
     redirect(ROUTE_ACCESS_DENIED);
   }
 
-  const [membership] = await db
+  let [membership] = await db
     .select({ memberId: userOrgMembership.memberId, userAccountId: userAccount.id })
     .from(userAccount)
     .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
@@ -45,6 +47,36 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
       eq(userOrgMembership.orgId, orgId),
       eq(userOrgMembership.status, "active"),
     ));
+
+  if (!membership?.memberId && email && emailVerified) {
+    const pendingAuthSubject = `pending:${email}`;
+    const [pendingMembership] = await db
+      .select({
+        memberId: userOrgMembership.memberId,
+        userAccountId: userAccount.id,
+        authSubject: userAccount.authSubject,
+      })
+      .from(userAccount)
+      .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
+      .where(and(
+        eq(userAccount.email, email),
+        eq(userAccount.authSubject, pendingAuthSubject),
+        eq(userAccount.status, "active"),
+        eq(userOrgMembership.orgId, orgId),
+        eq(userOrgMembership.status, "active"),
+      ));
+
+    if (pendingMembership?.memberId) {
+      await db
+        .update(userAccount)
+        .set({ authSubject: userId, updatedAt: new Date() })
+        .where(and(
+          eq(userAccount.id, pendingMembership.userAccountId),
+          eq(userAccount.authSubject, pendingAuthSubject),
+        ));
+      membership = pendingMembership;
+    }
+  }
 
   if (!membership?.memberId) {
     redirect(ROUTE_ACCESS_DENIED);
