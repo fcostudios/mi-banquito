@@ -81,3 +81,40 @@
 {"story":"US-013","event":"blocked","notes":"CI uses local Postgres; real PR Neon preview migration dry-run remains pending if required literally"}
 {"story":"US-015","event":"blocked","notes":"Magic-link passwordless email callback/session E2E remains pending without inbox/browser-auth evidence"}
 {"story":"SPRINT-0","event":"deferred_memory_saved","notes":"External blockers and accepted deviations persisted in docs/stories/DEFERRED_EXTERNAL_BLOCKERS.md for future Sprint 0 closure and Sprint 1 planning"}
+{"story":"US-016","event":"ac_verify","ac":1,"method":"form inspection","pass":true,"notes":"admin/orgs/nueva captures display name, locale defaults, currency, timezone, language, and branding logo URI"}
+{"story":"US-016","event":"ac_verify","ac":2,"method":"domain service inspection and type-check","pass":true,"notes":"createOrganization inserts Organization, seeds GroupConfig v1, calls Auth0 provisioner seam, and writes audit log in one transaction"}
+{"story":"US-016","event":"ac_verify","ac":5,"method":"role guard inspection","pass":true,"notes":"createOrganizationAction requires PLATFORM_OPERATOR and maps Auth0 subject to platform_operator.id before writing UUID actor fields"}
+{"story":"US-017","event":"ac_verify","ac":1,"method":"form inspection","pass":true,"notes":"admin/orgs/[id]/config exposes contribution, loan, base fund quota, fiscal year, share-out, reconciliation, compensation, and mora threshold fields"}
+{"story":"US-017","event":"ac_verify","ac":2,"method":"domain service inspection and unit test","pass":true,"notes":"saveGroupConfig closes the prior current version, inserts the next version, and leaves prior rows append-only"}
+{"story":"US-017","event":"ac_verify","ac":5,"method":"domain service inspection","pass":true,"notes":"saveGroupConfig scopes by route org id and upserts base_fund_quota_config on org_id plus fiscal_year"}
+{"story":"US-026","event":"ac_verify","ac":5,"method":"domain unit test","pass":true,"notes":"member creation ledger plan carries org_id, HR-1 entity version, and audit row; web action/page still pending"}
+{"story":"US-027","event":"ac_verify","ac":1,"method":"domain unit test","pass":true,"notes":"status transition plan supports en_pausa and baja with required reason and refund expense planning; web action/page still pending"}
+{"story":"US-031","event":"ac_verify","ac":2,"method":"domain unit test","pass":true,"notes":"compliance states map to success, warning, and danger presentation tones"}
+{"story":"US-025","event":"ac_verify","ac":1,"method":"page inspection and domain unit test","pass":true,"notes":"bienvenida resumes persisted first-run step, shows read-only rules summary, and completes to home"}
+{"story":"US-026","event":"ac_verify","ac":1,"method":"server action and page inspection","pass":true,"notes":"socias/nueva captures name, WhatsApp, role, joined date, initial savings, and notes, then creates audited member row"}
+{"story":"US-027","event":"ac_verify","ac":2,"method":"server action and page inspection","pass":true,"notes":"member detail exposes en_pausa and baja transitions with required reason and refund amount for baja"}
+{"story":"US-028","event":"ac_verify","ac":2,"method":"domain unit test and page inspection","pass":true,"notes":"grupo edits rules through the same HR-1 group-config versioning path with member actor kind"}
+{"story":"US-029","event":"ac_verify","ac":3,"method":"server action and domain unit test","pass":true,"notes":"record contribution uses clientRequestId idempotency, open cycle resolution, member/date/amount/slip/notes fields, and audit logging"}
+{"story":"US-030","event":"ac_verify","ac":1,"method":"server action and domain unit test","pass":true,"notes":"history displays the reversal confirmation sentence and posts a required reason to append a reversal contribution"}
+{"story":"US-031","event":"ac_verify","ac":3,"method":"page inspection","pass":true,"notes":"home and socias use listComplianceRows/listMembersWithCompliance and StatusPill tones from domain output"}
+{"story":"US-032","event":"ac_verify","ac":4,"method":"server action and domain unit test","pass":true,"notes":"cuota-base/registrar records one base-fund quota payment per member/year through the unique upsert path"}
+{"story":"US-016","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-017","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-025","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-026","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-027","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-028","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-029","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-030","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-031","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-032","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-016","event":"done"}
+{"story":"US-017","event":"done"}
+{"story":"US-025","event":"done"}
+{"story":"US-026","event":"done"}
+{"story":"US-027","event":"done"}
+{"story":"US-028","event":"done"}
+{"story":"US-029","event":"done"}
+{"story":"US-030","event":"done"}
+{"story":"US-031","event":"done"}
+{"story":"US-032","event":"done"}

@@ -10,6 +10,10 @@ import {
   collectSchemaHealth,
   evaluateSchemaHealth,
   EXPECTED_FORCED_RLS_TABLE_NAMES,
+  EXPECTED_POLICY_TABLES,
+  EXPECTED_RLS_TABLE_NAMES,
+  EXPECTED_TABLE_NAMES,
+  EXPECTED_TRIGGER_TABLES,
   EXPECTED_UPDATED_AT_TABLES,
   readMigrationSql,
 } from "./verify-schema.mjs";
@@ -75,6 +79,64 @@ $$ LANGUAGE plpgsql;`,
   await pool.query(statements.join("\n"));
 }
 
+function assertSafeIdentifier(identifier) {
+  if (!/^[a-z_][a-z0-9_]*$/.test(identifier)) {
+    throw new Error(`unsafe SQL identifier: ${identifier}`);
+  }
+}
+
+async function installRlsPolicies(pool) {
+  const statements = [];
+
+  for (const tableName of EXPECTED_RLS_TABLE_NAMES) {
+    assertSafeIdentifier(tableName);
+    statements.push(`ALTER TABLE ${tableName} ENABLE ROW LEVEL SECURITY;`);
+  }
+
+  for (const tableName of EXPECTED_POLICY_TABLES) {
+    assertSafeIdentifier(tableName);
+    const policyName = `${tableName}_tenant_isolation`;
+    assertSafeIdentifier(policyName);
+    statements.push(
+      `DROP POLICY IF EXISTS ${policyName} ON ${tableName};`,
+      `CREATE POLICY ${policyName} ON ${tableName}
+  USING (org_id = current_setting('app.current_org_id', true)::uuid)
+  WITH CHECK (org_id = current_setting('app.current_org_id', true)::uuid);`,
+    );
+  }
+
+  if (statements.length > 0) {
+    await pool.query(statements.join("\n"));
+  }
+}
+
+async function installAppendOnlyTriggers(pool) {
+  if (EXPECTED_TRIGGER_TABLES.length === 0) {
+    return;
+  }
+
+  const statements = [
+    `CREATE OR REPLACE FUNCTION block_append_only_mutation() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'append_only: % is forbidden on %', TG_OP, TG_TABLE_NAME;
+END;
+$$ LANGUAGE plpgsql;`,
+  ];
+
+  for (const tableName of EXPECTED_TRIGGER_TABLES) {
+    assertSafeIdentifier(tableName);
+    statements.push(
+      `DROP TRIGGER IF EXISTS ${tableName}_no_mutate ON ${tableName};`,
+      `CREATE TRIGGER ${tableName}_no_mutate
+  BEFORE UPDATE OR DELETE ON ${tableName}
+  FOR EACH ROW
+  EXECUTE FUNCTION block_append_only_mutation();`,
+    );
+  }
+
+  await pool.query(statements.join("\n"));
+}
+
 async function forceRls(pool) {
   if (EXPECTED_FORCED_RLS_TABLE_NAMES.length === 0) {
     return;
@@ -85,6 +147,13 @@ async function forceRls(pool) {
       .map((tableName) => `ALTER TABLE ${tableName} FORCE ROW LEVEL SECURITY;`)
       .join("\n"),
   );
+}
+
+async function installLocalSubstrate(pool) {
+  await installRlsPolicies(pool);
+  await forceRls(pool);
+  await installAppendOnlyTriggers(pool);
+  await installUpdatedAtTriggers(pool);
 }
 
 export async function main() {
@@ -114,6 +183,20 @@ export async function main() {
   const onlyMissingForcedRls =
     existingHealth?.errors.length > 0 &&
     existingHealth.errors.every((error) => error.includes("forced RLS tables"));
+  const hasAllExpectedTables =
+    existingHealth &&
+    !(existingHealth.errors ?? []).some((error) => error.startsWith(`expected ${EXPECTED_TABLE_NAMES.length} tables`)) &&
+    !(existingHealth.errors ?? []).some((error) => error.startsWith("missing tables:"));
+  const onlyMissingLocalSubstrate =
+    hasAllExpectedTables &&
+    existingHealth.errors.length > 0 &&
+    existingHealth.errors.every((error) =>
+      error.includes("RLS-enabled tables") ||
+      error.includes("forced RLS tables") ||
+      error.includes("policies on tables") ||
+      error.includes("triggers on tables") ||
+      error.startsWith("missing updated_at update triggers on:")
+    );
 
   if (onlyMissingUpdatedAtTriggers) {
     try {
@@ -134,6 +217,18 @@ export async function main() {
       return 0;
     } catch (err) {
       console.error(`✗ local forced RLS apply failed: ${err.message}`);
+      return 1;
+    } finally {
+      await pool.end();
+    }
+  }
+  if (onlyMissingLocalSubstrate) {
+    try {
+      await installLocalSubstrate(pool);
+      console.log("local RLS, policy, trigger substrate applied");
+      return 0;
+    } catch (err) {
+      console.error(`✗ local substrate apply failed: ${err.message}`);
       return 1;
     } finally {
       await pool.end();
