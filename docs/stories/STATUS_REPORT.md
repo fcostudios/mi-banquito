@@ -8,6 +8,10 @@ The Sprint 0 local foundation gate passes: type-check, lint, unit tests, build, 
 
 Use `Local Verified` for work proven by this repository and local commands. Use `External Blocked` for work that needs account/project evidence. Use `Partial` when a local substrate exists but the original story still has unmet acceptance criteria.
 
+Durable memory for deferred external work lives in
+[`DEFERRED_EXTERNAL_BLOCKERS.md`](DEFERRED_EXTERNAL_BLOCKERS.md). Check that file
+before closing Sprint 0 or planning Sprint 1.
+
 ## Story Status
 
 | Story | Status | Evidence | Remaining Work |

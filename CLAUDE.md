@@ -13,6 +13,7 @@ Drizzle, Auth0) — there is no separate backend service or container.
 |------|-------|-----------|
 | **This file (CLAUDE.md)** | Root | Always — architecture rules, current sprint, coding standards |
 | **Sprint plan** | `docs/stories/SPRINT_PLAN.md` | Before picking a story — sprints, status, execution order |
+| **Deferred external blockers** | `docs/stories/DEFERRED_EXTERNAL_BLOCKERS.md` | Before closing Sprint 0 or starting Sprint 1 — account/manual evidence still pending |
 | **Story files** | `docs/stories/` | Before coding — full spec: ACs, API contracts, entity changes, screen wiring |
 | **Screen specs (TOON)** | `docs/screens/` | For UI — `dataSource` tells you which API to call per section |
 | **Architecture** | `docs/specs/09_architecture.md` | For bounded-context structure + API conventions |
