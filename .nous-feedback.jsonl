@@ -98,3 +98,23 @@
 {"story":"US-030","event":"ac_verify","ac":1,"method":"server action and domain unit test","pass":true,"notes":"history displays the reversal confirmation sentence and posts a required reason to append a reversal contribution"}
 {"story":"US-031","event":"ac_verify","ac":3,"method":"page inspection","pass":true,"notes":"home and socias use listComplianceRows/listMembersWithCompliance and StatusPill tones from domain output"}
 {"story":"US-032","event":"ac_verify","ac":4,"method":"server action and domain unit test","pass":true,"notes":"cuota-base/registrar records one base-fund quota payment per member/year through the unique upsert path"}
+{"story":"US-016","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-017","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-025","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-026","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-027","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-028","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-029","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-030","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-031","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-032","event":"build_pass","notes":"Sprint 1 gate passed: pnpm type-check, pnpm lint, pnpm test, pnpm build, fresh local DB drizzle push/apply/verify, and Playwright chromium/mobile smoke"}
+{"story":"US-016","event":"done"}
+{"story":"US-017","event":"done"}
+{"story":"US-025","event":"done"}
+{"story":"US-026","event":"done"}
+{"story":"US-027","event":"done"}
+{"story":"US-028","event":"done"}
+{"story":"US-029","event":"done"}
+{"story":"US-030","event":"done"}
+{"story":"US-031","event":"done"}
+{"story":"US-032","event":"done"}
