@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { auth0 } from "@/lib/auth0";
 import { getDbOrgIdFromUser, getRolesFromUser } from "@/lib/auth/session-claims";
 import { hasMinRole, type AppRole } from "@/lib/auth/roles";
-import { ROUTE_LOGIN } from "@/lib/routes";
+import { ROUTE_ACCESS_DENIED, ROUTE_LOGIN } from "@/lib/routes";
 import { db } from "@mi-banquito/db";
 import { platformOperator, userAccount, userOrgMembership } from "@mi-banquito/db/schema";
 
@@ -24,12 +24,16 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
   const roles = getRolesFromUser(session?.user);
   const userId = typeof session?.user?.sub === "string" ? session.user.sub : undefined;
 
-  if (!orgId || !userId) {
+  if (!userId) {
     redirect(ROUTE_LOGIN);
   }
 
+  if (!orgId) {
+    redirect(ROUTE_ACCESS_DENIED);
+  }
+
   if (!hasMinRole(roles, minRole)) {
-    throw new Error("Forbidden");
+    redirect(ROUTE_ACCESS_DENIED);
   }
 
   const [membership] = await db
@@ -43,7 +47,7 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
     ));
 
   if (!membership?.memberId) {
-    throw new Error("Forbidden");
+    redirect(ROUTE_ACCESS_DENIED);
   }
 
   return { userId, actorId: membership.memberId, orgId, roles };
@@ -59,7 +63,7 @@ export async function requirePlatformOperator(): Promise<PlatformSession> {
   }
 
   if (!hasMinRole(roles, "PLATFORM_OPERATOR")) {
-    throw new Error("Forbidden");
+    redirect(ROUTE_ACCESS_DENIED);
   }
 
   const [operator] = await db
@@ -68,7 +72,7 @@ export async function requirePlatformOperator(): Promise<PlatformSession> {
     .where(eq(platformOperator.authSubject, userId));
 
   if (!operator) {
-    throw new Error("Forbidden");
+    redirect(ROUTE_ACCESS_DENIED);
   }
 
   return {

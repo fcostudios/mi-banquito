@@ -152,6 +152,12 @@
     "year_end": "Year-end share-out"
   },
   "pages": {
+    "accessDenied": {
+      "eyebrow": "Acceso restringido",
+      "title": "Tu usuario no está listo para entrar",
+      "description": "La sesión de Auth0 existe, pero falta la membresía, el grupo o los roles requeridos por Mi Banquito. Cierra sesión y avisa al administrador del banquito para completar tu acceso.",
+      "logout": "Cerrar sesión"
+    },
     "admin": {
       "title": "Admin Inicio"
     },

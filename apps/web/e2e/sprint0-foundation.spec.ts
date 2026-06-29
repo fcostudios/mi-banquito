@@ -19,6 +19,12 @@ test("unauthenticated home redirects to Auth0 login route", async ({ request }) 
   expect(response.headers()["location"]).toBe("/auth/login");
 });
 
+test("access denied page requires an Auth0 session", async ({ request }) => {
+  const response = await request.get("/acceso-denegado", { maxRedirects: 0 });
+  expect(response.status()).toBe(307);
+  expect(response.headers()["location"]).toBe("/auth/login");
+});
+
 test("Auth0 login route is mounted and redirects to Auth0", async ({ request }) => {
   const response = await request.get("/auth/login", { maxRedirects: 0 });
 
