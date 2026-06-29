@@ -1,0 +1,38 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+apps/web/.next/
+dist/
+packages/*/dist/
+*.tsbuildinfo
+apps/web/public/sw.js
+
+# Drizzle
+apps/web/drizzle/meta/_journal.json.bak
+
+# Vercel project metadata
+.vercel/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Logs
+*.log
