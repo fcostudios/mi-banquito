@@ -69,6 +69,71 @@
       "proportionalTimeWeighted": "Proporcional por tiempo"
     }
   },
+  "sprint1": {
+    "common": {
+      "save": "Guardar",
+      "member": "Socia",
+      "amount": "Monto",
+      "date": "Fecha",
+      "displayName": "Nombre visible",
+      "notes": "Notas",
+      "reason": "Razón",
+      "role": "Rol",
+      "status": "Estado",
+      "whatsapp": "WhatsApp",
+      "initialSavings": "Ahorro inicial",
+      "roles": {
+        "aportante": "aportante",
+        "tesorera": "tesorera",
+        "presidente": "presidente",
+        "secretaria": "secretaria"
+      }
+    },
+    "firstRun": {
+      "title": "Bienvenida",
+      "intro": "Completa la configuración inicial del banquito.",
+      "nameStep": "Nombre del grupo",
+      "rulesStep": "Reglas vigentes",
+      "completeStep": "Confirmación",
+      "displayName": "Nombre visible",
+      "logo": "Logo",
+      "continue": "Continuar",
+      "finish": "Finalizar bienvenida",
+      "confirmed": "Confirmo la configuración"
+    },
+    "members": {
+      "title": "Socias",
+      "newTitle": "Agregar socia",
+      "detailTitle": "Detalle de socia",
+      "add": "Agregar socia",
+      "empty": "Aún no hay socias registradas.",
+      "pause": "Pausar",
+      "deactivate": "Dar de baja",
+      "refund": "Monto a devolver",
+      "preserve": "La socia se conserva en el historial; solo cambia su estado."
+    },
+    "group": {
+      "title": "Mi grupo",
+      "description": "Revisa y edita reglas con versionado HR-1.",
+      "edit": "Editar reglas",
+      "newLoans": "Los préstamos existentes conservan la configuración de origen."
+    },
+    "contributions": {
+      "title": "Registrar aporte",
+      "historyTitle": "Historial",
+      "submit": "Registrar aporte",
+      "reverse": "Reversar",
+      "clientRequest": "Solicitud",
+      "slip": "Comprobante",
+      "empty": "Aún no hay aportes registrados."
+    },
+    "quota": {
+      "title": "Registrar cuota base",
+      "fiscalYear": "Año fiscal",
+      "paidOn": "Pagado el",
+      "submit": "Registrar cuota base"
+    }
+  },
   "nav": {
     "accounts": "Group accounts",
     "arrears": "Overdue",

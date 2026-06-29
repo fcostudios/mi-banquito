@@ -1,16 +1,27 @@
-// SCAFFOLD (SCR-treasurer-home) — generated page stub. Build the real screen per its spec: docs/screens/SCR-treasurer-home.json
+import Link from "next/link";
+import { createLedgerService } from "@mi-banquito/domain";
+import { StatusPill } from "@mi-banquito/ui";
+import { requireTreasurer } from "@/lib/auth/require-session";
 import messages from "@/lib/i18n/en-US.json";
 
-const pages = (messages as { pages?: Record<string, { title?: string }> }).pages ?? {};
+export const dynamic = "force-dynamic";
 
-export default function ScrTreasurerHomePage() {
-  const title = pages["home"]?.title ?? "Inicio";
+export default async function ScrTreasurerHomePage() {
+  const session = await requireTreasurer();
+  const rows = await createLedgerService().listComplianceRows(session.orgId);
+  const title = messages.pages.home.title;
+
   return (
-    <div className="p-6" data-scaffold={"SCR-treasurer-home"}>
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="mt-2 text-text-secondary">
-        {"SCR-treasurer-home"}
-      </p>
-    </div>
+    <main className="flex w-full flex-col gap-6 p-6">
+      <h1 className="text-2xl font-bold text-text-primary">{title}</h1>
+      <section className="grid gap-3">
+        {rows.map((row) => (
+          <Link key={row.memberId} href={`/socias/${row.memberId}`} className="flex items-center justify-between rounded-md border border-border bg-surface p-4">
+            <span className="font-medium text-text-primary">{row.displayName}</span>
+            <StatusPill tone={row.tone} label={row.state} />
+          </Link>
+        ))}
+      </section>
+    </main>
   );
 }

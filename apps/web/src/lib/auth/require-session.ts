@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { auth0 } from "@/lib/auth0";
 import { getDbOrgIdFromUser, getRolesFromUser } from "@/lib/auth/session-claims";
 import { hasMinRole, type AppRole } from "@/lib/auth/roles";
 import { ROUTE_LOGIN } from "@/lib/routes";
 import { db } from "@mi-banquito/db";
-import { platformOperator } from "@mi-banquito/db/schema";
+import { platformOperator, userAccount, userOrgMembership } from "@mi-banquito/db/schema";
 
 export type RequiredSession = {
   userId: string;
@@ -32,7 +32,21 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
     throw new Error("Forbidden");
   }
 
-  return { userId, actorId: userId, orgId, roles };
+  const [membership] = await db
+    .select({ memberId: userOrgMembership.memberId, userAccountId: userAccount.id })
+    .from(userAccount)
+    .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
+    .where(and(
+      eq(userAccount.authSubject, userId),
+      eq(userOrgMembership.orgId, orgId),
+      eq(userOrgMembership.status, "active"),
+    ));
+
+  if (!membership?.memberId) {
+    throw new Error("Forbidden");
+  }
+
+  return { userId, actorId: membership.memberId, orgId, roles };
 }
 
 export async function requirePlatformOperator(): Promise<PlatformSession> {
