@@ -101,6 +101,41 @@
       "finish": "Finalizar bienvenida",
       "confirmed": "Confirmo la configuración"
     },
+    "dashboard": {
+      "eyebrow": "Inicio operativo",
+      "title": "¿Qué quieres registrar hoy?",
+      "description": "Accesos rápidos y estado vivo de las socias del banquito.",
+      "primaryCta": "Registrar aporte",
+      "actionsLabel": "Acciones principales",
+      "actions": {
+        "contribution": "Registrar aporte",
+        "contributionHint": "Abono mensual, parcial o extraordinario.",
+        "quota": "Registrar cuota base",
+        "quotaHint": "Pago anual del fondo base.",
+        "member": "Agregar socia",
+        "memberHint": "Alta con rol, WhatsApp y ahorro inicial.",
+        "history": "Ver historial",
+        "historyHint": "Movimientos y reversos recientes."
+      },
+      "states": {
+        "alDia": "al día",
+        "atrasado": "atrasado",
+        "enMora": "en mora"
+      },
+      "complianceTitle": "Estado de socias",
+      "complianceDescription": "Misma fuente de verdad que la lista de socias.",
+      "viewMembers": "Ver socias",
+      "current": "Al día",
+      "late": "Atrasadas",
+      "mora": "En mora",
+      "empty": "Aún no hay socias registradas.",
+      "pendingRegularization": "Pendientes de regularizar",
+      "pendingRegularizationHint": "Depósitos en cuenta personal sin pasar al fondo.",
+      "accounts": "Cuentas del grupo",
+      "accountsValue": "Configurar cuentas",
+      "liquidity": "Mes más bajo proyectado",
+      "liquidityValue": "Ver liquidez"
+    },
     "members": {
       "title": "Socias",
       "newTitle": "Agregar socia",
@@ -110,7 +145,14 @@
       "pause": "Pausar",
       "deactivate": "Dar de baja",
       "refund": "Monto a devolver",
-      "preserve": "La socia se conserva en el historial; solo cambia su estado."
+      "preserve": "La socia se conserva en el historial; solo cambia su estado.",
+      "active": "Activas",
+      "paused": "Pausadas",
+      "inactive": "Baja",
+      "statusSummary": "Resumen de estado",
+      "openDetail": "Abrir detalle",
+      "memberInfo": "Información",
+      "statusActions": "Cambios de estado"
     },
     "group": {
       "title": "Mi grupo",
