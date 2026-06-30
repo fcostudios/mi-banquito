@@ -55,6 +55,7 @@ vi.mock("@mi-banquito/db/schema", () => ({
     memberId: "user_org_membership.member_id",
     userId: "user_org_membership.user_id",
     orgId: "user_org_membership.org_id",
+    role: "user_org_membership.role",
     status: "user_org_membership.status",
   },
 }));
@@ -119,5 +120,34 @@ describe("requireRole", () => {
       authSubject: "auth0|real-user",
       updatedAt: expect.any(Date),
     });
+  });
+
+  it("uses configured Auth0 organization and active DB membership role when custom claims are absent", async () => {
+    vi.stubEnv("AUTH0_ORGANIZATION", "org_Chul6oWgE2ZzCNvE");
+    vi.stubEnv("AUTH0_ORGANIZATION_DB_ORG_ID", "11111111-1111-4111-8111-111111111111");
+    const { requireTreasurer } = await import("./require-session");
+    getSession.mockResolvedValueOnce({
+      user: {
+        sub: "auth0|real-user",
+        email: "pancho@fcostudios.io",
+        email_verified: true,
+        org_id: "org_Chul6oWgE2ZzCNvE",
+      },
+    });
+    selectResponses.push([
+      {
+        memberId: "33333333-3333-4333-8333-333333333333",
+        userAccountId: "44444444-4444-4444-8444-444444444444",
+        role: "TESORERA",
+      },
+    ]);
+
+    await expect(requireTreasurer()).resolves.toMatchObject({
+      userId: "auth0|real-user",
+      actorId: "33333333-3333-4333-8333-333333333333",
+      orgId: "11111111-1111-4111-8111-111111111111",
+      roles: ["TESORERA"],
+    });
+    expect(warn).not.toHaveBeenCalled();
   });
 });

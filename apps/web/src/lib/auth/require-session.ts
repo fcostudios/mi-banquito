@@ -30,16 +30,27 @@ function logAuthGateDenied(reason: GateDenyReason, details: Record<string, unkno
   console.warn("auth_gate_denied", { reason, ...details });
 }
 
+function getConfiguredDbOrgIdFromNativeOrg(nativeOrgId: unknown): string | undefined {
+  if (
+    typeof nativeOrgId === "string" &&
+    process.env.AUTH0_ORGANIZATION_DB_ORG_ID &&
+    nativeOrgId === process.env.AUTH0_ORGANIZATION
+  ) {
+    return process.env.AUTH0_ORGANIZATION_DB_ORG_ID;
+  }
+  return undefined;
+}
+
 export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
   const session = await auth0.getSession();
-  const orgId = getDbOrgIdFromUser(session?.user);
-  const roles = getRolesFromUser(session?.user);
+  const orgId = getDbOrgIdFromUser(session?.user) ?? getConfiguredDbOrgIdFromNativeOrg(session?.user?.org_id);
+  const claimRoles = getRolesFromUser(session?.user);
   const userId = typeof session?.user?.sub === "string" ? session.user.sub : undefined;
   const email = typeof session?.user?.email === "string" ? session.user.email.toLowerCase() : undefined;
   const emailVerified = session?.user?.email_verified !== false;
 
   if (!userId) {
-    logAuthGateDenied("missing_user", { hasUserId: false, hasOrgId: Boolean(orgId), roles });
+    logAuthGateDenied("missing_user", { hasUserId: false, hasOrgId: Boolean(orgId), roles: claimRoles });
     redirect(ROUTE_LOGIN);
   }
 
@@ -48,18 +59,13 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
       hasUserId: true,
       hasOrgId: false,
       nativeOrgId: typeof session?.user?.org_id === "string" ? session.user.org_id : undefined,
-      roles,
+      roles: claimRoles,
     });
     redirect(ROUTE_ACCESS_DENIED);
   }
 
-  if (!hasMinRole(roles, minRole)) {
-    logAuthGateDenied("missing_role", { hasUserId: true, orgId, roles, minRole });
-    redirect(ROUTE_ACCESS_DENIED);
-  }
-
   let [membership] = await db
-    .select({ memberId: userOrgMembership.memberId, userAccountId: userAccount.id })
+    .select({ memberId: userOrgMembership.memberId, userAccountId: userAccount.id, role: userOrgMembership.role })
     .from(userAccount)
     .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
     .where(and(
@@ -74,6 +80,7 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
       .select({
         memberId: userOrgMembership.memberId,
         userAccountId: userAccount.id,
+        role: userOrgMembership.role,
         authSubject: userAccount.authSubject,
       })
       .from(userAccount)
@@ -102,10 +109,17 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
     logAuthGateDenied("missing_membership", {
       hasUserId: true,
       orgId,
-      roles,
+      roles: claimRoles,
       hasEmail: Boolean(email),
       emailVerified,
     });
+    redirect(ROUTE_ACCESS_DENIED);
+  }
+
+  const roles = claimRoles.length > 0 ? claimRoles : [membership.role].filter(Boolean);
+
+  if (!hasMinRole(roles, minRole)) {
+    logAuthGateDenied("missing_role", { hasUserId: true, orgId, roles, minRole });
     redirect(ROUTE_ACCESS_DENIED);
   }
 
