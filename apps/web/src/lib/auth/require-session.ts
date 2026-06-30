@@ -18,6 +18,18 @@ export type PlatformSession = Omit<RequiredSession, "orgId"> & {
   orgId?: string;
 };
 
+type GateDenyReason =
+  | "missing_user"
+  | "missing_org_claim"
+  | "missing_role"
+  | "missing_membership"
+  | "missing_platform_role"
+  | "missing_platform_operator";
+
+function logAuthGateDenied(reason: GateDenyReason, details: Record<string, unknown>) {
+  console.warn("auth_gate_denied", { reason, ...details });
+}
+
 export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
   const session = await auth0.getSession();
   const orgId = getDbOrgIdFromUser(session?.user);
@@ -27,14 +39,22 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
   const emailVerified = session?.user?.email_verified !== false;
 
   if (!userId) {
+    logAuthGateDenied("missing_user", { hasUserId: false, hasOrgId: Boolean(orgId), roles });
     redirect(ROUTE_LOGIN);
   }
 
   if (!orgId) {
+    logAuthGateDenied("missing_org_claim", {
+      hasUserId: true,
+      hasOrgId: false,
+      nativeOrgId: typeof session?.user?.org_id === "string" ? session.user.org_id : undefined,
+      roles,
+    });
     redirect(ROUTE_ACCESS_DENIED);
   }
 
   if (!hasMinRole(roles, minRole)) {
+    logAuthGateDenied("missing_role", { hasUserId: true, orgId, roles, minRole });
     redirect(ROUTE_ACCESS_DENIED);
   }
 
@@ -79,6 +99,13 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
   }
 
   if (!membership?.memberId) {
+    logAuthGateDenied("missing_membership", {
+      hasUserId: true,
+      orgId,
+      roles,
+      hasEmail: Boolean(email),
+      emailVerified,
+    });
     redirect(ROUTE_ACCESS_DENIED);
   }
 
@@ -91,10 +118,12 @@ export async function requirePlatformOperator(): Promise<PlatformSession> {
   const userId = typeof session?.user?.sub === "string" ? session.user.sub : undefined;
 
   if (!userId) {
+    logAuthGateDenied("missing_user", { hasUserId: false, roles });
     redirect(ROUTE_LOGIN);
   }
 
   if (!hasMinRole(roles, "PLATFORM_OPERATOR")) {
+    logAuthGateDenied("missing_platform_role", { hasUserId: true, roles });
     redirect(ROUTE_ACCESS_DENIED);
   }
 
@@ -104,6 +133,7 @@ export async function requirePlatformOperator(): Promise<PlatformSession> {
     .where(eq(platformOperator.authSubject, userId));
 
   if (!operator) {
+    logAuthGateDenied("missing_platform_operator", { hasUserId: true, roles });
     redirect(ROUTE_ACCESS_DENIED);
   }
 
