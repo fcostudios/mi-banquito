@@ -20,7 +20,15 @@ sufficient. See `CLAUDE.md` for the summary; this is the authoritative gate.
    pnpm build               # next build --webpack (serverless / PWA bundler)
    ```
 
-4. **Schema applies on a fresh database (and is verified):**
+4. **Sprint UI closure gates pass when closing an implemented sprint:**
+   ```bash
+   pnpm audit:sprint1-ui    # Sprint 1: no Sprint 1 scaffold screens; shell/home markers present
+   ```
+   - This does not replace rendered QA. It prevents claiming a sprint is closed
+     while its committed route files still expose generated scaffolds or the
+     stabilized app shell/home markers are missing.
+
+5. **Schema applies on a fresh database (and is verified):**
    - **Prerequisite:** `DATABASE_URL` must be set to a reachable Postgres before this
      step — copy `.env.example` → `.env` and set it (or run `task setup`). The bare
      `push` below silently no-ops against an unset/unreachable URL.
@@ -36,13 +44,13 @@ sufficient. See `CLAUDE.md` for the summary; this is the authoritative gate.
    - Once applied, a migration file is immutable — add a new one; never edit it.
    - Every Drizzle column has a corresponding migration column.
 
-5. **Report evidence** in `.nous-feedback.jsonl`:
+6. **Report evidence** in `.nous-feedback.jsonl`:
    ```jsonl
    {"story":"US-XXX","event":"build_pass","notes":"type-check + lint + build green"}
    {"story":"US-XXX","event":"done"}
    ```
 
-6. **Adversarial AC verification** — see
+7. **Adversarial AC verification** — see
    [`FEEDBACK.md`](FEEDBACK.md) (AC Verification Protocol).
 
 ## Story Rejection Criteria
