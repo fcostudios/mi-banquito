@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // client-side, so this server component stays SSR/prerender-safe.
   return (
     <html lang="es-EC">
-      <body className="antialiased">
+      <body className="bg-background text-text-primary antialiased">
         <AuthSessionProvider>{children}</AuthSessionProvider>
       </body>
     </html>

@@ -1,16 +1,42 @@
-// SCAFFOLD (SCR-admin-orgs-new) — generated page stub. Build the real screen per its spec: docs/screens/SCR-admin-orgs-new.json
+import { ButtonPrimary, FormField, InputText } from "@mi-banquito/ui";
 import messages from "@/lib/i18n/en-US.json";
+import { createOrganizationAction } from "../actions";
 
-const pages = (messages as { pages?: Record<string, { title?: string }> }).pages ?? {};
+export const dynamic = "force-dynamic";
+
+const copy = messages.adminOrgs.new;
 
 export default function ScrAdminOrgsNewPage() {
-  const title = pages["admin/orgs/nueva"]?.title ?? "Nueva organización";
   return (
-    <div className="p-6" data-scaffold={"SCR-admin-orgs-new"}>
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="mt-2 text-text-secondary">
-        {"SCR-admin-orgs-new"}
-      </p>
-    </div>
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
+      <div>
+        <h1 className="text-2xl font-bold text-text-primary">{copy.title}</h1>
+        <p className="mt-2 text-text-secondary">{copy.description}</p>
+      </div>
+
+      <form action={createOrganizationAction} className="grid gap-4">
+        <FormField labelKey={copy.displayName}>
+          <InputText labelKey={copy.displayName} name="displayName" required minLength={1} />
+        </FormField>
+
+        <input type="hidden" name="countryCode" value="EC" />
+        <input type="hidden" name="currencyCode" value="USD" />
+        <input type="hidden" name="timezone" value="America/Guayaquil" />
+        <input type="hidden" name="defaultLanguage" value="es-EC" />
+
+        <FormField labelKey={copy.brandingLogoUri}>
+          <InputText
+            labelKey={copy.brandingLogoUri}
+            name="brandingLogoUri"
+            inputMode="url"
+            placeholderKey={copy.brandingPlaceholder}
+          />
+        </FormField>
+
+        <div>
+          <ButtonPrimary type="submit" labelKey={copy.submit} />
+        </div>
+      </form>
+    </main>
   );
 }

@@ -1,16 +1,47 @@
-// SCAFFOLD (SCR-record-contribution) — generated page stub. Build the real screen per its spec: docs/screens/SCR-record-contribution.json
+import { randomUUID } from "node:crypto";
+import { createLedgerService } from "@mi-banquito/domain";
+import { ButtonPrimary, FormField, InputNumber, InputText, Select } from "@mi-banquito/ui";
+import { requireTreasurer } from "@/lib/auth/require-session";
+import { todayISO } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
+import { recordContributionAction } from "./actions";
 
-const pages = (messages as { pages?: Record<string, { title?: string }> }).pages ?? {};
+export const dynamic = "force-dynamic";
 
-export default function ScrRecordContributionPage() {
-  const title = pages["aportes/registrar"]?.title ?? "Registrar aporte";
+const copy = messages.sprint1;
+
+export default async function ScrRecordContributionPage() {
+  const session = await requireTreasurer();
+  const members = await createLedgerService().listMembers(session.orgId);
+
   return (
-    <div className="p-6" data-scaffold={"SCR-record-contribution"}>
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="mt-2 text-text-secondary">
-        {"SCR-record-contribution"}
-      </p>
-    </div>
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
+      <h1 className="text-2xl font-bold text-text-primary">{copy.contributions.title}</h1>
+      <form action={recordContributionAction} className="grid gap-4 rounded-md border border-border bg-surface p-5">
+        <input type="hidden" name="clientRequestId" value={randomUUID()} />
+        <FormField labelKey={copy.common.member}>
+          <Select name="memberId" required>
+            {members.map((row) => (
+              <option key={row.id} value={row.id}>{row.displayName}</option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField labelKey={copy.common.amount}>
+          <InputNumber name="amount" min="0" step="0.01" required />
+        </FormField>
+        <FormField labelKey={copy.common.date}>
+          <InputText labelKey={copy.common.date} name="datedOn" type="date" defaultValue={todayISO()} required />
+        </FormField>
+        <FormField labelKey={copy.contributions.slip}>
+          <InputText labelKey={copy.contributions.slip} name="slipPhotoId" />
+        </FormField>
+        <FormField labelKey={copy.common.notes}>
+          <InputText labelKey={copy.common.notes} name="notes" />
+        </FormField>
+        <div>
+          <ButtonPrimary type="submit" labelKey={copy.contributions.submit} />
+        </div>
+      </form>
+    </main>
   );
 }

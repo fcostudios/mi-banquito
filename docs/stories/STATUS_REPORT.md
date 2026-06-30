@@ -1,6 +1,7 @@
 # Sprint 0 Status Report
 
 Generated: 2026-06-29
+Closure updated: 2026-06-30
 
 ## Summary
 
@@ -11,6 +12,20 @@ Use `Local Verified` for work proven by this repository and local commands. Use 
 Durable memory for deferred external work lives in
 [`DEFERRED_EXTERNAL_BLOCKERS.md`](DEFERRED_EXTERNAL_BLOCKERS.md). Check that file
 before closing Sprint 0 or planning Sprint 1.
+
+## Closure Decision
+
+Sprint 0 is closed as **repository/local foundation complete with accepted
+external deferrals**. Do not reopen Sprint 0 for implementation work unless one
+of the deferred account/manual-evidence items is explicitly pulled back into an
+active sprint. The unresolved account/manual items remain tracked in
+`DEFERRED_EXTERNAL_BLOCKERS.md` and `.nous-feedback.jsonl`.
+
+Sprint 1 is closed as **implemented and verified**, with the same Sprint 0
+external deferrals still inherited for live Auth0/passwordless, Sentry, Better
+Stack, device-install, and Neon-preview evidence. Sprint 1-specific stories have
+`done` events in `.nous-feedback.jsonl`; follow-on sprint work starts at Sprint 2
+in `SPRINT_PLAN.md`.
 
 ## Story Status
 

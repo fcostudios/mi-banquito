@@ -9,6 +9,173 @@
     "home": "Home",
     "orgsNew": "New organization"
   },
+  "adminOrgs": {
+    "new": {
+      "title": "Nueva organización",
+      "description": "Crea el banquito y deja lista su configuración inicial.",
+      "displayName": "Nombre visible",
+      "brandingLogoUri": "Logo",
+      "brandingPlaceholder": "https://...",
+      "submit": "Crear organización"
+    },
+    "detail": {
+      "title": "Detalle de org",
+      "status": "Estado",
+      "country": "País",
+      "currency": "Moneda",
+      "timezone": "Zona horaria",
+      "language": "Idioma",
+      "configLink": "Configurar reglas",
+      "createdAt": "Creada"
+    },
+    "config": {
+      "title": "Configuración de reglas",
+      "description": "Ajusta las reglas vigentes del grupo con versionado HR-1.",
+      "currentVersion": "Versión actual",
+      "aportes": "Aportes",
+      "prestamos": "Préstamos",
+      "cuotaBase": "Cuota base",
+      "cierreReparto": "Cierre y reparto",
+      "alertasAtraso": "Alertas de atraso",
+      "contributionCycleKind": "Ciclo de aporte",
+      "contributionAmount": "Monto de aporte",
+      "opensOnDay": "Día de apertura",
+      "loanRateModel": "Modelo de tasa",
+      "memberLoanRateValue": "Tasa para socias",
+      "nonMemberLoanRateValue": "Tasa para no socias",
+      "loanRatePeriodUnit": "Periodo de tasa",
+      "loanGracePeriods": "Periodos de gracia",
+      "loanToSavingsCapRatio": "Tope préstamo / ahorro",
+      "adminFeePct": "Comisión administrativa",
+      "referralCommissionAmount": "Comisión por referida",
+      "treasurerCompensationKind": "Compensación tesorera",
+      "treasurerCompensationAmount": "Monto compensación",
+      "treasurerCompensationPeriod": "Periodo compensación",
+      "baseFundQuotaFiscalYear": "Año fiscal",
+      "baseFundQuotaAmount": "Monto cuota base",
+      "fiscalYearStartMonth": "Mes inicio fiscal",
+      "fiscalYearStartDay": "Día inicio fiscal",
+      "yearEndShareOutFormula": "Fórmula de reparto",
+      "reconciliationToleranceAmount": "Tolerancia de conciliación",
+      "lateThresholdDays": "Días hasta atraso",
+      "moraThresholdDays": "Días hasta mora",
+      "save": "Guardar configuración",
+      "monthly": "Mensual",
+      "weekly": "Semanal",
+      "decliningBalance": "Saldo decreciente",
+      "fixed": "Fija",
+      "percentage": "Porcentaje",
+      "cycle": "Ciclo",
+      "proportionalTimeWeighted": "Proporcional por tiempo"
+    }
+  },
+  "sprint1": {
+    "common": {
+      "save": "Guardar",
+      "member": "Socia",
+      "amount": "Monto",
+      "date": "Fecha",
+      "displayName": "Nombre visible",
+      "notes": "Notas",
+      "reason": "Razón",
+      "role": "Rol",
+      "status": "Estado",
+      "whatsapp": "WhatsApp",
+      "initialSavings": "Ahorro inicial",
+      "roles": {
+        "aportante": "aportante",
+        "tesorera": "tesorera",
+        "presidente": "presidente",
+        "secretaria": "secretaria"
+      }
+    },
+    "firstRun": {
+      "title": "Bienvenida",
+      "intro": "Completa la configuración inicial del banquito.",
+      "nameStep": "Nombre del grupo",
+      "rulesStep": "Reglas vigentes",
+      "completeStep": "Confirmación",
+      "displayName": "Nombre visible",
+      "logo": "Logo",
+      "continue": "Continuar",
+      "finish": "Finalizar bienvenida",
+      "confirmed": "Confirmo la configuración"
+    },
+    "dashboard": {
+      "eyebrow": "Inicio operativo",
+      "title": "¿Qué quieres registrar hoy?",
+      "description": "Accesos rápidos y estado vivo de las socias del banquito.",
+      "primaryCta": "Registrar aporte",
+      "actionsLabel": "Acciones principales",
+      "actions": {
+        "contribution": "Registrar aporte",
+        "contributionHint": "Abono mensual, parcial o extraordinario.",
+        "quota": "Registrar cuota base",
+        "quotaHint": "Pago anual del fondo base.",
+        "member": "Agregar socia",
+        "memberHint": "Alta con rol, WhatsApp y ahorro inicial.",
+        "history": "Ver historial",
+        "historyHint": "Movimientos y reversos recientes."
+      },
+      "states": {
+        "alDia": "al día",
+        "atrasado": "atrasado",
+        "enMora": "en mora"
+      },
+      "complianceTitle": "Estado de socias",
+      "complianceDescription": "Misma fuente de verdad que la lista de socias.",
+      "viewMembers": "Ver socias",
+      "current": "Al día",
+      "late": "Atrasadas",
+      "mora": "En mora",
+      "empty": "Aún no hay socias registradas.",
+      "pendingRegularization": "Pendientes de regularizar",
+      "pendingRegularizationHint": "Depósitos en cuenta personal sin pasar al fondo.",
+      "accounts": "Cuentas del grupo",
+      "accountsValue": "Configurar cuentas",
+      "liquidity": "Mes más bajo proyectado",
+      "liquidityValue": "Ver liquidez"
+    },
+    "members": {
+      "title": "Socias",
+      "newTitle": "Agregar socia",
+      "detailTitle": "Detalle de socia",
+      "add": "Agregar socia",
+      "empty": "Aún no hay socias registradas.",
+      "pause": "Pausar",
+      "deactivate": "Dar de baja",
+      "refund": "Monto a devolver",
+      "preserve": "La socia se conserva en el historial; solo cambia su estado.",
+      "active": "Activas",
+      "paused": "Pausadas",
+      "inactive": "Baja",
+      "statusSummary": "Resumen de estado",
+      "openDetail": "Abrir detalle",
+      "memberInfo": "Información",
+      "statusActions": "Cambios de estado"
+    },
+    "group": {
+      "title": "Mi grupo",
+      "description": "Revisa y edita reglas con versionado HR-1.",
+      "edit": "Editar reglas",
+      "newLoans": "Los préstamos existentes conservan la configuración de origen."
+    },
+    "contributions": {
+      "title": "Registrar aporte",
+      "historyTitle": "Historial",
+      "submit": "Registrar aporte",
+      "reverse": "Reversar",
+      "clientRequest": "Solicitud",
+      "slip": "Comprobante",
+      "empty": "Aún no hay aportes registrados."
+    },
+    "quota": {
+      "title": "Registrar cuota base",
+      "fiscalYear": "Año fiscal",
+      "paidOn": "Pagado el",
+      "submit": "Registrar cuota base"
+    }
+  },
   "nav": {
     "accounts": "Group accounts",
     "arrears": "Overdue",
@@ -27,6 +194,12 @@
     "year_end": "Year-end share-out"
   },
   "pages": {
+    "accessDenied": {
+      "eyebrow": "Acceso restringido",
+      "title": "Tu usuario no está listo para entrar",
+      "description": "La sesión de Auth0 existe, pero falta la membresía, el grupo o los roles requeridos por Mi Banquito. Cierra sesión y avisa al administrador del banquito para completar tu acceso.",
+      "logout": "Cerrar sesión"
+    },
     "admin": {
       "title": "Admin Inicio"
     },

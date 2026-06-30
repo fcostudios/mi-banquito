@@ -2,38 +2,43 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUser } from "@auth0/nextjs-auth0";
 import { navItems } from "@/components/shell/nav-items.gen";
-import { getRolesFromUser } from "@/lib/auth/session-claims";
 
 const MOBILE_ITEM_LIMIT = 5;
 
-export function MobileBar() {
+type MobileBarProps = {
+  roles: string[];
+};
+
+function isActivePath(pathname: string, href: string) {
+  return pathname === href || (href !== "/" && pathname.startsWith(href));
+}
+
+export function MobileBar({ roles }: MobileBarProps) {
   const pathname = usePathname();
-  const { user } = useUser();
-  const userRoles = getRolesFromUser(user as Record<string, unknown> | undefined);
   const visible = navItems
     .filter((item) => {
       if (!item.roles || item.roles.length === 0) return true;
-      return item.roles.some((role) => userRoles.includes(role));
+      return item.roles.some((role) => roles.includes(role));
     })
     .slice(0, MOBILE_ITEM_LIMIT);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 flex md:hidden h-14 border-t bg-white">
+    <nav className="fixed inset-x-0 bottom-0 z-30 grid min-h-16 grid-flow-col border-t border-border bg-surface md:hidden" aria-label="Navegación móvil">
       {visible.map((item) => {
-        const active = pathname.startsWith(item.href);
-        // Data-driven active color from the project's primary token (IMP-241).
+        const active = isActivePath(pathname, item.href);
+        const Icon = item.icon;
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-1 flex-col items-center justify-center text-xs ${
-              active ? "" : "text-gray-500"
+            aria-current={active ? "page" : undefined}
+            className={`flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-xs font-medium ${
+              active ? "text-primary" : "text-text-secondary"
             }`}
-            style={active ? { color: "var(--color-primary)" } : undefined}
           >
-            {item.label}
+            <Icon className="h-4 w-4 shrink-0" aria-hidden />
+            <span className="max-w-full truncate">{item.label}</span>
           </Link>
         );
       })}
