@@ -18,6 +18,13 @@ export type PlatformSession = Omit<RequiredSession, "orgId"> & {
   orgId?: string;
 };
 
+export type ShellSession = {
+  displayName: string;
+  email?: string;
+  orgId?: string;
+  roles: string[];
+};
+
 type GateDenyReason =
   | "missing_user"
   | "missing_org_claim"
@@ -41,7 +48,25 @@ function getConfiguredDbOrgIdFromNativeOrg(nativeOrgId: unknown): string | undef
   return undefined;
 }
 
+function getDevelopmentBypassSession(): RequiredSession | undefined {
+  if (process.env.E2E_AUTH_BYPASS !== "1" || process.env.NODE_ENV === "production") {
+    return undefined;
+  }
+
+  return {
+    userId: "e2e-auth-bypass",
+    actorId: "33333333-3333-4333-8333-333333333333",
+    orgId: process.env.AUTH0_ORGANIZATION_DB_ORG_ID ?? "11111111-1111-4111-8111-111111111111",
+    roles: ["TESORERA"],
+  };
+}
+
 export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
+  const bypass = getDevelopmentBypassSession();
+  if (bypass && hasMinRole(bypass.roles, minRole)) {
+    return bypass;
+  }
+
   const session = await auth0.getSession();
   const orgId = getDbOrgIdFromUser(session?.user) ?? getConfiguredDbOrgIdFromNativeOrg(session?.user?.org_id);
   const claimRoles = getRolesFromUser(session?.user);
@@ -161,4 +186,41 @@ export async function requirePlatformOperator(): Promise<PlatformSession> {
 
 export async function requireTreasurer(): Promise<RequiredSession> {
   return requireRole("TESORERA");
+}
+
+export async function getShellSession(): Promise<ShellSession> {
+  const bypass = getDevelopmentBypassSession();
+  if (bypass) {
+    return {
+      displayName: "Tesorera QA",
+      email: "qa@mi-banquito.local",
+      orgId: bypass.orgId,
+      roles: bypass.roles,
+    };
+  }
+
+  const session = await auth0.getSession();
+  const user = session?.user;
+  const userId = typeof user?.sub === "string" ? user.sub : undefined;
+  const email = typeof user?.email === "string" ? user.email.toLowerCase() : undefined;
+  const displayName = typeof user?.name === "string" && user.name.trim() ? user.name : email ?? "";
+  const orgId = getDbOrgIdFromUser(user) ?? getConfiguredDbOrgIdFromNativeOrg(user?.org_id);
+  const claimRoles = getRolesFromUser(user);
+
+  if (!userId || !orgId) {
+    return { displayName, email, orgId, roles: claimRoles };
+  }
+
+  const [membership] = await db
+    .select({ role: userOrgMembership.role })
+    .from(userAccount)
+    .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
+    .where(and(
+      eq(userAccount.authSubject, userId),
+      eq(userOrgMembership.orgId, orgId),
+      eq(userOrgMembership.status, "active"),
+    ));
+
+  const roles = claimRoles.length > 0 ? claimRoles : [membership?.role].filter((role): role is string => Boolean(role));
+  return { displayName, email, orgId, roles };
 }
