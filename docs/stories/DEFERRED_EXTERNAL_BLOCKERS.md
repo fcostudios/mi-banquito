@@ -1,6 +1,6 @@
 # Deferred External Blockers
 
-Last updated: 2026-06-29
+Last updated: 2026-06-30
 
 This file is the durable memory for Sprint 0 work that passed the local repo gate
 but still needs external account evidence, manual acceptance, or a product
@@ -34,3 +34,10 @@ Sprint 0 is declared fully closed:
 | US-008 | Current schema/RLS verification exists, but deeper append-only, audit, and period-lock behavior is deferred to substrate stories. | Accept current Sprint 0 substrate evidence or expand tests now. |
 | US-009 | `packages/design-system/tokens.json` is canonical; no duplicate locked token JSON file was added. | Accept token-source deviation or implement literal story file paths. |
 | US-014 | BR-01 fixture and invariant tests exist; deliberate mutation checking remains a review exercise. | Accept the current harness as the Sprint 0 business-rule gate. |
+
+## Sprint 1 Closure Note
+
+Sprint 1 has no additional external blocker list of its own. It is closed with
+the Sprint 0 external deferrals still active. The Sprint 1 implementation and UI
+closure gates are recorded in `.nous-feedback.jsonl` for US-016, US-017,
+US-025, US-026, US-027, US-028, US-029, US-030, US-031, and US-032.
