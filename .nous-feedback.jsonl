@@ -118,3 +118,5 @@
 {"story":"US-030","event":"done"}
 {"story":"US-031","event":"done"}
 {"story":"US-032","event":"done"}
+{"story":"SPRINT-0","event":"closed_with_deferrals","notes":"Closed 2026-06-30 as repository/local foundation complete. External/account/manual evidence remains tracked in docs/stories/DEFERRED_EXTERNAL_BLOCKERS.md: custom domain decision, Neon PR lifecycle, Auth0 passwordless/session evidence, Sentry/Better Stack, device PWA install, cron secret invocation, and accepted deviations."}
+{"story":"SPRINT-1","event":"closed_with_deferrals","notes":"Closed 2026-06-30 as implemented and verified. All Sprint 1 stories have done events; inherited Sprint 0 external deferrals remain active. Latest production deployment and Sprint 1 UI closure gate passed."}
