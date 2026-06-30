@@ -4,6 +4,7 @@ const getSession = vi.fn();
 const redirect = vi.fn((path: string): never => {
   throw new Error(`NEXT_REDIRECT:${path}`);
 });
+const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 const selectResponses: unknown[][] = [];
 const updateSet = vi.fn();
 const updateWhere = vi.fn();
@@ -66,6 +67,7 @@ describe("requireRole", () => {
     db.update.mockClear();
     updateSet.mockReset();
     updateWhere.mockReset();
+    warn.mockClear();
     selectResponses.length = 0;
   });
 
@@ -83,6 +85,11 @@ describe("requireRole", () => {
 
     await expect(requireTreasurer()).rejects.toThrow("NEXT_REDIRECT:/acceso-denegado");
     expect(redirect).toHaveBeenCalledWith("/acceso-denegado");
+    expect(warn).toHaveBeenCalledWith("auth_gate_denied", expect.objectContaining({
+      reason: "missing_org_claim",
+      hasUserId: true,
+      roles: [],
+    }));
   });
 
   it("links an active pending email membership to the Auth0 subject on first login", async () => {
