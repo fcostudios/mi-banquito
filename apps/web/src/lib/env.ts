@@ -8,6 +8,7 @@ export const serverEnvSchema = z.object({
   AUTH0_CLIENT_SECRET: nonEmpty,
   AUTH0_DOMAIN: nonEmpty,
   AUTH0_ORGANIZATION: z.string().optional(),
+  AUTH0_ORGANIZATION_DB_ORG_ID: z.string().uuid().optional(),
   AUTH0_SECRET: z.string().min(32),
   CRON_SECRET: nonEmpty,
   DATABASE_URL: nonEmpty,
