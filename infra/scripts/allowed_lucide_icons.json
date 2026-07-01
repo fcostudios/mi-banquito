@@ -2,14 +2,22 @@
   "version": "1",
   "description": "Lucide icon allow-list — canonical source is the ICON_MAP in regenerate-sidebar.py. Consumed by Nous/System/spec_parsers/sidebar_parser.py and ready-check 100 (IMP-137 / HR-30). DO NOT EDIT BY HAND — regenerated on every regenerate-sidebar.py invocation.",
   "icons": [
+    "AlertCircle",
+    "Banknote",
     "Bell",
     "BookOpen",
     "Building2",
     "Calendar",
+    "CheckCircle2",
     "Circle",
+    "FileText",
+    "HandCoins",
+    "History",
+    "Home",
     "Kanban",
     "Key",
     "LayoutDashboard",
+    "LineChart",
     "List",
     "ListChecks",
     "Menu",
@@ -22,6 +30,7 @@
     "UploadCloud",
     "User",
     "Users",
+    "Wallet",
     "Webhook"
   ]
 }

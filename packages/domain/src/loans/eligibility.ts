@@ -22,6 +22,13 @@ function parseMoney4(value: string): bigint {
   return BigInt(whole) * BigInt(10000) + BigInt(fraction.padEnd(4, "0"));
 }
 
+function formatMoney2(value: bigint): string {
+  const cents = (value + BigInt(50)) / BigInt(100);
+  const whole = cents / BigInt(100);
+  const fraction = (cents % BigInt(100)).toString().padStart(2, "0");
+  return `${whole.toString()}.${fraction}`;
+}
+
 function parseRatio2(value: string): bigint {
   if (!/^\d+(\.\d{1,2})?$/.test(value)) {
     throw new Error("ratio value must be a non-negative decimal with up to 2 places");
@@ -55,9 +62,13 @@ export function evaluateLoanEligibility(input: {
     : parseMoney4(input.guarantorSavingsBalance ?? "0.0000");
 
   if (requestedPrincipal > availableCapital) {
+    const reason = availableCapital === BigInt(0)
+      ? "Todavía no hay aportes registrados en el fondo del grupo. Registra un aporte antes de crear un préstamo."
+      : `El fondo del grupo tiene $${formatMoney2(availableCapital)} disponible. Baja el monto o registra más aportes antes de crear este préstamo.`;
+
     return {
       ok: false,
-      reason: "No hay suficiente dinero disponible para este préstamo. Baja el monto o registra aportes primero.",
+      reason,
     };
   }
 
