@@ -176,13 +176,26 @@ export const memberStatusTransitionFormSchema = z.object({
   reason: z.string().trim().min(1),
 });
 
+export const contributionSourceSchema = z.enum(["bank_transfer", "cash_in_meeting", "petty_cash_deposit"]);
+export const contributionKindSchema = z.enum(["regular", "partial"]);
+
 export const contributionFormSchema = z.object({
   clientRequestId: uuidString,
   memberId: uuidString,
   amount: moneyString,
   datedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  paymentSource: contributionSourceSchema.default("cash_in_meeting"),
+  kind: contributionKindSchema.default("regular"),
   slipPhotoId: uuidString.optional().or(z.literal("")),
   notes: z.string().max(500).optional(),
+}).superRefine((value, ctx) => {
+  if (value.paymentSource !== "cash_in_meeting" && !value.slipPhotoId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["slipPhotoId"],
+      message: "Slip photo is required for bank and petty-cash deposits",
+    });
+  }
 });
 
 export const reverseContributionFormSchema = z.object({
@@ -198,6 +211,66 @@ export const baseFundQuotaPaymentFormSchema = z.object({
   slipPhotoId: uuidString.optional().or(z.literal("")),
 });
 
+export const loanOriginationFormSchema = z.object({
+  clientRequestId: uuidString,
+  borrowerKind: z.enum(["member", "non_member"]).default("member"),
+  borrowerMemberId: uuidString.optional().or(z.literal("")),
+  nonMemberDisplayName: z.string().trim().optional(),
+  nonMemberWhatsappNumber: e164.optional().or(z.literal("")),
+  nonMemberNationalIdLast4: z.string().regex(/^\d{4}$/).optional().or(z.literal("")),
+  nonMemberNotes: z.string().max(500).optional(),
+  guarantorMemberId: uuidString.optional().or(z.literal("")),
+  referrerMemberId: uuidString.optional().or(z.literal("")),
+  principalAmount: moneyString,
+  termPeriods: z.coerce.number().int().min(1).max(120),
+  originatedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  purpose: z.string().max(500).optional(),
+}).superRefine((value, ctx) => {
+  if (value.borrowerKind === "member" && !value.borrowerMemberId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["borrowerMemberId"],
+      message: "Member borrower is required",
+    });
+  }
+
+  if (value.borrowerKind === "non_member") {
+    if (!value.nonMemberDisplayName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["nonMemberDisplayName"],
+        message: "Non-member name is required",
+      });
+    }
+
+    if (!value.guarantorMemberId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["guarantorMemberId"],
+        message: "Guarantor is required",
+      });
+    }
+  }
+});
+
+export const loanRepaymentFormSchema = z.object({
+  clientRequestId: uuidString,
+  loanId: uuidString,
+  amount: moneyString,
+  datedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  slipPhotoId: uuidString.optional().or(z.literal("")),
+  notes: z.string().max(500).optional(),
+});
+
+export const cronReplayFormSchema = z.object({
+  endpoint: z.enum(["accrue-interest", "award-treasurer-compensation", "drift-check"]),
+  fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+}).refine((value) => value.fromDate <= value.toDate, {
+  path: ["toDate"],
+  message: "Replay end date must be on or after start date",
+});
+
 export type OrganizationCreateForm = z.infer<typeof organizationCreateFormSchema>;
 export type GroupConfigForm = z.infer<typeof groupConfigFormSchema>;
 export type FirstRunNameForm = z.infer<typeof firstRunNameFormSchema>;
@@ -207,3 +280,6 @@ export type MemberStatusTransitionForm = z.infer<typeof memberStatusTransitionFo
 export type ContributionForm = z.infer<typeof contributionFormSchema>;
 export type ReverseContributionForm = z.infer<typeof reverseContributionFormSchema>;
 export type BaseFundQuotaPaymentForm = z.infer<typeof baseFundQuotaPaymentFormSchema>;
+export type LoanOriginationForm = z.infer<typeof loanOriginationFormSchema>;
+export type LoanRepaymentForm = z.infer<typeof loanRepaymentFormSchema>;
+export type CronReplayForm = z.infer<typeof cronReplayFormSchema>;

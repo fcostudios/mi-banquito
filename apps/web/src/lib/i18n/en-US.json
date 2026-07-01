@@ -166,6 +166,13 @@
       "submit": "Registrar aporte",
       "reverse": "Reversar",
       "clientRequest": "Solicitud",
+      "kind": "Tipo de aporte",
+      "kindRegular": "Regular",
+      "kindPartial": "Parcial",
+      "paymentSource": "Origen del pago",
+      "bankTransfer": "Transferencia bancaria",
+      "cashInMeeting": "Efectivo en reunión",
+      "pettyCashDeposit": "Depósito desde caja chica",
       "slip": "Comprobante",
       "empty": "Aún no hay aportes registrados."
     },
