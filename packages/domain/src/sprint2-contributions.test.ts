@@ -3,7 +3,7 @@ import { getTableName } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ContributionForm } from "@mi-banquito/contracts";
-import { auditLogEntry, contribution, contributionCycle } from "@mi-banquito/db/schema";
+import { auditLogEntry, baseFundQuotaPayment, contribution, contributionCycle } from "@mi-banquito/db/schema";
 import {
   deriveComplianceState,
   isSlipRequiredForContribution,
@@ -55,6 +55,10 @@ class FakeInsertBuilder {
     const inserted = this.inserts.at(-1)?.values;
     const row = Array.isArray(inserted) ? inserted[0] : inserted;
     return Promise.resolve([{ id: "99999999-9999-4999-8999-999999999999", ...row }]);
+  }
+
+  onConflictDoUpdate() {
+    return this;
   }
 }
 
@@ -170,6 +174,36 @@ describe("Sprint 2 contribution source and partial state", () => {
         paymentSource: "cash_in_meeting",
       });
       expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(1);
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.resetModules();
+    }
+  });
+
+  it("refreshes read models after base-fund quota payments change protected capital", async () => {
+    const fakeDb = new FakeDb([]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+
+    try {
+      const { createLedgerService } = await import("./ledger");
+      await createLedgerService().recordBaseFundQuotaPayment(
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+        {
+          memberId: "44444444-4444-4444-8444-444444444444",
+          fiscalYear: 2026,
+          amount: "25.0000",
+          paidOn: "2026-07-01",
+          slipPhotoId: "",
+        },
+      );
+
+      expect(insertedRows(fakeDb, baseFundQuotaPayment)[0]).toMatchObject({
+        amount: "25.0000",
+      });
+      expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(1);
+      expect(fakeDb.executedSql).toHaveLength(1);
     } finally {
       vi.doUnmock("@mi-banquito/db");
       vi.resetModules();

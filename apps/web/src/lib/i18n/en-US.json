@@ -173,7 +173,7 @@
       "title": "Mi grupo",
       "description": "Revisa y edita reglas con versionado HR-1.",
       "edit": "Editar reglas",
-      "newLoans": "Los préstamos existentes conservan la configuración de origen."
+      "newLoans": "Los préstamos existentes conservan la configuración que tenían cuando se registraron."
     },
     "contributions": {
       "title": "Registrar aporte",
@@ -211,7 +211,7 @@
     },
     "loans": {
       "title": "Nuevo préstamo",
-      "description": "Origina un préstamo para una socia o para una persona externa con garante.",
+      "description": "Registra un préstamo para una socia o para una persona externa con garante.",
       "borrowerSection": "Quién recibe el préstamo",
       "borrowerKind": "Tipo de prestataria",
       "borrowerKindMember": "Socia",
@@ -231,9 +231,9 @@
       "loanSection": "Condiciones del préstamo",
       "principalAmount": "Monto principal",
       "termPeriods": "Número de cuotas",
-      "originatedOn": "Fecha de origen",
+      "originatedOn": "Fecha del préstamo",
       "purpose": "Propósito",
-      "submit": "Originar préstamo"
+      "submit": "Registrar préstamo"
     },
     "loansList": {
       "title": "Préstamos",
@@ -256,7 +256,7 @@
       "paidInterest": "Interés pagado",
       "rate": "Tasa",
       "term": "Cuotas",
-      "originatedOn": "Fecha de origen",
+      "originatedOn": "Fecha del préstamo",
       "guarantor": "Garante",
       "referrer": "Referida por",
       "fee": "Comisión administrativa",

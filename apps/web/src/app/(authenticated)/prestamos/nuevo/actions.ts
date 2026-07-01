@@ -9,7 +9,7 @@ import { requireTreasurer } from "@/lib/auth/require-session";
 import { formDataToObject } from "@/lib/forms/sprint1";
 
 const isSpanishEligibilityMessage = (message: string): boolean => {
-  return /[áéíóúñ]|No hay|Selecciona|El monto/i.test(message);
+  return /[áéíóúñ]|No hay|Selecciona|El monto|Configura/i.test(message);
 };
 
 export async function originateLoanAction(formData: FormData) {
@@ -29,8 +29,8 @@ export async function originateLoanAction(formData: FormData) {
       : error instanceof Error
         ? isSpanishEligibilityMessage(error.message)
           ? error.message
-          : "No se pudo originar el préstamo. Revisa la elegibilidad, el garante y los datos requeridos."
-        : "No se pudo originar el préstamo.";
+          : "No se pudo registrar el préstamo. Revisa la socia, la garante y los datos requeridos."
+        : "No se pudo registrar el préstamo.";
     redirect(`/prestamos/nuevo?error=${encodeURIComponent(message)}`);
   }
   revalidatePath("/prestamos");
