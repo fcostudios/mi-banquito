@@ -12,7 +12,7 @@ export const serverEnvSchema = z.object({
   AUTH0_SECRET: z.string().min(32),
   CRON_SECRET: nonEmpty,
   DATABASE_URL: nonEmpty,
-  DB_DRIVER: z.enum(["pg", "neon"]).optional(),
+  DB_DRIVER: z.enum(["pg", "neon", "neon-http"]).optional(),
 });
 
 export const externalProviderEnvSchema = z.object({
