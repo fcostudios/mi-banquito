@@ -189,6 +189,9 @@
       "cashInMeeting": "Efectivo en reunión",
       "pettyCashDeposit": "Depósito desde caja chica",
       "slip": "Comprobante",
+      "slipRequired": "Para transferencia bancaria o depósito desde caja chica, registra un comprobante antes de guardar el aporte.",
+      "invalid": "Revisa los datos del aporte antes de continuar.",
+      "failed": "No se pudo registrar el aporte. Revisa los datos e intenta nuevamente.",
       "empty": "Aún no hay aportes registrados."
     },
     "quota": {
