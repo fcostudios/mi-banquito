@@ -17,6 +17,10 @@ function uniqueSorted(values) {
   return [...new Set(values)].sort();
 }
 
+function pgIdentifierName(value) {
+  return value.slice(0, 63);
+}
+
 function parsePgArray(value) {
   if (Array.isArray(value)) {
     return uniqueSorted(value.filter((item) => typeof item === "string"));
@@ -56,6 +60,27 @@ export function parseExpectedSchema(sql) {
     [...sql.matchAll(/CREATE TRIGGER\s+[a-z_]+[\s\S]*?\bON\s+([a-z_]+)/g)]
       .map((match) => match[1])
   );
+  const materializedViewNames = uniqueSorted(
+    [...sql.matchAll(/CREATE MATERIALIZED VIEW\s+([a-z_]+)\s+AS/g)].map(
+      (match) => match[1]
+    )
+  );
+  const indexNames = uniqueSorted(
+    [...sql.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX IF NOT EXISTS\s+([a-z_]+)\s+/g)]
+      .map((match) => pgIdentifierName(match[1]))
+  );
+  const checkConstraintNames = uniqueSorted(
+    [...sql.matchAll(/ADD CONSTRAINT\s+([a-z_]+)\s+CHECK\s*\(/g)]
+      .map((match) => pgIdentifierName(match[1]))
+  );
+  const uniqueConstraintNames = uniqueSorted(
+    [...sql.matchAll(/CONSTRAINT\s+([a-z_]+)\s+UNIQUE\s*\(/g)]
+      .map((match) => pgIdentifierName(match[1]))
+  );
+  const foreignKeyConstraintNames = uniqueSorted(
+    [...sql.matchAll(/ADD CONSTRAINT\s+([a-z_]+)\s+FOREIGN KEY\s*\(/g)]
+      .map((match) => pgIdentifierName(match[1]))
+  );
   const updatedAtTables = uniqueSorted(
     [...sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+([a-z_]+)\s+\(([\s\S]*?)\n\);/g)]
       .filter(([, , body]) => /\bupdated_at\b/.test(body))
@@ -68,6 +93,11 @@ export function parseExpectedSchema(sql) {
     forcedRlsTableNames,
     policyTables,
     triggerTables,
+    materializedViewNames,
+    indexNames,
+    checkConstraintNames,
+    uniqueConstraintNames,
+    foreignKeyConstraintNames,
     updatedAtTables,
   };
 }
@@ -87,6 +117,11 @@ export const EXPECTED_RLS_TABLE_NAMES = EXPECTED_SCHEMA.rlsTableNames;
 export const EXPECTED_FORCED_RLS_TABLE_NAMES = EXPECTED_SCHEMA.forcedRlsTableNames;
 export const EXPECTED_POLICY_TABLES = EXPECTED_SCHEMA.policyTables;
 export const EXPECTED_TRIGGER_TABLES = EXPECTED_SCHEMA.triggerTables;
+export const EXPECTED_MATERIALIZED_VIEW_NAMES = EXPECTED_SCHEMA.materializedViewNames;
+export const EXPECTED_INDEX_NAMES = EXPECTED_SCHEMA.indexNames;
+export const EXPECTED_CHECK_CONSTRAINT_NAMES = EXPECTED_SCHEMA.checkConstraintNames;
+export const EXPECTED_UNIQUE_CONSTRAINT_NAMES = EXPECTED_SCHEMA.uniqueConstraintNames;
+export const EXPECTED_FOREIGN_KEY_CONSTRAINT_NAMES = EXPECTED_SCHEMA.foreignKeyConstraintNames;
 export const EXPECTED_UPDATED_AT_TABLES = EXPECTED_SCHEMA.updatedAtTables;
 
 export const EXPECTED_TABLES = EXPECTED_TABLE_NAMES.length;
@@ -94,6 +129,11 @@ export const EXPECTED_RLS_TABLES = EXPECTED_RLS_TABLE_NAMES.length;
 export const EXPECTED_FORCED_RLS_TABLES = EXPECTED_FORCED_RLS_TABLE_NAMES.length;
 export const EXPECTED_POLICIES = EXPECTED_POLICY_TABLES.length;
 export const EXPECTED_TRIGGERS = EXPECTED_TRIGGER_TABLES.length;
+export const EXPECTED_MATERIALIZED_VIEWS = EXPECTED_MATERIALIZED_VIEW_NAMES.length;
+export const EXPECTED_INDEXES = EXPECTED_INDEX_NAMES.length;
+export const EXPECTED_CHECK_CONSTRAINTS = EXPECTED_CHECK_CONSTRAINT_NAMES.length;
+export const EXPECTED_UNIQUE_CONSTRAINTS = EXPECTED_UNIQUE_CONSTRAINT_NAMES.length;
+export const EXPECTED_FOREIGN_KEY_CONSTRAINTS = EXPECTED_FOREIGN_KEY_CONSTRAINT_NAMES.length;
 export const EXPECTED_UPDATED_AT_TRIGGERS = EXPECTED_UPDATED_AT_TABLES.length;
 
 function normalizedList(value) {
@@ -160,6 +200,36 @@ export function evaluateSchemaHealth(actual, expected = EXPECTED_SCHEMA) {
     label: "triggers on tables",
     expectedNames: expected.triggerTables,
     actualValue: actual.triggerTables ?? actual.triggerCount,
+    errors,
+  });
+  assertExpectedObjects({
+    label: "materialized views",
+    expectedNames: expected.materializedViewNames,
+    actualValue: actual.materializedViewNames ?? actual.materializedViewCount,
+    errors,
+  });
+  assertExpectedObjects({
+    label: "indexes",
+    expectedNames: expected.indexNames,
+    actualValue: actual.indexNames ?? actual.indexCount,
+    errors,
+  });
+  assertExpectedObjects({
+    label: "check constraints",
+    expectedNames: expected.checkConstraintNames,
+    actualValue: actual.checkConstraintNames ?? actual.checkConstraintCount,
+    errors,
+  });
+  assertExpectedObjects({
+    label: "unique constraints",
+    expectedNames: expected.uniqueConstraintNames,
+    actualValue: actual.uniqueConstraintNames ?? actual.uniqueConstraintCount,
+    errors,
+  });
+  assertExpectedObjects({
+    label: "foreign key constraints",
+    expectedNames: expected.foreignKeyConstraintNames,
+    actualValue: actual.foreignKeyConstraintNames ?? actual.foreignKeyConstraintCount,
     errors,
   });
 
@@ -237,6 +307,44 @@ SELECT
     ARRAY[]::text[]
   ) AS trigger_tables,
   COALESCE(
+    (SELECT array_agg(c.relname::text ORDER BY c.relname::text)
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relkind = 'm'),
+    ARRAY[]::text[]
+  ) AS materialized_view_names,
+  COALESCE(
+    (SELECT array_agg(indexname::text ORDER BY indexname::text)
+       FROM pg_indexes
+      WHERE schemaname = 'public'),
+    ARRAY[]::text[]
+  ) AS index_names,
+  COALESCE(
+    (SELECT array_agg(conname::text ORDER BY conname::text)
+       FROM pg_constraint con
+       JOIN pg_namespace n ON n.oid = con.connamespace
+      WHERE n.nspname = 'public'
+        AND con.contype = 'c'),
+    ARRAY[]::text[]
+  ) AS check_constraint_names,
+  COALESCE(
+    (SELECT array_agg(conname::text ORDER BY conname::text)
+       FROM pg_constraint con
+       JOIN pg_namespace n ON n.oid = con.connamespace
+      WHERE n.nspname = 'public'
+        AND con.contype = 'u'),
+    ARRAY[]::text[]
+  ) AS unique_constraint_names,
+  COALESCE(
+    (SELECT array_agg(conname::text ORDER BY conname::text)
+       FROM pg_constraint con
+       JOIN pg_namespace n ON n.oid = con.connamespace
+      WHERE n.nspname = 'public'
+        AND con.contype = 'f'),
+    ARRAY[]::text[]
+  ) AS foreign_key_constraint_names,
+  COALESCE(
     (SELECT array_agg(table_name::text ORDER BY table_name::text)
        FROM information_schema.columns
       WHERE table_schema = 'public'
@@ -285,6 +393,11 @@ function normalizeHealthRow(row = {}) {
     forcedRlsTableNames: parsePgArray(row.forced_rls_table_names),
     policyTables: parsePgArray(row.policy_tables),
     triggerTables: parsePgArray(row.trigger_tables),
+    materializedViewNames: parsePgArray(row.materialized_view_names),
+    indexNames: parsePgArray(row.index_names),
+    checkConstraintNames: parsePgArray(row.check_constraint_names),
+    uniqueConstraintNames: parsePgArray(row.unique_constraint_names),
+    foreignKeyConstraintNames: parsePgArray(row.foreign_key_constraint_names),
     updatedAtTables: parsePgArray(row.updated_at_tables),
     updatedAtTriggerTables: parsePgArray(row.updated_at_trigger_tables),
   };
@@ -326,6 +439,11 @@ export async function main() {
       `${EXPECTED_FORCED_RLS_TABLES} forced RLS tables,`,
       `${EXPECTED_POLICIES} policy tables,`,
       `${EXPECTED_TRIGGERS} trigger tables,`,
+      `${EXPECTED_MATERIALIZED_VIEWS} materialized views,`,
+      `${EXPECTED_INDEXES} indexes,`,
+      `${EXPECTED_CHECK_CONSTRAINTS} check constraints,`,
+      `${EXPECTED_UNIQUE_CONSTRAINTS} unique constraints,`,
+      `${EXPECTED_FOREIGN_KEY_CONSTRAINTS} foreign key constraints,`,
       `${EXPECTED_UPDATED_AT_TRIGGERS} updated_at trigger tables`,
       "verified.",
     ].join(" ")
