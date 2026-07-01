@@ -29,6 +29,12 @@ function formatMoney2(value: bigint): string {
   return `${whole.toString()}.${fraction}`;
 }
 
+function formatRatio2(value: bigint): string {
+  const whole = value / BigInt(100);
+  const fraction = (value % BigInt(100)).toString().padStart(2, "0");
+  return `${whole.toString()}.${fraction}`;
+}
+
 function parseRatio2(value: string): bigint {
   if (!/^\d+(\.\d{1,2})?$/.test(value)) {
     throw new Error("ratio value must be a non-negative decimal with up to 2 places");
@@ -64,7 +70,7 @@ export function evaluateLoanEligibility(input: {
   if (requestedPrincipal > availableCapital) {
     const reason = availableCapital === BigInt(0)
       ? "Todavía no hay aportes registrados en el fondo del grupo. Registra un aporte antes de crear un préstamo."
-      : `El fondo del grupo tiene $${formatMoney2(availableCapital)} disponible. Baja el monto o registra más aportes antes de crear este préstamo.`;
+      : `El monto solicitado ($${formatMoney2(requestedPrincipal)}) supera el dinero disponible del grupo ($${formatMoney2(availableCapital)}). Baja el monto a $${formatMoney2(availableCapital)} o menos, o registra más aportes antes de crear este préstamo.`;
 
     return {
       ok: false,
@@ -79,10 +85,11 @@ export function evaluateLoanEligibility(input: {
     };
   }
 
-  if (requestedPrincipal > (savingsBasis * capRatio) / BigInt(100)) {
+  const savingsCap = (savingsBasis * capRatio) / BigInt(100);
+  if (requestedPrincipal > savingsCap) {
     return {
       ok: false,
-      reason: "El monto es mayor al límite permitido según los ahorros de la socia o garante.",
+      reason: `El monto solicitado ($${formatMoney2(requestedPrincipal)}) supera el límite por ahorros ($${formatMoney2(savingsCap)}). Ese límite sale de $${formatMoney2(savingsBasis)} de ahorros disponibles x ${formatRatio2(capRatio)}. Baja el monto a $${formatMoney2(savingsCap)} o registra más ahorros para la socia o garante.`,
     };
   }
 
