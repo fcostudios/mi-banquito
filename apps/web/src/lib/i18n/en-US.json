@@ -9,6 +9,20 @@
     "home": "Home",
     "orgsNew": "New organization"
   },
+  "adminCronRuns": {
+    "title": "Cron status",
+    "description": "Review cron history and replay a date range when recovery is needed.",
+    "endpoint": "Endpoint",
+    "timestamp": "Timestamp",
+    "duration": "Duration",
+    "orgs": "Orgs",
+    "failures": "Failures",
+    "summary": "Summary",
+    "replay": "Replay",
+    "fromDate": "From date",
+    "toDate": "To date",
+    "empty": "No cron runs have been recorded yet."
+  },
   "adminOrgs": {
     "new": {
       "title": "Nueva organización",
@@ -220,6 +234,45 @@
       "originatedOn": "Fecha de origen",
       "purpose": "Propósito",
       "submit": "Originar préstamo"
+    },
+    "loansList": {
+      "title": "Préstamos",
+      "description": "Consulta préstamos activos, pagados y en mora.",
+      "newLoan": "Nuevo préstamo",
+      "empty": "Aún no hay préstamos registrados."
+    },
+    "loanDetail": {
+      "title": "Detalle del préstamo",
+      "tabs": "Secciones del préstamo",
+      "summary": "Resumen",
+      "schedule": "Cronograma",
+      "payments": "Pagos",
+      "history": "Historial",
+      "actions": "Acciones",
+      "principal": "Principal",
+      "interest": "Interés",
+      "remainingPrincipal": "Principal restante",
+      "paidPrincipal": "Principal pagado",
+      "paidInterest": "Interés pagado",
+      "rate": "Tasa",
+      "term": "Cuotas",
+      "originatedOn": "Fecha de origen",
+      "guarantor": "Garante",
+      "referrer": "Referida por",
+      "fee": "Comisión administrativa",
+      "noPayments": "Aún no hay pagos registrados.",
+      "noAccruals": "Aún no hay intereses devengados.",
+      "recordPayment": "Registrar pago",
+      "reverse": "Hacer reversión",
+      "paymentRecorded": "Pago registrado"
+    },
+    "repayment": {
+      "title": "Registrar pago",
+      "amount": "Monto pagado",
+      "datedOn": "Fecha de pago",
+      "slip": "Comprobante",
+      "notes": "Notas",
+      "submit": "Registrar pago"
     }
   },
   "nav": {
