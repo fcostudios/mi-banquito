@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { getTableName } from "drizzle-orm";
 import {
+  alert,
   auditLogEntry,
   groupConfig,
   loan as loanTable,
@@ -9,6 +10,8 @@ import {
   loanReferral,
   loanSchedule,
   nonMemberBorrower,
+  repayment,
+  withdrawal,
 } from "@mi-banquito/db/schema";
 import {
   calculateInterestFirstSplit,
@@ -21,6 +24,11 @@ import { generateDecliningBalanceSchedule } from "./rules/loans/declining-balanc
 type InsertRecord = {
   tableName: string;
   values: Record<string, unknown> | Array<Record<string, unknown>>;
+};
+
+type UpdateRecord = {
+  tableName: string;
+  values: Record<string, unknown>;
 };
 
 const tableNameOf = (table: unknown): string => getTableName(table as Parameters<typeof getTableName>[0]);
@@ -60,8 +68,25 @@ class FakeInsertBuilder {
   }
 }
 
+class FakeUpdateBuilder {
+  constructor(
+    private readonly table: unknown,
+    private readonly updates: UpdateRecord[],
+  ) {}
+
+  set(values: Record<string, unknown>) {
+    this.updates.push({ tableName: tableNameOf(this.table), values });
+    return this;
+  }
+
+  where() {
+    return Promise.resolve([]);
+  }
+}
+
 class FakeDb {
   readonly inserts: InsertRecord[] = [];
+  readonly updates: UpdateRecord[] = [];
   private readonly selectResults: unknown[][];
 
   constructor(selectResults: unknown[][]) {
@@ -76,7 +101,11 @@ class FakeDb {
     return new FakeInsertBuilder(table, this.inserts);
   }
 
-  async transaction<T>(callback: (tx: Pick<FakeDb, "insert" | "select">) => Promise<T>): Promise<T> {
+  update(table: unknown) {
+    return new FakeUpdateBuilder(table, this.updates);
+  }
+
+  async transaction<T>(callback: (tx: Pick<FakeDb, "insert" | "select" | "update">) => Promise<T>): Promise<T> {
     return callback(this);
   }
 }
@@ -87,6 +116,13 @@ const insertedRows = (
 ): Array<Record<string, unknown>> => fakeDb.inserts
   .filter((entry) => entry.tableName === tableNameOf(table))
   .flatMap((entry) => Array.isArray(entry.values) ? entry.values : [entry.values]);
+
+const updatedRows = (
+  fakeDb: FakeDb,
+  table: unknown,
+): Array<Record<string, unknown>> => fakeDb.updates
+  .filter((entry) => entry.tableName === tableNameOf(table))
+  .map((entry) => entry.values);
 
 describe("Sprint 2 loan domain rules", () => {
   it("uses the member rate for member loans and non-member rate for non-member loans", () => {
@@ -512,6 +548,133 @@ describe("Sprint 2 loan domain rules", () => {
         id: "66666666-6666-4666-8666-666666666666",
         displayName: "Con capacidad",
       }]);
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.resetModules();
+    }
+  });
+
+  it("records a final repayment, marks the loan paid, and credits referral exactly once", async () => {
+    const fakeDb = new FakeDb([
+      [],
+      [{
+        id: "77777777-7777-4777-8777-777777777777",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        borrowerKind: "member",
+        borrowerMemberId: "55555555-5555-4555-8555-555555555555",
+        principalAmount: "1000.0000",
+        currencyCode: "USD",
+        status: "activo",
+      }],
+      [],
+      [
+        {
+          id: "88888888-8888-4888-8888-888888888888",
+          orgId: "11111111-1111-4111-8111-111111111111",
+          loanId: "77777777-7777-4777-8777-777777777777",
+          periodIndex: 1,
+          dueOn: "2026-07-01",
+          principalDue: "1000.0000",
+          interestDue: "40.0000",
+          paidPrincipalToDate: "0.0000",
+          paidInterestToDate: "0.0000",
+          status: "pendiente",
+        },
+      ],
+      [],
+      [{
+        id: "55555555-5555-4555-8555-555555555555",
+        displayName: "Ana Mora",
+      }],
+      [{
+        id: "99999999-9999-4999-8999-999999999999",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        loanId: "77777777-7777-4777-8777-777777777777",
+        referrerMemberId: "66666666-6666-4666-8666-666666666666",
+        commissionAmount: "10.0000",
+        commissionCurrency: "USD",
+        accruedAt: null,
+        withdrawalId: null,
+      }],
+      [{
+        id: "99999999-9999-4999-8999-999999999999",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        loanId: "77777777-7777-4777-8777-777777777777",
+        referrerMemberId: "66666666-6666-4666-8666-666666666666",
+        commissionAmount: "10.0000",
+        commissionCurrency: "USD",
+        accruedAt: null,
+        withdrawalId: null,
+      }],
+      [{
+        id: "66666666-6666-4666-8666-666666666666",
+        displayName: "Rosa Vera",
+      }],
+    ]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+
+    try {
+      const { createLoanService } = await import("./loan");
+      const result = await createLoanService().recordRepayment({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        actorId: "22222222-2222-4222-8222-222222222222",
+        clientRequestId: "33333333-3333-4333-8333-333333333333",
+        loanId: "77777777-7777-4777-8777-777777777777",
+        amount: "1040.0000",
+        datedOn: "2026-07-01",
+      });
+
+      expect(result.paidOff).toBe(true);
+      expect(result.split).toMatchObject({
+        appliedToInterest: "40.0000",
+        appliedToPrincipal: "1000.0000",
+        remainingInterest: "0.0000",
+        remainingPrincipal: "0.0000",
+      });
+      expect(insertedRows(fakeDb, repayment)[0]).toMatchObject({
+        loanId: "77777777-7777-4777-8777-777777777777",
+        memberId: "55555555-5555-4555-8555-555555555555",
+        amount: "1040.0000",
+        appliedToInterest: "40.0000",
+        appliedToPrincipal: "1000.0000",
+      });
+      expect(updatedRows(fakeDb, loanTable)).toContainEqual(expect.objectContaining({ status: "pagado" }));
+      expect(updatedRows(fakeDb, loanSchedule)).toContainEqual(expect.objectContaining({
+        status: "pagado",
+        paidInterestToDate: "40.0000",
+        paidPrincipalToDate: "1000.0000",
+      }));
+      expect(insertedRows(fakeDb, withdrawal)[0]).toMatchObject({
+        memberId: "66666666-6666-4666-8666-666666666666",
+        kind: "referral_commission_credit",
+        amount: "10.0000",
+        clientRequestId: "99999999-9999-4999-8999-999999999999",
+      });
+      expect(updatedRows(fakeDb, loanReferral)[0]).toMatchObject({
+        accruedAt: expect.any(Date),
+        withdrawalId: expect.any(String),
+      });
+      expect(insertedRows(fakeDb, alert)[0]).toMatchObject({
+        alertKind: "loan_referral_commission",
+        severity: "low",
+      });
+      expect(insertedRows(fakeDb, alert)[0]?.payload).toMatchObject({
+        message: expect.stringContaining("Ana Mora"),
+      });
+      expect(insertedRows(fakeDb, alert)[0]?.payload).toMatchObject({
+        message: expect.stringContaining("Rosa Vera"),
+      });
+      expect(insertedRows(fakeDb, auditLogEntry)).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          actionKind: "loan.referral_commission.credit",
+          subjectKind: "withdrawal",
+        }),
+        expect.objectContaining({
+        actionKind: "loan.repayment.payoff",
+        subjectKind: "repayment",
+        }),
+      ]));
     } finally {
       vi.doUnmock("@mi-banquito/db");
       vi.resetModules();
