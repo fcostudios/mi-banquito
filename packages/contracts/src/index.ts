@@ -184,7 +184,7 @@ export const contributionFormSchema = z.object({
   memberId: uuidString,
   amount: moneyString,
   datedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  paymentSource: contributionSourceSchema.default("cash_in_meeting"),
+  paymentSource: contributionSourceSchema.default("bank_transfer"),
   kind: contributionKindSchema.default("regular"),
   slipPhotoId: uuidString.optional().or(z.literal("")),
   notes: z.string().max(500).optional(),

@@ -5,18 +5,20 @@
 // (validated at the action edge, so this layer stays Zod-free). Member is the
 // salient entity (most screen-referenced, org-scoped) for this project.
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
 import {
   auditLogEntry,
   baseFundQuotaConfig,
   baseFundQuotaPayment,
+  cashBalances,
   contribution,
   contributionCycle,
   entityVersion,
   expense,
   groupConfig,
   member,
+  memberComplianceState,
   organization,
 } from "@mi-banquito/db/schema";
 import type {
@@ -44,8 +46,8 @@ export type ExpenseInsert = typeof expense.$inferInsert;
 export type LedgerActorKind = "member" | "platform_operator" | "system";
 export type MemberRole = "aportante" | "tesorera" | "presidente" | "secretaria";
 export type MemberStatus = "activo" | "en_pausa" | "baja";
-export type ComplianceState = "al_dia" | "al_día" | "atrasado" | "en_mora";
-export type ComplianceTone = "success" | "warning" | "danger";
+export type ComplianceState = "al_dia" | "al_día" | "parcial" | "atrasado" | "en_mora";
+export type ComplianceTone = "success" | "neutral" | "warning" | "danger";
 export type FirstRunStep = 1 | 2 | 3 | "complete";
 
 export type FirstRunState = {
@@ -65,6 +67,13 @@ export type MemberComplianceRow = {
   displayName: string;
   state: ComplianceState;
   tone: ComplianceTone;
+};
+
+export type CashBalanceRow = {
+  orgId: string;
+  bankBalance: string;
+  pettyCashBalance: string;
+  refreshedAt: Date;
 };
 
 export interface BuildMemberCreationLedgerPlanInput {
@@ -165,11 +174,40 @@ export function mapComplianceStatusToTone(state: ComplianceState): ComplianceTon
     case "al_dia":
     case "al_día":
       return "success";
+    case "parcial":
+      return "neutral";
     case "atrasado":
       return "warning";
     case "en_mora":
       return "danger";
   }
+}
+
+export function isSlipRequiredForContribution(paymentSource: ContributionForm["paymentSource"]): boolean {
+  return paymentSource !== "cash_in_meeting";
+}
+
+export function deriveComplianceState(input: {
+  paidAmount: string | number;
+  expectedAmount: string | number;
+  isPastLateBoundary?: boolean;
+  isPastMoraBoundary?: boolean;
+}): ComplianceState {
+  const paid = Number(input.paidAmount);
+  const expected = Number(input.expectedAmount);
+  if (paid >= expected) {
+    return "al_dia";
+  }
+  if (paid > 0) {
+    return "parcial";
+  }
+  if (input.isPastMoraBoundary) {
+    return "en_mora";
+  }
+  if (input.isPastLateBoundary) {
+    return "atrasado";
+  }
+  return "atrasado";
 }
 
 export function defaultRefundAmount(accumulatedSavings: string): string {
@@ -370,6 +408,7 @@ export interface LedgerService {
   transitionMemberStatus(orgId: string, actorId: string, input: MemberStatusTransitionForm): Promise<void>;
   getCurrentGroupConfig(orgId: string): Promise<typeof groupConfig.$inferSelect | undefined>;
   saveTreasurerGroupConfig(orgId: string, actorId: string, input: GroupConfigForm): Promise<typeof groupConfig.$inferSelect>;
+  getCashBalances(orgId: string): Promise<CashBalanceRow>;
   recordContribution(orgId: string, actorId: string, input: ContributionForm): Promise<typeof contribution.$inferSelect>;
   listContributions(orgId: string): Promise<Array<typeof contribution.$inferSelect & { memberName: string }>>;
   reverseContribution(orgId: string, actorId: string, input: ReverseContributionForm): Promise<void>;
@@ -451,12 +490,21 @@ export const createLedgerService = (): LedgerService => ({
     return db.select().from(member).where(eq(member.orgId, orgId));
   },
   async listMembersWithCompliance(orgId) {
-    const rows = await db.select().from(member).where(eq(member.orgId, orgId)).orderBy(member.displayName);
-    return rows.map((row) => ({
+    const [rows, states] = await Promise.all([
+      db.select().from(member).where(eq(member.orgId, orgId)).orderBy(member.displayName),
+      db.select().from(memberComplianceState).where(eq(memberComplianceState.orgId, orgId)),
+    ]);
+    const stateByMember = new Map(states.map((row) => [row.memberId, row.state as ComplianceState]));
+    return rows.map((row) => {
+      const complianceState = row.status === "activo"
+        ? stateByMember.get(row.id) ?? "al_dia"
+        : "al_dia";
+      return {
       ...row,
-      complianceState: row.status === "activo" ? "al_dia" : "atrasado",
-      complianceTone: row.status === "activo" ? "success" : "warning",
-    }));
+        complianceState,
+        complianceTone: mapComplianceStatusToTone(complianceState),
+      };
+    });
   },
   async listComplianceRows(orgId) {
     const rows = await this.listMembersWithCompliance(orgId);
@@ -542,6 +590,15 @@ export const createLedgerService = (): LedgerService => ({
   async saveTreasurerGroupConfig(orgId, actorId, input) {
     return createPlatformService().saveGroupConfig(orgId, input, actorId, "member");
   },
+  async getCashBalances(orgId) {
+    const [row] = await db.select().from(cashBalances).where(eq(cashBalances.orgId, orgId));
+    return row ?? {
+      orgId,
+      bankBalance: "0.0000",
+      pettyCashBalance: "0.0000",
+      refreshedAt: new Date(0),
+    };
+  },
   async recordContribution(orgId, actorId, input) {
     const now = new Date();
     const [existing] = await db.select().from(contribution)
@@ -554,13 +611,16 @@ export const createLedgerService = (): LedgerService => ({
 
     const activeCycle = cycle ?? await db.transaction(async (tx) => {
       const label = input.datedOn.slice(0, 7);
+      const [currentConfig] = await tx.select().from(groupConfig)
+        .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)))
+        .orderBy(desc(groupConfig.version));
       const [created] = await tx.insert(contributionCycle).values({
         orgId,
         cycleLabel: label,
         kind: "monthly",
         opensOn: `${label}-01`,
         closesOn: input.datedOn,
-        expectedAmountPerMember: money4(input.amount),
+        expectedAmountPerMember: money4(currentConfig?.contributionAmount ?? input.amount),
         currencyCode: "USD",
         status: "open",
         createdAt: now,
@@ -602,6 +662,7 @@ export const createLedgerService = (): LedgerService => ({
         at: now,
         createdAt: now,
       });
+      await tx.execute(sql`SELECT refresh_sprint1_read_models()`);
       return row;
     });
   },
@@ -654,6 +715,7 @@ export const createLedgerService = (): LedgerService => ({
         at: now,
         createdAt: now,
       });
+      await tx.execute(sql`SELECT refresh_sprint1_read_models()`);
     });
   },
   async getBaseFundQuotaDefaults(orgId) {

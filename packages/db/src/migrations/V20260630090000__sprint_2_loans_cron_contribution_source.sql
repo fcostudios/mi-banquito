@@ -169,9 +169,9 @@ SELECT
     WHEN m.status <> 'activo' THEN 'al_dia'
     WHEN cc.id IS NULL THEN 'al_dia'
     WHEN COALESCE(SUM(c.amount), 0) >= cc.expected_amount_per_member THEN 'al_dia'
+    WHEN COALESCE(SUM(c.amount), 0) > 0 THEN 'parcial'
     WHEN CURRENT_DATE > cc.closes_on + COALESCE(gc.mora_threshold_days, 15) THEN 'en_mora'
     WHEN CURRENT_DATE > cc.closes_on + COALESCE(gc.late_threshold_days, 3) THEN 'atrasado'
-    WHEN COALESCE(SUM(c.amount), 0) > 0 THEN 'parcial'
     ELSE 'atrasado'
   END AS state,
   now() AS refreshed_at

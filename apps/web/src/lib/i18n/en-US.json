@@ -119,6 +119,7 @@
       },
       "states": {
         "alDia": "al día",
+        "parcial": "parcial",
         "atrasado": "atrasado",
         "enMora": "en mora"
       },
@@ -184,6 +185,16 @@
     }
   },
   "sprint2": {
+    "close": {
+      "title": "Cierre del mes",
+      "description": "Revisa saldos separados antes de reconciliar banco y caja chica.",
+      "reconciliationRows": "Saldos para reconciliación",
+      "bankBalance": "Saldo bancario",
+      "bankHint": "Aportes recibidos por transferencia bancaria.",
+      "pettyCashBalance": "Saldo de caja chica",
+      "pettyCashHint": "Efectivo en reunión y depósitos desde caja chica.",
+      "declaredBalance": "Saldo declarado"
+    },
     "loans": {
       "title": "Nuevo préstamo",
       "description": "Origina un préstamo para una socia o para una persona externa con garante.",
