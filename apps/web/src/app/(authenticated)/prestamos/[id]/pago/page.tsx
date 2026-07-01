@@ -1,16 +1,51 @@
-// SCAFFOLD (SCR-record-repayment) — generated page stub. Build the real screen per its spec: docs/screens/SCR-record-repayment.json
+import { randomUUID } from "node:crypto";
+import { notFound } from "next/navigation";
+import { createLoanService } from "@mi-banquito/domain";
+import { ButtonPrimary, FormField, InputNumber, InputText } from "@mi-banquito/ui";
+import { requireTreasurer } from "@/lib/auth/require-session";
+import { todayISO } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
+import { recordRepaymentAction } from "./actions";
 
-const pages = (messages as { pages?: Record<string, { title?: string }> }).pages ?? {};
+export const dynamic = "force-dynamic";
 
-export default function ScrRecordRepaymentPage() {
-  const title = pages["prestamos/[id]/pago"]?.title ?? "Registrar pago";
+const copy = messages.sprint2.repayment;
+
+export default async function ScrRecordRepaymentPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const session = await requireTreasurer();
+  const { id } = await params;
+  const detail = await createLoanService().getLoanDetail(session.orgId, id);
+  if (!detail) notFound();
+
   return (
-    <div className="p-6" data-scaffold={"SCR-record-repayment"}>
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="mt-2 text-text-secondary">
-        {"SCR-record-repayment"}
-      </p>
-    </div>
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6" data-screen="SCR-record-repayment">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-bold text-text-primary">{copy.title}</h1>
+        <p className="text-text-secondary">{detail.borrowerName}</p>
+      </div>
+      <form action={recordRepaymentAction} className="grid gap-4 rounded-md border border-border bg-surface p-5">
+        <input type="hidden" name="clientRequestId" value={randomUUID()} />
+        <input type="hidden" name="loanId" value={detail.id} />
+        <FormField labelKey={copy.amount}>
+          <InputNumber name="amount" min="0.01" step="0.01" required />
+        </FormField>
+        <FormField labelKey={copy.datedOn}>
+          <InputText labelKey={copy.datedOn} name="datedOn" type="date" defaultValue={todayISO()} required />
+        </FormField>
+        <FormField labelKey={copy.slip}>
+          <InputText labelKey={copy.slip} name="slipPhotoId" />
+        </FormField>
+        <FormField labelKey={copy.notes}>
+          <InputText labelKey={copy.notes} name="notes" />
+        </FormField>
+        <div>
+          <ButtonPrimary type="submit" labelKey={copy.submit} />
+        </div>
+      </form>
+    </main>
   );
 }

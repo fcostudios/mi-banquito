@@ -50,6 +50,44 @@ export type LoanSupportMember = {
   displayName: string;
 };
 
+export type LoanListRow = {
+  id: string;
+  borrowerName: string;
+  borrowerKind: BorrowerKind;
+  principalAmount: string;
+  currencyCode: string;
+  status: string;
+};
+
+export type LoanDetailRow = LoanListRow & {
+  rateValue: string;
+  rateModel: string;
+  termPeriods: number;
+  originatedOn: string;
+  guarantorName?: string;
+  referrerName?: string;
+  schedule: Array<{
+    periodIndex: number;
+    dueOn: string;
+    principalDue: string;
+    interestDue: string;
+    paidPrincipalToDate: string;
+    paidInterestToDate: string;
+    status: string;
+  }>;
+  fees: Array<{ feeKind: string; amount: string; datedOn: string }>;
+  repayments: Array<{
+    id: string;
+    amount: string;
+    appliedToInterest: string;
+    appliedToPrincipal: string;
+    datedOn: string;
+    reversesId?: string | null;
+    reverseReason?: string | null;
+  }>;
+  accruals: Array<{ accruedOn: string; interestAmount: string; principalBasis: string }>;
+};
+
 export type RecordRepaymentInput = {
   orgId: string;
   actorId: string;

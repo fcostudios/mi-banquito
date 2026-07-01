@@ -5,9 +5,11 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
 import {
+  alert,
   auditLogEntry,
   availableCapital,
   groupConfig,
+  interestAccrual,
   loan,
   loanFee,
   loanGuarantor,
@@ -15,11 +17,16 @@ import {
   loanSchedule,
   member,
   nonMemberBorrower,
+  repayment,
+  withdrawal,
 } from "@mi-banquito/db/schema";
+import { calculateInterestFirstSplit } from "./loans/repayment";
 import { evaluateLoanEligibility, resolveOriginationRate } from "./loans/eligibility";
 import type {
   OriginateLoanInput,
   OriginateLoanResult,
+  LoanDetailRow,
+  LoanListRow,
   LoanSupportMember,
   RecordRepaymentInput,
   RecordRepaymentResult,
@@ -28,6 +35,8 @@ import { generateDecliningBalanceSchedule } from "./rules/loans/declining-balanc
 export type {
   BorrowerKind,
   EligibilityResult,
+  LoanDetailRow,
+  LoanListRow,
   LoanSupportMember,
   OriginateLoanInput,
   OriginateLoanResult,
@@ -40,6 +49,8 @@ export type {
 export interface LoanService {
   readonly context: "loan";
   listEligibleGuarantorMembers(orgId: string): Promise<LoanSupportMember[]>;
+  listLoans(orgId: string): Promise<LoanListRow[]>;
+  getLoanDetail(orgId: string, loanId: string): Promise<LoanDetailRow | undefined>;
   originateLoan(input: OriginateLoanInput): Promise<OriginateLoanResult>;
   recordRepayment(input: RecordRepaymentInput): Promise<RecordRepaymentResult>;
 }
@@ -123,6 +134,75 @@ const memberActiveExposure = async (orgId: string, memberId: string): Promise<st
   Number(await memberBorrowerExposure(orgId, memberId)) + Number(await guarantorExposure(orgId, memberId)),
 );
 
+const openLoanStatuses = new Set(["originated", "activo", "en_mora"]);
+
+const scheduledInterestDueOn = (
+  rows: Array<typeof loanSchedule.$inferSelect>,
+  datedOn: string,
+): string => money4(
+  rows
+    .filter((row) => row.dueOn <= datedOn)
+    .reduce((total, row) => total + Number(row.interestDue), 0),
+);
+
+const allocateRepaymentToSchedule = (
+  rows: Array<typeof loanSchedule.$inferSelect>,
+  split: { appliedToInterest: string; appliedToPrincipal: string },
+): Array<{
+  row: typeof loanSchedule.$inferSelect;
+  paidInterestToDate: string;
+  paidPrincipalToDate: string;
+  status: typeof loanSchedule.$inferSelect.status;
+}> => {
+  let remainingInterest = Number(split.appliedToInterest);
+  let remainingPrincipal = Number(split.appliedToPrincipal);
+  return [...rows].sort((left, right) => left.periodIndex - right.periodIndex).map((row) => {
+    const interestRoom = Math.max(0, Number(row.interestDue) - Number(row.paidInterestToDate));
+    const principalRoom = Math.max(0, Number(row.principalDue) - Number(row.paidPrincipalToDate));
+    const interestApplied = Math.min(interestRoom, remainingInterest);
+    remainingInterest -= interestApplied;
+    const principalApplied = Math.min(principalRoom, remainingPrincipal);
+    remainingPrincipal -= principalApplied;
+    const paidInterestToDate = money4(Number(row.paidInterestToDate) + interestApplied);
+    const paidPrincipalToDate = money4(Number(row.paidPrincipalToDate) + principalApplied);
+    const fullyPaid = Number(paidInterestToDate) >= Number(row.interestDue)
+      && Number(paidPrincipalToDate) >= Number(row.principalDue);
+    const partiallyPaid = Number(paidInterestToDate) > 0 || Number(paidPrincipalToDate) > 0;
+    return {
+      row,
+      paidInterestToDate,
+      paidPrincipalToDate,
+      status: fullyPaid ? "pagado" : partiallyPaid ? "parcial" : row.status,
+    };
+  });
+};
+
+const payerMemberIdForLoan = async (orgId: string, currentLoan: typeof loan.$inferSelect): Promise<string> => {
+  if (currentLoan.borrowerMemberId) {
+    return currentLoan.borrowerMemberId;
+  }
+  const [guarantor] = await db.select().from(loanGuarantor)
+    .where(and(eq(loanGuarantor.orgId, orgId), eq(loanGuarantor.loanId, currentLoan.id), isNull(loanGuarantor.releasedAt)));
+  if (!guarantor) {
+    throw new Error("Active guarantor is required to record a non-member repayment");
+  }
+  return guarantor.guarantorMemberId;
+};
+
+const resolveBorrowerName = async (orgId: string, row: typeof loan.$inferSelect): Promise<string> => {
+  if (row.borrowerMemberId) {
+    const [borrower] = await db.select().from(member)
+      .where(and(eq(member.orgId, orgId), eq(member.id, row.borrowerMemberId)));
+    return borrower?.displayName ?? "Socia";
+  }
+  if (row.borrowerNonMemberId) {
+    const [borrower] = await db.select().from(nonMemberBorrower)
+      .where(and(eq(nonMemberBorrower.orgId, orgId), eq(nonMemberBorrower.id, row.borrowerNonMemberId)));
+    return borrower?.displayName ?? "No socia";
+  }
+  return "Prestataria";
+};
+
 export const createLoanService = (): LoanService => ({
   context: "loan",
   async listEligibleGuarantorMembers(orgId) {
@@ -152,6 +232,79 @@ export const createLoanService = (): LoanService => ({
     return membersWithCapacity
       .filter((row) => row.remainingCapacity > 0)
       .map(({ id, displayName }) => ({ id, displayName }));
+  },
+  async listLoans(orgId) {
+    const rows = await db.select().from(loan)
+      .where(eq(loan.orgId, orgId))
+      .orderBy(desc(loan.originatedOn));
+    return Promise.all(rows.map(async (row) => ({
+      id: row.id,
+      borrowerName: await resolveBorrowerName(orgId, row),
+      borrowerKind: row.borrowerKind,
+      principalAmount: money4(row.principalAmount),
+      currencyCode: row.currencyCode,
+      status: row.status,
+    })));
+  },
+  async getLoanDetail(orgId, loanId) {
+    const [row] = await db.select().from(loan)
+      .where(and(eq(loan.orgId, orgId), eq(loan.id, loanId)));
+    if (!row) {
+      return undefined;
+    }
+    const [scheduleRows, feeRows, repaymentRows, accrualRows, guarantorRows, referralRows] = await Promise.all([
+      db.select().from(loanSchedule).where(and(eq(loanSchedule.orgId, orgId), eq(loanSchedule.loanId, loanId))),
+      db.select().from(loanFee).where(and(eq(loanFee.orgId, orgId), eq(loanFee.loanId, loanId))),
+      db.select().from(repayment).where(and(eq(repayment.orgId, orgId), eq(repayment.loanId, loanId))),
+      db.select().from(interestAccrual).where(and(eq(interestAccrual.orgId, orgId), eq(interestAccrual.loanId, loanId))),
+      db.select().from(loanGuarantor).where(and(eq(loanGuarantor.orgId, orgId), eq(loanGuarantor.loanId, loanId), isNull(loanGuarantor.releasedAt))),
+      db.select().from(loanReferral).where(and(eq(loanReferral.orgId, orgId), eq(loanReferral.loanId, loanId))),
+    ]);
+    const [guarantorMember] = guarantorRows[0]
+      ? await db.select().from(member).where(and(eq(member.orgId, orgId), eq(member.id, guarantorRows[0].guarantorMemberId)))
+      : [];
+    const [referrerMember] = referralRows[0]
+      ? await db.select().from(member).where(and(eq(member.orgId, orgId), eq(member.id, referralRows[0].referrerMemberId)))
+      : [];
+
+    return {
+      id: row.id,
+      borrowerName: await resolveBorrowerName(orgId, row),
+      borrowerKind: row.borrowerKind,
+      principalAmount: money4(row.principalAmount),
+      currencyCode: row.currencyCode,
+      status: row.status,
+      rateValue: money4(row.rateValue),
+      rateModel: row.rateModel,
+      termPeriods: row.termPeriods,
+      originatedOn: row.originatedOn,
+      guarantorName: guarantorMember?.displayName,
+      referrerName: referrerMember?.displayName,
+      schedule: [...scheduleRows].sort((left, right) => left.periodIndex - right.periodIndex).map((schedule) => ({
+        periodIndex: schedule.periodIndex,
+        dueOn: schedule.dueOn,
+        principalDue: money4(schedule.principalDue),
+        interestDue: money4(schedule.interestDue),
+        paidPrincipalToDate: money4(schedule.paidPrincipalToDate),
+        paidInterestToDate: money4(schedule.paidInterestToDate),
+        status: schedule.status,
+      })),
+      fees: feeRows.map((fee) => ({ feeKind: fee.feeKind, amount: money4(fee.amount), datedOn: fee.datedOn })),
+      repayments: repaymentRows.map((repaymentRow) => ({
+        id: repaymentRow.id,
+        amount: money4(repaymentRow.amount),
+        appliedToInterest: money4(repaymentRow.appliedToInterest),
+        appliedToPrincipal: money4(repaymentRow.appliedToPrincipal),
+        datedOn: repaymentRow.datedOn,
+        reversesId: repaymentRow.reversesId,
+        reverseReason: repaymentRow.reverseReason,
+      })),
+      accruals: accrualRows.map((accrual) => ({
+        accruedOn: accrual.accruedOn,
+        interestAmount: money4(accrual.interestAmount),
+        principalBasis: money4(accrual.principalBasis),
+      })),
+    };
   },
   async originateLoan(input) {
     const [existing] = await db.select().from(loan)
@@ -379,7 +532,185 @@ export const createLoanService = (): LoanService => ({
 
     return { loanId };
   },
-  async recordRepayment(_input) {
-    throw new Error("LoanService.recordRepayment persistence is not implemented yet");
+  async recordRepayment(input) {
+    const [existing] = await db.select().from(repayment)
+      .where(and(eq(repayment.orgId, input.orgId), eq(repayment.clientRequestId, input.clientRequestId)));
+    if (existing) {
+      return {
+        repaymentId: existing.id,
+        paidOff: false,
+        split: {
+          appliedToInterest: money4(existing.appliedToInterest),
+          appliedToPrincipal: money4(existing.appliedToPrincipal),
+          remainingInterest: "0.0000",
+          remainingPrincipal: "0.0000",
+          unappliedAmount: "0.0000",
+          paidOff: false,
+        },
+      };
+    }
+
+    const [currentLoan] = await db.select().from(loan)
+      .where(and(eq(loan.orgId, input.orgId), eq(loan.id, input.loanId)));
+    if (!currentLoan || !openLoanStatuses.has(currentLoan.status)) {
+      throw new Error("Loan is not open for repayment");
+    }
+
+    const [priorRepayments, scheduleRows, accrualRows] = await Promise.all([
+      db.select().from(repayment).where(and(eq(repayment.orgId, input.orgId), eq(repayment.loanId, input.loanId))),
+      db.select().from(loanSchedule).where(and(eq(loanSchedule.orgId, input.orgId), eq(loanSchedule.loanId, input.loanId))),
+      db.select().from(interestAccrual).where(and(eq(interestAccrual.orgId, input.orgId), eq(interestAccrual.loanId, input.loanId))),
+    ]);
+    const paidPrincipal = priorRepayments.reduce((total, row) => total + Number(row.appliedToPrincipal), 0);
+    const paidInterest = priorRepayments.reduce((total, row) => total + Number(row.appliedToInterest), 0);
+    const accruedInterest = accrualRows
+      .filter((row) => row.accruedOn <= input.datedOn)
+      .reduce((total, row) => total + Number(row.interestAmount), 0);
+    const scheduledInterest = Number(scheduledInterestDueOn(scheduleRows, input.datedOn));
+    const outstandingPrincipal = money4(Math.max(0, Number(currentLoan.principalAmount) - paidPrincipal));
+    const outstandingInterest = money4(Math.max(0, scheduledInterest + accruedInterest - paidInterest));
+    const split = calculateInterestFirstSplit({
+      amount: money4(input.amount),
+      accruedInterest: outstandingInterest,
+      outstandingPrincipal,
+    });
+    if (Number(split.unappliedAmount) > 0) {
+      throw new Error("Repayment amount exceeds the current loan balance");
+    }
+    const payerMemberId = await payerMemberIdForLoan(input.orgId, currentLoan);
+    const repaymentId = randomUUID();
+    const now = new Date();
+    const paidOff = split.paidOff;
+    const scheduleUpdates = allocateRepaymentToSchedule(scheduleRows, split);
+    const borrowerDisplayName = await resolveBorrowerName(input.orgId, currentLoan);
+
+    await db.transaction(async (tx) => {
+      await tx.insert(repayment).values({
+        id: repaymentId,
+        orgId: input.orgId,
+        loanId: input.loanId,
+        memberId: payerMemberId,
+        amount: money4(input.amount),
+        currencyCode: currentLoan.currencyCode,
+        appliedToPrincipal: split.appliedToPrincipal,
+        appliedToInterest: split.appliedToInterest,
+        datedOn: input.datedOn,
+        recordedAt: now,
+        slipPhotoId: input.slipPhotoId || null,
+        notes: normalizeNullableText(input.notes),
+        reversesId: null,
+        reverseReason: null,
+        clientRequestId: input.clientRequestId,
+        createdAt: now,
+        createdBy: input.actorId,
+        createdByKind: ACTOR_KIND,
+      });
+
+      await Promise.all(scheduleUpdates.map((update) => tx.update(loanSchedule)
+        .set({
+          paidInterestToDate: update.paidInterestToDate,
+          paidPrincipalToDate: update.paidPrincipalToDate,
+          status: update.status,
+        })
+        .where(and(eq(loanSchedule.orgId, input.orgId), eq(loanSchedule.id, update.row.id)))));
+
+      if (paidOff) {
+        await tx.update(loan)
+          .set({ status: "pagado", updatedAt: now, updatedBy: input.actorId })
+          .where(and(eq(loan.orgId, input.orgId), eq(loan.id, input.loanId)));
+
+        const [referral] = await tx.select().from(loanReferral)
+          .where(and(eq(loanReferral.orgId, input.orgId), eq(loanReferral.loanId, input.loanId), isNull(loanReferral.accruedAt)));
+        if (referral && Number(referral.commissionAmount) > 0) {
+          const [stillUncredited] = await tx.select().from(loanReferral)
+            .where(and(eq(loanReferral.orgId, input.orgId), eq(loanReferral.id, referral.id), isNull(loanReferral.accruedAt)));
+          if (stillUncredited) {
+            const [referrer] = await tx.select().from(member)
+              .where(and(eq(member.orgId, input.orgId), eq(member.id, referral.referrerMemberId)));
+            const withdrawalId = randomUUID();
+            await tx.insert(withdrawal).values({
+              id: withdrawalId,
+              orgId: input.orgId,
+              memberId: referral.referrerMemberId,
+              amount: money4(referral.commissionAmount),
+              currencyCode: referral.commissionCurrency,
+              datedOn: input.datedOn,
+              recordedAt: now,
+              kind: "referral_commission_credit",
+              shareOutId: null,
+              notes: `Comisión por préstamo ${input.loanId}`,
+              reversesId: null,
+              reverseReason: null,
+              clientRequestId: referral.id,
+              createdAt: now,
+              createdBy: input.actorId,
+              createdByKind: ACTOR_KIND,
+              yearEndShareOutLineId: null,
+            });
+            await tx.update(loanReferral)
+              .set({ accruedAt: now, withdrawalId })
+              .where(and(eq(loanReferral.orgId, input.orgId), eq(loanReferral.id, referral.id), isNull(loanReferral.accruedAt)));
+            await tx.insert(alert).values({
+              orgId: input.orgId,
+              alertKind: "loan_referral_commission",
+              severity: "low",
+              audience: "treasurer",
+              subjectKind: "loan",
+              subjectId: input.loanId,
+              payload: {
+                message: `Préstamo de ${borrowerDisplayName} pagado — comisión de ${referral.commissionCurrency} ${money4(referral.commissionAmount)} acreditada a ${referrer?.displayName ?? "la socia referidora"}`,
+                referralId: referral.id,
+                withdrawalId,
+              },
+              dedupWindowEnd: now,
+              dismissedAt: null,
+              dismissedBy: null,
+              snoozedUntil: null,
+              createdAt: now,
+            });
+            await tx.insert(auditLogEntry).values({
+              orgId: input.orgId,
+              actorKind: ACTOR_KIND,
+              actorId: input.actorId,
+              actionKind: "loan.referral_commission.credit",
+              subjectKind: "withdrawal",
+              subjectId: withdrawalId,
+              payloadSnapshot: {
+                loanId: input.loanId,
+                referralId: referral.id,
+                withdrawalId,
+                referrerMemberId: referral.referrerMemberId,
+                commissionAmount: money4(referral.commissionAmount),
+                commissionCurrency: referral.commissionCurrency,
+              },
+              reason: null,
+              at: now,
+              createdAt: now,
+            });
+          }
+        }
+      }
+
+      await tx.insert(auditLogEntry).values({
+        orgId: input.orgId,
+        actorKind: ACTOR_KIND,
+        actorId: input.actorId,
+        actionKind: paidOff ? "loan.repayment.payoff" : "loan.repayment.create",
+        subjectKind: "repayment",
+        subjectId: repaymentId,
+        payloadSnapshot: {
+          repaymentId,
+          loanId: input.loanId,
+          amount: money4(input.amount),
+          split,
+          paidOff,
+        },
+        reason: null,
+        at: now,
+        createdAt: now,
+      });
+    });
+
+    return { repaymentId, paidOff, split };
   },
 });
