@@ -45,6 +45,11 @@ export type OriginateLoanResult = {
   loanId: string;
 };
 
+export type LoanSupportMember = {
+  id: string;
+  displayName: string;
+};
+
 export type RecordRepaymentInput = {
   orgId: string;
   actorId: string;

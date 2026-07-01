@@ -183,6 +183,34 @@
       "submit": "Registrar cuota base"
     }
   },
+  "sprint2": {
+    "loans": {
+      "title": "Nuevo préstamo",
+      "description": "Origina un préstamo para una socia o para una persona externa con garante.",
+      "borrowerSection": "Quién recibe el préstamo",
+      "borrowerKind": "Tipo de prestataria",
+      "borrowerKindMember": "Socia",
+      "borrowerKindNonMember": "No socia",
+      "borrowerMember": "Socia prestataria",
+      "selectMember": "Selecciona una socia",
+      "nonMemberSection": "Datos de no socia",
+      "nonMemberDisplayName": "Nombre de la no socia",
+      "nonMemberWhatsappNumber": "WhatsApp de la no socia",
+      "nonMemberNationalIdLast4": "Últimos 4 dígitos de cédula",
+      "nonMemberNotes": "Notas de no socia",
+      "supportSection": "Garante y referida",
+      "guarantorMember": "Socia garante",
+      "selectGuarantor": "Selecciona una garante",
+      "referrerMember": "Socia que refiere",
+      "noReferrer": "Sin referida",
+      "loanSection": "Condiciones del préstamo",
+      "principalAmount": "Monto principal",
+      "termPeriods": "Número de cuotas",
+      "originatedOn": "Fecha de origen",
+      "purpose": "Propósito",
+      "submit": "Originar préstamo"
+    }
+  },
   "nav": {
     "accounts": "Group accounts",
     "arrears": "Overdue",

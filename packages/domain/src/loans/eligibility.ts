@@ -19,7 +19,7 @@ function parseMoney4(value: string): bigint {
     throw new Error("money value must be a non-negative decimal with up to 4 places");
   }
   const [whole, fraction = ""] = value.split(".");
-  return BigInt(whole) * 10_000n + BigInt(fraction.padEnd(4, "0"));
+  return BigInt(whole) * BigInt(10000) + BigInt(fraction.padEnd(4, "0"));
 }
 
 function parseRatio2(value: string): bigint {
@@ -27,7 +27,7 @@ function parseRatio2(value: string): bigint {
     throw new Error("ratio value must be a non-negative decimal with up to 2 places");
   }
   const [whole, fraction = ""] = value.split(".");
-  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, "0"));
+  return BigInt(whole) * BigInt(100) + BigInt(fraction.padEnd(2, "0"));
 }
 
 export function resolveOriginationRate(
@@ -68,7 +68,7 @@ export function evaluateLoanEligibility(input: {
     };
   }
 
-  if (requestedPrincipal > (savingsBasis * capRatio) / 100n) {
+  if (requestedPrincipal > (savingsBasis * capRatio) / BigInt(100)) {
     return {
       ok: false,
       reason: "El monto supera el límite de préstamo permitido por los ahorros disponibles.",
