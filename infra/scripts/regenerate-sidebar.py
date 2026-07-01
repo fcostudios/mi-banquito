@@ -42,10 +42,19 @@ FALLBACK_ICON = "Circle"
 # Lucide icon name → React component name (the lucide-react export).
 # All icons in the nav map must map here; unknown icons fall back to FALLBACK_ICON.
 ICON_MAP = {
+    "AlertCircle": "AlertCircle",
+    "Banknote": "Banknote",
     "LayoutDashboard": "LayoutDashboard",
     "Kanban": "Kanban",
     "Building2": "Building2",
+    "CheckCircle2": "CheckCircle2",
+    "FileText": "FileText",
+    "HandCoins": "HandCoins",
+    "History": "History",
+    "Home": "Home",
+    "LineChart": "LineChart",
     "Users": "Users",
+    "Wallet": "Wallet",
     "TrendingUp": "TrendingUp",
     "Target": "Target",
     "Shuffle": "Shuffle",

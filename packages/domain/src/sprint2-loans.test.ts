@@ -147,7 +147,23 @@ describe("Sprint 2 loan domain rules", () => {
 
     expect(result).toEqual({
       ok: false,
-      reason: "No hay suficiente dinero disponible para este préstamo. Baja el monto o registra aportes primero.",
+      reason: "El fondo del grupo tiene $1000.00 disponible. Baja el monto o registra más aportes antes de crear este préstamo.",
+    });
+  });
+
+  it("explains when the group fund has no recorded contributions", () => {
+    const result = evaluateLoanEligibility({
+      requestedPrincipal: "120.0000",
+      availableCapital: "0.0000",
+      borrowerSavingsBalance: "500.0000",
+      loanToSavingsCapRatio: "3.00",
+      borrowerKind: "member",
+      guarantorSavingsBalance: undefined,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "Todavía no hay aportes registrados en el fondo del grupo. Registra un aporte antes de crear un préstamo.",
     });
   });
 
