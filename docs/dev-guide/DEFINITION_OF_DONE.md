@@ -38,8 +38,9 @@ sufficient. See `CLAUDE.md` for the summary; this is the authoritative gate.
    - `drizzle-kit push` exits **0 even on an unreachable `DATABASE_URL`** (a silent
      no-op: 0 tables). `verify-schema.mjs` counts the applied tables and exits
      non-zero on 0 — so "schema applies cleanly" can no longer be a false pass.
-   - The DB client auto-selects its driver by `DATABASE_URL` (`pg` for a local/
-     standard Postgres URL, `neon-http` for a Neon URL), so `push` applies locally.
+   - The runtime DB client uses the transaction-capable `pg` driver by default,
+     including for Neon URLs. `neon-http` is only an explicit read-only/tooling
+     opt-in because it does not support `transaction()`.
    - Migrations live in `packages/db/src/migrations/` as `V<timestamp>__<slug>.sql`.
    - Once applied, a migration file is immutable — add a new one; never edit it.
    - Every Drizzle column has a corresponding migration column.

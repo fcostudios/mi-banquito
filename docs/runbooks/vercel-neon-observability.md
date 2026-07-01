@@ -37,7 +37,8 @@
   - Deployed config includes all three cron schedules from root `vercel.json`
 - Production envs configured in Vercel:
   - `DATABASE_URL`
-  - `DB_DRIVER=neon`
+  - `DB_DRIVER=pg` (or legacy `neon`, which the app treats as pg because
+    runtime writes require transactions; do not use `neon-http` for the app)
   - `NEXT_PUBLIC_API_URL`
   - `APP_BASE_URL`
   - `AUTH0_DOMAIN`
@@ -49,7 +50,7 @@
 - Branch-specific preview envs configured for
   `feature/sprint0/foundation-completion`:
   - `DATABASE_URL`
-  - `DB_DRIVER=neon`
+  - `DB_DRIVER=pg` (or legacy `neon`, treated as pg)
   - `NEXT_PUBLIC_API_URL`
   - `APP_BASE_URL`
   - `AUTH0_DOMAIN`
