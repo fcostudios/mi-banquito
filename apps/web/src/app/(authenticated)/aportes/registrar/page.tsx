@@ -32,6 +32,19 @@ export default async function ScrRecordContributionPage() {
         <FormField labelKey={copy.common.date}>
           <InputText labelKey={copy.common.date} name="datedOn" type="date" defaultValue={todayISO()} required />
         </FormField>
+        <FormField labelKey={copy.contributions.kind}>
+          <Select name="kind" defaultValue="regular" required>
+            <option value="regular">{copy.contributions.kindRegular}</option>
+            <option value="partial">{copy.contributions.kindPartial}</option>
+          </Select>
+        </FormField>
+        <FormField labelKey={copy.contributions.paymentSource}>
+          <Select name="paymentSource" defaultValue="cash_in_meeting" required>
+            <option value="cash_in_meeting">{copy.contributions.cashInMeeting}</option>
+            <option value="bank_transfer">{copy.contributions.bankTransfer}</option>
+            <option value="petty_cash_deposit">{copy.contributions.pettyCashDeposit}</option>
+          </Select>
+        </FormField>
         <FormField labelKey={copy.contributions.slip}>
           <InputText labelKey={copy.contributions.slip} name="slipPhotoId" />
         </FormField>
