@@ -60,7 +60,7 @@ export default async function ScrAdminCronRunsPage() {
     .orderBy(desc(cronRun.startedAt));
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6" data-screen="SCR-admin-cron-runs">
       <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold text-text-primary">{t.title}</h1>
         <p className="max-w-3xl text-sm text-text-secondary">{t.description}</p>
