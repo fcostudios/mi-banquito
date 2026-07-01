@@ -147,7 +147,7 @@ describe("Sprint 2 loan domain rules", () => {
 
     expect(result).toEqual({
       ok: false,
-      reason: "El fondo del grupo tiene $1000.00 disponible. Baja el monto o registra más aportes antes de crear este préstamo.",
+      reason: "El monto solicitado ($1001.00) supera el dinero disponible del grupo ($1000.00). Baja el monto a $1000.00 o menos, o registra más aportes antes de crear este préstamo.",
     });
   });
 
@@ -164,6 +164,22 @@ describe("Sprint 2 loan domain rules", () => {
     expect(result).toEqual({
       ok: false,
       reason: "Todavía no hay aportes registrados en el fondo del grupo. Registra un aporte antes de crear un préstamo.",
+    });
+  });
+
+  it("shows the requested amount and savings cap when the loan exceeds member capacity", () => {
+    const result = evaluateLoanEligibility({
+      requestedPrincipal: "120.0000",
+      availableCapital: "1000.0000",
+      borrowerSavingsBalance: "30.0000",
+      loanToSavingsCapRatio: "3.00",
+      borrowerKind: "member",
+      guarantorSavingsBalance: undefined,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "El monto solicitado ($120.00) supera el límite por ahorros ($90.00). Ese límite sale de $30.00 de ahorros disponibles x 3.00. Baja el monto a $90.00 o registra más ahorros para la socia o garante.",
     });
   });
 
