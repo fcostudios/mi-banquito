@@ -19,6 +19,7 @@ const actionTiles = [
 function stateLabel(state: string) {
   if (state === "al_dia") return copy.states.alDia;
   if (state === "al_día") return copy.states.alDia;
+  if (state === "parcial") return copy.states.parcial;
   if (state === "atrasado") return copy.states.atrasado;
   return copy.states.enMora;
 }

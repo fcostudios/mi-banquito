@@ -39,9 +39,9 @@ export default async function ScrRecordContributionPage() {
           </Select>
         </FormField>
         <FormField labelKey={copy.contributions.paymentSource}>
-          <Select name="paymentSource" defaultValue="cash_in_meeting" required>
-            <option value="cash_in_meeting">{copy.contributions.cashInMeeting}</option>
+          <Select name="paymentSource" defaultValue="bank_transfer" required>
             <option value="bank_transfer">{copy.contributions.bankTransfer}</option>
+            <option value="cash_in_meeting">{copy.contributions.cashInMeeting}</option>
             <option value="petty_cash_deposit">{copy.contributions.pettyCashDeposit}</option>
           </Select>
         </FormField>

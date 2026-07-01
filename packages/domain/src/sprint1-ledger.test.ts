@@ -171,6 +171,7 @@ describe("US-027 member status transition ledger plan", () => {
 describe("US-031 compliance state display mapping", () => {
   it.each([
     ["al_dia", "success"],
+    ["parcial", "neutral"],
     ["atrasado", "warning"],
     ["en_mora", "danger"],
   ] as const)("maps %s to %s", (state, tone) => {
@@ -212,6 +213,7 @@ describe("US-026 and US-031 member helpers", () => {
 
   it("maps compliance to stable tones", () => {
     expect(mapComplianceStatusToTone("al_dia")).toBe("success");
+    expect(mapComplianceStatusToTone("parcial")).toBe("neutral");
     expect(mapComplianceStatusToTone("atrasado")).toBe("warning");
     expect(mapComplianceStatusToTone("en_mora")).toBe("danger");
   });
