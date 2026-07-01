@@ -763,6 +763,7 @@ export const createLedgerService = (): LedgerService => ({
         at: now,
         createdAt: now,
       });
+      await tx.execute(sql`SELECT refresh_sprint1_read_models()`);
       return row;
     });
   },

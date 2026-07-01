@@ -147,7 +147,7 @@ describe("Sprint 2 loan domain rules", () => {
 
     expect(result).toEqual({
       ok: false,
-      reason: "No hay suficiente capital disponible sin tocar la cuota base protegida.",
+      reason: "No hay suficiente dinero disponible para este préstamo. Baja el monto o registra aportes primero.",
     });
   });
 

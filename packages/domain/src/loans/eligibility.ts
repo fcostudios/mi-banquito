@@ -57,21 +57,21 @@ export function evaluateLoanEligibility(input: {
   if (requestedPrincipal > availableCapital) {
     return {
       ok: false,
-      reason: "No hay suficiente capital disponible sin tocar la cuota base protegida.",
+      reason: "No hay suficiente dinero disponible para este préstamo. Baja el monto o registra aportes primero.",
     };
   }
 
   if (input.borrowerKind === "non_member" && !input.guarantorSavingsBalance) {
     return {
       ok: false,
-      reason: "Selecciona una socia garante activa antes de originar este préstamo.",
+      reason: "Selecciona una socia garante activa antes de registrar este préstamo.",
     };
   }
 
   if (requestedPrincipal > (savingsBasis * capRatio) / BigInt(100)) {
     return {
       ok: false,
-      reason: "El monto supera el límite de préstamo permitido por los ahorros disponibles.",
+      reason: "El monto es mayor al límite permitido según los ahorros de la socia o garante.",
     };
   }
 

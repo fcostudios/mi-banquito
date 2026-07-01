@@ -57,6 +57,10 @@ Every TOON section has a `dataSource` (`url` + `method`). When implementing a sc
 ## i18n
 
 - Never hardcode user-facing strings in JSX (the `check-hardcoded-string` lint rejects bare text nodes).
+- Write Spanish copy for non-financial users first: prefer familiar verbs like
+  `registrar`, `guardar`, and `pagar`; avoid internal finance terms such as
+  `originar`, `capital disponible`, or unexplained protected-fund language in
+  buttons, banners, and validation errors.
 - **Client Component** (`"use client"`): use `useLocale()` from `@/lib/i18n/use-locale`.
 - **Server Component** (default; `async` pages, anything that `await`s): `useLocale()` is a client hook and CANNOT be called here. Import the messages JSON instead — e.g. `import messages from "@/lib/i18n/<lang>.json"` then read `messages.pages[key]?.title` (the `socias` list + `[id]` detail worked examples show the pattern).
 - Locale: `en-US` (single-locale project).
