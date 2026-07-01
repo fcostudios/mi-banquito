@@ -120,3 +120,34 @@
 {"story":"US-032","event":"done"}
 {"story":"SPRINT-0","event":"closed_with_deferrals","notes":"Closed 2026-06-30 as repository/local foundation complete. External/account/manual evidence remains tracked in docs/stories/DEFERRED_EXTERNAL_BLOCKERS.md: custom domain decision, Neon PR lifecycle, Auth0 passwordless/session evidence, Sentry/Better Stack, device PWA install, cron secret invocation, and accepted deviations."}
 {"story":"SPRINT-1","event":"closed_with_deferrals","notes":"Closed 2026-06-30 as implemented and verified. All Sprint 1 stories have done events; inherited Sprint 0 external deferrals remain active. Latest production deployment and Sprint 1 UI closure gate passed."}
+{"story":"US-033","event":"ac_verify","ac":1,"method":"domain tests and page inspection","pass":true,"notes":"Member loan origination persists borrower, config version, declining-balance schedule, first-period admin fee, and audit row."}
+{"story":"US-034","event":"ac_verify","ac":1,"method":"domain tests and page inspection","pass":true,"notes":"Non-member origination requires active guarantor, writes non_member_borrower and loan_guarantor rows, and filters guarantor picker by remaining capacity."}
+{"story":"US-035","event":"ac_verify","ac":1,"method":"domain tests and page inspection","pass":true,"notes":"Origination optionally stamps referrer member and LoanReferral with commission amount/currency for later payoff credit."}
+{"story":"US-036","event":"ac_verify","ac":2,"method":"domain tests and page/action inspection","pass":true,"notes":"Repayment action computes interest-first split against date-bounded interest and outstanding principal, persists Repayment, updates schedule paid-to-date, and shows split success copy."}
+{"story":"US-037","event":"ac_verify","ac":1,"method":"page inspection and type-check","pass":true,"notes":"Loan detail renders summary, schedule, payments, history, and actions sections with party names, fees, paid-to-date, repayment split, accruals, and reversal affordance markers."}
+{"story":"US-038","event":"ac_verify","ac":1,"method":"domain and route tests","pass":true,"notes":"Accrue-interest cron plans idempotent loan/day interest accruals, mora fees, A6 alerts, and run summaries."}
+{"story":"US-039","event":"ac_verify","ac":3,"method":"domain tests","pass":true,"notes":"Final repayment transitions loan to pagado and credits exactly one referral_commission_credit withdrawal with guarded LoanReferral accrual update, audit, and low-severity alert."}
+{"story":"US-074","event":"ac_verify","ac":5,"method":"domain/schema/page tests","pass":true,"notes":"Contribution payment_source persists with audit, cash source does not require slip, bank/petty cash do require slip, and monthly close shows separate bank and petty-cash reconciliation inputs."}
+{"story":"US-075","event":"ac_verify","ac":2,"method":"domain/schema/page tests","pass":true,"notes":"Partial contributions persist append-only, compliance derivation and MV ordering return parcial for 0 < sum < expected, and status pill maps parcial to neutral."}
+{"story":"US-081","event":"ac_verify","ac":1,"method":"route/page tests","pass":true,"notes":"Cron run history page lists cron_run rows and provides manual replay action guarded by platform operator session and CRON_SECRET bearer invocation."}
+{"story":"US-033","event":"build_pass","notes":"Sprint 2 gate passed: pnpm type-check, pnpm lint, pnpm test, local Docker schema apply/verify, pnpm build, and Playwright e2e."}
+{"story":"US-034","event":"build_pass","notes":"Sprint 2 gate passed: pnpm type-check, pnpm lint, pnpm test, local Docker schema apply/verify, pnpm build, and Playwright e2e."}
+{"story":"US-035","event":"build_pass","notes":"Sprint 2 gate passed: pnpm type-check, pnpm lint, pnpm test, local Docker schema apply/verify, pnpm build, and Playwright e2e."}
+{"story":"US-036","event":"build_pass","notes":"Sprint 2 gate passed: pnpm type-check, pnpm lint, pnpm test, local Docker schema apply/verify, pnpm build, and Playwright e2e."}
+{"story":"US-037","event":"build_pass","notes":"Sprint 2 gate passed: pnpm type-check, pnpm lint, pnpm test, local Docker schema apply/verify, pnpm build, and Playwright e2e."}
+{"story":"US-038","event":"build_pass","notes":"Sprint 2 gate passed: pnpm type-check, pnpm lint, pnpm test, local Docker schema apply/verify, pnpm build, and Playwright e2e."}
+{"story":"US-039","event":"build_pass","notes":"Sprint 2 gate passed: pnpm type-check, pnpm lint, pnpm test, local Docker schema apply/verify, pnpm build, and Playwright e2e."}
+{"story":"US-074","event":"build_pass","notes":"Sprint 2 gate passed: pnpm type-check, pnpm lint, pnpm test, local Docker schema apply/verify, pnpm build, and Playwright e2e."}
+{"story":"US-075","event":"build_pass","notes":"Sprint 2 gate passed: pnpm type-check, pnpm lint, pnpm test, local Docker schema apply/verify, pnpm build, and Playwright e2e."}
+{"story":"US-081","event":"build_pass","notes":"Sprint 2 gate passed: pnpm type-check, pnpm lint, pnpm test, local Docker schema apply/verify, pnpm build, and Playwright e2e."}
+{"story":"US-033","event":"done"}
+{"story":"US-034","event":"done"}
+{"story":"US-035","event":"done"}
+{"story":"US-036","event":"done"}
+{"story":"US-037","event":"done"}
+{"story":"US-038","event":"done"}
+{"story":"US-039","event":"done"}
+{"story":"US-074","event":"done"}
+{"story":"US-075","event":"done"}
+{"story":"US-081","event":"done"}
+{"story":"SPRINT-2","event":"closed_with_deferrals","notes":"Closed 2026-06-30 as implemented and locally verified. Inherited Sprint 0 external deferrals remain active for live Auth0/passwordless and production-secret/account-side evidence; no new Sprint 2 external blockers were added."}

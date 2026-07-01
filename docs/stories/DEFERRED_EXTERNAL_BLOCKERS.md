@@ -41,3 +41,11 @@ Sprint 1 has no additional external blocker list of its own. It is closed with
 the Sprint 0 external deferrals still active. The Sprint 1 implementation and UI
 closure gates are recorded in `.nous-feedback.jsonl` for US-016, US-017,
 US-025, US-026, US-027, US-028, US-029, US-030, US-031, and US-032.
+
+## Sprint 2 Closure Note
+
+Sprint 2 has no new external blocker list of its own. It is closed with the
+Sprint 0 external deferrals still active for live Auth0/passwordless evidence,
+production cron-secret invocation, and external observability resources. Sprint
+2 local verification includes schema verification, domain/web tests, type-check,
+lint, build, and Playwright protected-route/cron guards.

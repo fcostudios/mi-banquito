@@ -92,16 +92,16 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |
 |---|-------|-------|------|------|---------------|-----|------------|--------|----------|------|
-| 1 | full-stack | **US-033** ⬜ | Treasurer originates a member loan declining-balance schedule auto-generated | ? ?SP | `See story file` | — | US-008, US-014, US-017 | →5 | — | [r1_loans_us_033.md](sprint-2/r1_loans_us_033.md) |
-| 2 | full-stack | **US-038** ⬜ | System fires daily interest accrual cron idempotent on loan_id and accrued_on | ? ?SP | `See story file` | — | US-008, US-012, US-003 | →1 | — | [r1_loans_us_038.md](sprint-2/r1_loans_us_038.md) |
-| 3 | full-stack | **US-074** ⬜ | Treasurer records a contribution as cash, bank, or petty cash | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_074.md](sprint-2/r1_chg_us_074.md) |
-| 4 | full-stack | **US-075** ⬜ | System supports a "partial aporte" state and treasurer records partial payments | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_075.md](sprint-2/r1_chg_us_075.md) |
-| 5 | full-stack | **US-081** ⬜ | Operator views cron run history and triggers manual replay | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_081.md](sprint-2/r1_chg_us_081.md) |
-| 6 | full-stack | **US-034** ⬜ | Treasurer originates a non-member loan with required guarantor picker | ? ?SP | `See story file` | — | US-008, US-017, US-033 | →2 | — | [r1_loans_us_034.md](sprint-2/r1_loans_us_034.md) |
-| 7 | full-stack | **US-036** ⬜ | Treasurer records a loan repayment with auto split interest first | ? ?SP | `See story file` | — | US-008, US-014, US-033 | →4 | — | [r1_loans_us_036.md](sprint-2/r1_loans_us_036.md) |
-| 8 | full-stack | **US-035** ⬜ | Treasurer optionally designates a referrer member on origination | ? ?SP | `See story file` | — | US-017, US-034, US-025 | →1 | — | [r1_loans_us_035.md](sprint-2/r1_loans_us_035.md) |
-| 9 | full-stack | **US-037** ⬜ | Treasurer views loan detail with schedule fees repayments accruals referrer guarantor | ? ?SP | `See story file` | — | US-033, US-036, US-004 | — | — | [r1_loans_us_037.md](sprint-2/r1_loans_us_037.md) |
-| 10 | full-stack | **US-039** ⬜ | System fires referral commission credit on Loan status pagado | ? ?SP | `See story file` | — | US-035, US-036, US-003 | — | — | [r1_loans_us_039.md](sprint-2/r1_loans_us_039.md) |
+| 1 | full-stack | **US-033** ✅ | Treasurer originates a member loan declining-balance schedule auto-generated | ? ?SP | `See story file` | — | US-008, US-014, US-017 | →5 | — | [r1_loans_us_033.md](sprint-2/r1_loans_us_033.md) |
+| 2 | full-stack | **US-038** ✅ | System fires daily interest accrual cron idempotent on loan_id and accrued_on | ? ?SP | `See story file` | — | US-008, US-012, US-003 | →1 | — | [r1_loans_us_038.md](sprint-2/r1_loans_us_038.md) |
+| 3 | full-stack | **US-074** ✅ | Treasurer records a contribution as cash, bank, or petty cash | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_074.md](sprint-2/r1_chg_us_074.md) |
+| 4 | full-stack | **US-075** ✅ | System supports a "partial aporte" state and treasurer records partial payments | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_075.md](sprint-2/r1_chg_us_075.md) |
+| 5 | full-stack | **US-081** ✅ | Operator views cron run history and triggers manual replay | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_081.md](sprint-2/r1_chg_us_081.md) |
+| 6 | full-stack | **US-034** ✅ | Treasurer originates a non-member loan with required guarantor picker | ? ?SP | `See story file` | — | US-008, US-017, US-033 | →2 | — | [r1_loans_us_034.md](sprint-2/r1_loans_us_034.md) |
+| 7 | full-stack | **US-036** ✅ | Treasurer records a loan repayment with auto split interest first | ? ?SP | `See story file` | — | US-008, US-014, US-033 | →4 | — | [r1_loans_us_036.md](sprint-2/r1_loans_us_036.md) |
+| 8 | full-stack | **US-035** ✅ | Treasurer optionally designates a referrer member on origination | ? ?SP | `See story file` | — | US-017, US-034, US-025 | →1 | — | [r1_loans_us_035.md](sprint-2/r1_loans_us_035.md) |
+| 9 | full-stack | **US-037** ✅ | Treasurer views loan detail with schedule fees repayments accruals referrer guarantor | ? ?SP | `See story file` | — | US-033, US-036, US-004 | — | — | [r1_loans_us_037.md](sprint-2/r1_loans_us_037.md) |
+| 10 | full-stack | **US-039** ✅ | System fires referral commission credit on Loan status pagado | ? ?SP | `See story file` | — | US-035, US-036, US-003 | — | — | [r1_loans_us_039.md](sprint-2/r1_loans_us_039.md) |
 
 ### References
 
@@ -373,4 +373,3 @@ See `docs/specs/09_architecture.md` for bounded context details.
 - Architecture: [docs/specs/09_architecture.md](../specs/09_architecture.md)
 - Design system: [packages/design-system/tokens.json](../../packages/design-system/tokens.json)
 - HTML specs: [docs/specs-html/index.html](../specs-html/index.html)
-

@@ -27,6 +27,26 @@ Stack, device-install, and Neon-preview evidence. Sprint 1-specific stories have
 `done` events in `.nous-feedback.jsonl`; follow-on sprint work starts at Sprint 2
 in `SPRINT_PLAN.md`.
 
+Sprint 2 is closed as **implemented and locally verified**, with inherited
+Sprint 0 external deferrals still active for live Auth0/passwordless and
+production-secret evidence. Sprint 2 delivered the loan origination/repayment
+vertical slice, contribution source and partial-state realism, cron accrual,
+cron-run history/replay, a Sprint 2 closure gate, and Playwright protected-route
+guards. Full local verification passed on 2026-06-30:
+
+- `rtk pnpm type-check`
+- `rtk pnpm lint`
+- `rtk pnpm test`
+- `rtk docker start mi-banquito-postgres && rtk pnpm --dir packages/db exec node scripts/apply-local-schema.mjs && rtk pnpm --dir packages/db exec node scripts/verify-schema.mjs`
+- `rtk pnpm build`
+- `rtk pnpm test:e2e` (26 passed, 2 skipped)
+
+Known non-fatal warning: the Auth0 SDK continues to emit the DPoP dynamic
+dependency webpack warning during build/e2e. Authenticated in-app UI rendering
+still depends on the inherited live Auth0 session evidence; repository-level
+coverage verifies the protected-route, validation, domain, schema, and build
+contracts.
+
 ## Story Status
 
 | Story | Status | Evidence | Remaining Work |
