@@ -317,7 +317,7 @@ export const createLoanService = (): LoanService => ({
       .where(and(eq(groupConfig.orgId, input.orgId), isNull(groupConfig.validTo)))
       .orderBy(desc(groupConfig.version));
     if (!currentConfig) {
-      throw new Error("Current group configuration is required before originating loans");
+      throw new Error("Configura las reglas del grupo antes de registrar préstamos.");
     }
 
     const memberRateValue = money4(currentConfig.loanRateValue);
