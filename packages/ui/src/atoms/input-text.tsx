@@ -9,7 +9,13 @@ export interface InputTextProps extends InputHTMLAttributes<HTMLInputElement> {
   errorMessageKey?: string;
 }
 
-export function InputText({ placeholderKey, ...rest }: InputTextProps) {
+export function InputText({
+  errorMessageKey: _errorMessageKey,
+  helperTextKey: _helperTextKey,
+  labelKey: _labelKey,
+  placeholderKey,
+  ...rest
+}: InputTextProps) {
   return (
     <input
       type="text"

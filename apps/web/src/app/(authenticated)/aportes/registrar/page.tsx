@@ -10,14 +10,25 @@ export const dynamic = "force-dynamic";
 
 const copy = messages.sprint1;
 
-export default async function ScrRecordContributionPage() {
+export default async function ScrRecordContributionPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ error?: string }>;
+}) {
   const session = await requireTreasurer();
   const members = await createLedgerService().listMembers(session.orgId);
+  const params = await searchParams;
+  const errorMessage = params?.error ? decodeURIComponent(params.error) : undefined;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
       <h1 className="text-2xl font-bold text-text-primary">{copy.contributions.title}</h1>
       <form action={recordContributionAction} className="grid gap-4 rounded-md border border-border bg-surface p-5">
+        {errorMessage ? (
+          <div className="rounded-md border border-error bg-surface p-3 text-sm text-error" role="alert">
+            {errorMessage}
+          </div>
+        ) : null}
         <input type="hidden" name="clientRequestId" value={randomUUID()} />
         <FormField labelKey={copy.common.member}>
           <Select name="memberId" required>
@@ -39,9 +50,9 @@ export default async function ScrRecordContributionPage() {
           </Select>
         </FormField>
         <FormField labelKey={copy.contributions.paymentSource}>
-          <Select name="paymentSource" defaultValue="bank_transfer" required>
-            <option value="bank_transfer">{copy.contributions.bankTransfer}</option>
+          <Select name="paymentSource" defaultValue="cash_in_meeting" required>
             <option value="cash_in_meeting">{copy.contributions.cashInMeeting}</option>
+            <option value="bank_transfer">{copy.contributions.bankTransfer}</option>
             <option value="petty_cash_deposit">{copy.contributions.pettyCashDeposit}</option>
           </Select>
         </FormField>
