@@ -35,24 +35,16 @@ describe("Sprint 2 form validation", () => {
     })).toThrow();
   });
 
-  it("defaults contribution source to bank transfer and preserves existing slip behavior", () => {
-    expect(() => contributionFormSchema.parse({
-      clientRequestId: "11111111-1111-4111-8111-111111111111",
-      memberId: "22222222-2222-4222-8222-222222222222",
-      amount: "10.0000",
-      datedOn: "2026-06-30",
-      slipPhotoId: "",
-    })).toThrow();
-
+  it("defaults contribution source to cash so a receipt is not required before uploads exist", () => {
     const parsed = contributionFormSchema.parse({
       clientRequestId: "11111111-1111-4111-8111-111111111111",
       memberId: "22222222-2222-4222-8222-222222222222",
       amount: "10.0000",
       datedOn: "2026-06-30",
-      slipPhotoId: "33333333-3333-4333-8333-333333333333",
+      slipPhotoId: "",
     });
 
-    expect(parsed.paymentSource).toBe("bank_transfer");
+    expect(parsed.paymentSource).toBe("cash_in_meeting");
     expect(parsed.kind).toBe("regular");
   });
 
