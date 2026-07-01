@@ -11,6 +11,8 @@ export const alert_severity_enum = pgEnum("alert_severity_enum", ["low", "medium
 export const audit_log_entry_actor_kind_enum = pgEnum("audit_log_entry_actor_kind_enum", ["member", "platform_operator", "system"]);
 export const contribution_cycle_created_by_kind_enum = pgEnum("contribution_cycle_created_by_kind_enum", ["system", "member"]);
 export const contribution_cycle_status_enum = pgEnum("contribution_cycle_status_enum", ["open", "closed"]);
+export const contribution_kind_enum = pgEnum("contribution_kind_enum", ["regular", "partial"]);
+export const contribution_payment_source_enum = pgEnum("contribution_payment_source_enum", ["bank_transfer", "cash_in_meeting", "petty_cash_deposit"]);
 export const entity_version_change_kind_enum = pgEnum("entity_version_change_kind_enum", ["create", "update", "status_transition"]);
 export const entity_version_created_by_kind_enum = pgEnum("entity_version_created_by_kind_enum", ["member", "platform_operator", "system"]);
 export const expense_status_enum = pgEnum("expense_status_enum", ["planned", "paid"]);
@@ -20,6 +22,7 @@ export const group_config_created_by_kind_enum = pgEnum("group_config_created_by
 export const group_config_repayment_split_rule_enum = pgEnum("group_config_repayment_split_rule_enum", ["interest_first", "principal_first", "even_split"]);
 export const institution_kind_enum = pgEnum("institution_kind_enum", ["bank", "coop", "other"]);
 export const institution_status_enum = pgEnum("institution_status_enum", ["active", "inactive"]);
+export const loan_borrower_kind_enum = pgEnum("loan_borrower_kind_enum", ["member", "non_member"]);
 export const loan_schedule_status_enum = pgEnum("loan_schedule_status_enum", ["pendiente", "parcial", "pagado", "atrasado", "en_mora"]);
 export const loan_status_enum = pgEnum("loan_status_enum", ["proposed", "originated", "activo", "pagado", "cancelado", "en_mora"]);
 export const member_role_enum = pgEnum("member_role_enum", ["aportante", "tesorera", "presidente", "secretaria"]);
@@ -33,7 +36,7 @@ export const surplus_governance_decision_status_enum = pgEnum("surplus_governanc
 export const user_account_status_enum = pgEnum("user_account_status_enum", ["active", "disabled"]);
 export const user_org_membership_status_enum = pgEnum("user_org_membership_status_enum", ["active", "revoked"]);
 export const withdrawal_created_by_kind_enum = pgEnum("withdrawal_created_by_kind_enum", ["member", "system"]);
-export const withdrawal_kind_enum = pgEnum("withdrawal_kind_enum", ["member_refund", "year_end_share_out", "other"]);
+export const withdrawal_kind_enum = pgEnum("withdrawal_kind_enum", ["member_refund", "year_end_share_out", "other", "referral_commission_credit"]);
 export const year_end_share_out_status_enum = pgEnum("year_end_share_out_status_enum", ["draft", "approved", "distributed", "locked"]);
 
 export const alert = pgTable("alert", {
@@ -135,6 +138,8 @@ export const contribution = pgTable("contribution", {
   orgId: uuid("org_id").notNull(),
   cycleId: uuid("cycle_id").references((): AnyPgColumn => contributionCycle.id).notNull(),
   memberId: uuid("member_id").references((): AnyPgColumn => member.id).notNull(),
+  kind: contribution_kind_enum("kind").default("regular").notNull(),
+  paymentSource: contribution_payment_source_enum("payment_source").default("bank_transfer").notNull(),
   amount: numeric("amount", { precision: 18, scale: 4 }).notNull(),
   currencyCode: text("currency_code").notNull(),
   datedOn: date("dated_on").notNull(),
@@ -262,10 +267,25 @@ export const extraordinaryCollectionLine = pgTable("extraordinary_collection_lin
   createdBy: uuid("created_by").notNull(),
 });
 
+export const nonMemberBorrower = pgTable("non_member_borrower", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  displayName: text("display_name").notNull(),
+  whatsappNumber: text("whatsapp_number"),
+  nationalIdRedacted: text("national_id_redacted"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull(),
+  createdBy: uuid("created_by").notNull(),
+  createdByKind: text("created_by_kind").notNull(),
+});
+
 export const loan = pgTable("loan", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   orgId: uuid("org_id").notNull(),
-  memberId: uuid("member_id").references((): AnyPgColumn => member.id).notNull(),
+  memberId: uuid("member_id").references((): AnyPgColumn => member.id),
+  borrowerKind: loan_borrower_kind_enum("borrower_kind").default("member").notNull(),
+  borrowerMemberId: uuid("borrower_member_id").references((): AnyPgColumn => member.id),
+  borrowerNonMemberId: uuid("borrower_non_member_id").references((): AnyPgColumn => nonMemberBorrower.id),
   principalAmount: numeric("principal_amount", { precision: 18, scale: 4 }).notNull(),
   currencyCode: text("currency_code").notNull(),
   rateValue: numeric("rate_value", { precision: 8, scale: 4 }).notNull(),
@@ -276,11 +296,41 @@ export const loan = pgTable("loan", {
   status: loan_status_enum("status").notNull(),
   purpose: text("purpose"),
   clientRequestId: uuid("client_request_id"),
+  groupConfigVersionAtOrigination: integer("group_config_version_at_origination").default(1).notNull(),
+  referrerMemberId: uuid("referrer_member_id").references((): AnyPgColumn => member.id),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
   updatedAt: timestamp("updated_at"),
   updatedBy: uuid("updated_by"),
+});
+
+export const loanGuarantor = pgTable("loan_guarantor", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  loanId: uuid("loan_id").references((): AnyPgColumn => loan.id).notNull(),
+  guarantorMemberId: uuid("guarantor_member_id").references((): AnyPgColumn => member.id).notNull(),
+  assumedAt: timestamp("assumed_at").notNull(),
+  releasedAt: timestamp("released_at"),
+  liabilityAmount: numeric("liability_amount", { precision: 18, scale: 4 }).notNull(),
+  currencyCode: text("currency_code").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+  createdBy: uuid("created_by").notNull(),
+  createdByKind: text("created_by_kind").notNull(),
+});
+
+export const loanReferral = pgTable("loan_referral", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  loanId: uuid("loan_id").references((): AnyPgColumn => loan.id).notNull(),
+  referrerMemberId: uuid("referrer_member_id").references((): AnyPgColumn => member.id).notNull(),
+  commissionAmount: numeric("commission_amount", { precision: 18, scale: 4 }).notNull(),
+  commissionCurrency: text("commission_currency").notNull(),
+  accruedAt: timestamp("accrued_at"),
+  withdrawalId: uuid("withdrawal_id").references((): AnyPgColumn => withdrawal.id),
+  createdAt: timestamp("created_at").notNull(),
+  createdBy: uuid("created_by").notNull(),
+  createdByKind: text("created_by_kind").notNull(),
 });
 
 export const loanSchedule = pgTable("loan_schedule", {
@@ -439,6 +489,13 @@ export const availableCapital = pgMaterializedView("mv_available_capital", {
   refreshedAt: timestamp("refreshed_at").notNull(),
 }).existing();
 
+export const cashBalances = pgMaterializedView("mv_cash_balances", {
+  orgId: uuid("org_id").notNull(),
+  bankBalance: numeric("bank_balance", { precision: 18, scale: 4 }).notNull(),
+  pettyCashBalance: numeric("petty_cash_balance", { precision: 18, scale: 4 }).notNull(),
+  refreshedAt: timestamp("refreshed_at").notNull(),
+}).existing();
+
 export const platformOperator = pgTable("platform_operator", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   displayName: text("display_name").notNull(),
@@ -457,6 +514,22 @@ export const impersonation = pgTable("impersonation", {
   endedAt: timestamp("ended_at"),
   reason: text("reason").notNull(),
   mode: text("mode").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
+  createdAt: timestamp("created_at").notNull(),
+});
+
+export const cronRun = pgTable("cron_run", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  endpoint: text("endpoint").notNull(),
+  startedAt: timestamp("started_at").notNull(),
+  finishedAt: timestamp("finished_at").notNull(),
+  durationMs: integer("duration_ms").notNull(),
+  orgsProcessed: integer("orgs_processed").notNull(),
+  failureCount: integer("failure_count").notNull(),
+  replayFrom: date("replay_from"),
+  replayTo: date("replay_to"),
+  summary: jsonb("summary").notNull(),
+  triggeredByKind: text("triggered_by_kind").notNull(),
+  triggeredBy: uuid("triggered_by"),
   createdAt: timestamp("created_at").notNull(),
 });
 
