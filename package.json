@@ -10,7 +10,8 @@
     "test": "turbo run test",
     "test:e2e": "pnpm --filter mi-banquito-web test:e2e",
     "audit:sprint0": "node scripts/sprint0-ac-audit.mjs",
-    "audit:sprint1-ui": "node scripts/sprint1-ui-closure-gate.mjs"
+    "audit:sprint1-ui": "node scripts/sprint1-ui-closure-gate.mjs",
+    "audit:sprint2": "node scripts/sprint2-closure-gate.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
