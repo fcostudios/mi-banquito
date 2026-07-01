@@ -11,6 +11,7 @@ const dashboardCopy = messages.sprint1.dashboard;
 
 function stateLabel(state: string) {
   if (state === "al_dia" || state === "al_día") return dashboardCopy.states.alDia;
+  if (state === "parcial") return dashboardCopy.states.parcial;
   if (state === "atrasado") return dashboardCopy.states.atrasado;
   return dashboardCopy.states.enMora;
 }
