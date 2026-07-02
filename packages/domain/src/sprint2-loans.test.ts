@@ -3,6 +3,7 @@ import { getTableName } from "drizzle-orm";
 import {
   alert,
   auditLogEntry,
+  contribution,
   groupConfig,
   loan as loanTable,
   loanFee,
@@ -329,6 +330,8 @@ describe("Sprint 2 loan domain rules", () => {
       }],
       [],
       [],
+      [],
+      [],
       [{
         orgId: "11111111-1111-4111-8111-111111111111",
         availableCapital: "2000.0000",
@@ -453,6 +456,8 @@ describe("Sprint 2 loan domain rules", () => {
       }],
       [],
       [{ liabilityAmount: "250.0000" }],
+      [],
+      [],
       [{
         orgId: "11111111-1111-4111-8111-111111111111",
         availableCapital: "2000.0000",
@@ -506,6 +511,8 @@ describe("Sprint 2 loan domain rules", () => {
       }],
       [{ status: "activo", principalAmount: "250.0000" }],
       [{ liabilityAmount: "50.0000" }],
+      [],
+      [],
       [{
         orgId: "11111111-1111-4111-8111-111111111111",
         availableCapital: "2000.0000",
@@ -529,6 +536,61 @@ describe("Sprint 2 loan domain rules", () => {
       })).rejects.toThrow("ahorros");
 
       expect(fakeDb.inserts).toHaveLength(0);
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.resetModules();
+    }
+  });
+
+  it("uses net member contributions as savings capacity for member loan approval", async () => {
+    const fakeDb = new FakeDb([
+      [],
+      [{
+        id: "44444444-4444-4444-8444-444444444444",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        version: 7,
+        validTo: null,
+        currencyCode: "USD",
+        loanRateModel: "declining_balance",
+        loanRateValue: "4.0000",
+        loanGracePeriods: 0,
+        loanToSavingsCapRatio: "2.00",
+        config: {},
+      }],
+      [{
+        id: "55555555-5555-4555-8555-555555555555",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        status: "activo",
+        initialSavingsBalance: "0.0000",
+      }],
+      [],
+      [],
+      [{ amount: "60.0000" }],
+      [],
+      [{
+        orgId: "11111111-1111-4111-8111-111111111111",
+        availableCapital: "200.0000",
+      }],
+    ]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+
+    try {
+      const { createLoanService } = await import("./loan");
+
+      await expect(createLoanService().originateLoan({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        actorId: "22222222-2222-4222-8222-222222222222",
+        clientRequestId: "33333333-3333-4333-8333-333333333333",
+        borrowerKind: "member",
+        borrowerMemberId: "55555555-5555-4555-8555-555555555555",
+        principalAmount: "100.0000",
+        termPeriods: 2,
+        originatedOn: "2026-07-01",
+      })).resolves.toMatchObject({ loanId: expect.any(String) });
+
+      expect(insertedRows(fakeDb, contribution)).toHaveLength(0);
+      expect(insertedRows(fakeDb, loanTable)).toHaveLength(1);
     } finally {
       vi.doUnmock("@mi-banquito/db");
       vi.resetModules();
