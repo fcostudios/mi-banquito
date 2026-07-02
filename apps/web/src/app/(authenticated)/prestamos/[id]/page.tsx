@@ -11,6 +11,21 @@ export const dynamic = "force-dynamic";
 const copy = messages.sprint2.loanDetail;
 const statusTone = (status: string) => status === "pagado" ? "success" : status === "en_mora" ? "danger" : "neutral";
 
+const percentFormatter = new Intl.NumberFormat("es-EC", {
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 0,
+});
+
+function formatMoney(value: string | number | undefined): string {
+  const numeric = Number(value ?? 0);
+  return ecCurrency.format(Number.isFinite(numeric) ? numeric : 0);
+}
+
+function formatRate(value: string | number): string {
+  const numeric = Number(value);
+  return `${percentFormatter.format(Number.isFinite(numeric) ? numeric : 0)}%`;
+}
+
 export default async function ScrLoanDetailPage({
   params,
   searchParams,
@@ -37,7 +52,7 @@ export default async function ScrLoanDetailPage({
 
       {query?.repayment ? (
         <section className="rounded-md border border-border bg-surface p-4 text-sm text-text-primary" role="status">
-          {copy.paymentRecorded}: {copy.interest} {query.interest ?? "0.0000"} · {copy.principal} {query.principal ?? "0.0000"} · {copy.remainingPrincipal} {query.remaining ?? "0.0000"}
+          {copy.paymentRecorded}: {copy.interest} {formatMoney(query.interest)} · {copy.principal} {formatMoney(query.principal)} · {copy.remainingPrincipal} {formatMoney(query.remaining)}
         </section>
       ) : null}
 
@@ -58,8 +73,8 @@ export default async function ScrLoanDetailPage({
       <section id="resumen" className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.summary}>
         <h2 className="text-xl font-semibold text-text-primary">{copy.summary}</h2>
         <div className="grid gap-3 md:grid-cols-4">
-          <Metric label={copy.principal} value={ecCurrency.format(Number(detail.principalAmount))} />
-          <Metric label={copy.rate} value={`${detail.rateValue}%`} />
+          <Metric label={copy.principal} value={formatMoney(detail.principalAmount)} />
+          <Metric label={copy.rate} value={formatRate(detail.rateValue)} />
           <Metric label={copy.term} value={`${detail.termPeriods}`} />
           <Metric label={copy.originatedOn} value={detail.originatedOn} />
         </div>
@@ -75,14 +90,23 @@ export default async function ScrLoanDetailPage({
           {detail.schedule.map((row) => {
             const fee = detail.fees.find((item) => item.datedOn === row.dueOn);
             return (
-              <div key={row.periodIndex} className="grid gap-2 border-b border-border py-3 last:border-b-0 md:grid-cols-[auto_1fr_auto] md:items-center">
-                <span className="font-semibold text-text-primary">{row.periodIndex}</span>
-                <p className="text-sm text-text-secondary">
-                  {row.dueOn} · {copy.principal}: {row.principalDue} · {copy.interest}: {row.interestDue}
-                  {" · "}{copy.paidPrincipal}: {row.paidPrincipalToDate} · {copy.paidInterest}: {row.paidInterestToDate}
-                  {fee ? ` · ${copy.fee}: ${fee.amount}` : ""}
-                </p>
-                <StatusPill tone={statusTone(row.status)} label={row.status} />
+              <div key={row.periodIndex} className="grid gap-3 border-b border-border py-4 last:border-b-0 md:grid-cols-[3rem_1fr_auto] md:items-start">
+                <div className="flex items-center gap-3 md:block">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-surface-muted text-base font-bold text-text-primary">
+                    {row.periodIndex}
+                  </span>
+                  <p className="text-sm font-medium text-text-secondary md:mt-2">{row.dueOn}</p>
+                </div>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
+                  <Amount label={copy.principal} value={formatMoney(row.principalDue)} />
+                  <Amount label={copy.interest} value={formatMoney(row.interestDue)} />
+                  {fee ? <Amount label={copy.fee} value={formatMoney(fee.amount)} /> : null}
+                  <Amount label={copy.paidPrincipal} value={formatMoney(row.paidPrincipalToDate)} />
+                  <Amount label={copy.paidInterest} value={formatMoney(row.paidInterestToDate)} />
+                </dl>
+                <div className="md:justify-self-end">
+                  <StatusPill tone={statusTone(row.status)} label={row.status} />
+                </div>
               </div>
             );
           })}
@@ -96,7 +120,7 @@ export default async function ScrLoanDetailPage({
         ) : detail.repayments.map((row) => (
           <div key={row.id} className="grid gap-2 border-b border-border py-2 text-sm text-text-secondary last:border-b-0 md:grid-cols-[1fr_auto] md:items-center">
             <p>
-              {row.datedOn} · {copy.interest}: {row.appliedToInterest} · {copy.principal}: {row.appliedToPrincipal}
+              {row.datedOn} · {copy.interest}: {formatMoney(row.appliedToInterest)} · {copy.principal}: {formatMoney(row.appliedToPrincipal)}
             </p>
             {!row.reversesId && !row.reverseReason ? (
               <span className="font-semibold text-primary">{copy.reverse}</span>
@@ -111,7 +135,7 @@ export default async function ScrLoanDetailPage({
           <p className="text-sm text-text-secondary">{copy.noAccruals}</p>
         ) : detail.accruals.map((row) => (
           <p key={row.accruedOn} className="border-b border-border py-2 text-sm text-text-secondary last:border-b-0">
-            {row.accruedOn} · {copy.interest}: {row.interestAmount} · {copy.principal}: {row.principalBasis}
+            {row.accruedOn} · {copy.interest}: {formatMoney(row.interestAmount)} · {copy.principal}: {formatMoney(row.principalBasis)}
           </p>
         ))}
       </section>
@@ -129,6 +153,15 @@ export default async function ScrLoanDetailPage({
         ) : null}
       </section>
     </main>
+  );
+}
+
+function Amount({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium text-text-secondary">{label}</dt>
+      <dd className="mt-1 font-semibold text-text-primary">{value}</dd>
+    </div>
   );
 }
 
