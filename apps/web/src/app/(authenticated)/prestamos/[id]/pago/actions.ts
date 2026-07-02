@@ -19,6 +19,7 @@ export async function recordRepaymentAction(formData: FormData) {
   revalidatePath(`/prestamos/${parsed.loanId}`);
   const params = new URLSearchParams({
     repayment: result.repaymentId,
+    fee: result.split.appliedToFee,
     interest: result.split.appliedToInterest,
     principal: result.split.appliedToPrincipal,
     remaining: result.split.remainingPrincipal,

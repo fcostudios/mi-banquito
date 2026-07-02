@@ -5,13 +5,17 @@ export type EligibilityResult =
   | { ok: false; reason: string };
 
 export type RepaymentSplitResult = {
+  appliedToFee: string;
   appliedToInterest: string;
   appliedToPrincipal: string;
+  remainingFee: string;
   remainingInterest: string;
   remainingPrincipal: string;
   unappliedAmount: string;
   paidOff: boolean;
 };
+
+export type RepaymentMode = "next_installment" | "principal_payment";
 
 export type ReferralCommissionPlan =
   | { shouldCredit: false }
@@ -75,10 +79,11 @@ export type LoanDetailRow = LoanListRow & {
     paidInterestToDate: string;
     status: string;
   }>;
-  fees: Array<{ feeKind: string; amount: string; datedOn: string }>;
+  fees: Array<{ feeKind: string; amount: string; paidToDate: string; datedOn: string; loanScheduleId?: string | null }>;
   repayments: Array<{
     id: string;
     amount: string;
+    appliedToFee: string;
     appliedToInterest: string;
     appliedToPrincipal: string;
     datedOn: string;
@@ -95,6 +100,7 @@ export type RecordRepaymentInput = {
   loanId: string;
   amount: string;
   datedOn: string;
+  paymentMode?: RepaymentMode;
   slipPhotoId?: string;
   notes?: string;
 };

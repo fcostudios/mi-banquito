@@ -85,6 +85,7 @@ describe("Sprint 2 form validation", () => {
     });
 
     expect(parsed.amount).toBe("125.0000");
+    expect(parsed.paymentMode).toBe("next_installment");
   });
 
   it("validates cron replay endpoint and date range", () => {

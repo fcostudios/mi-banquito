@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { createLoanService } from "@mi-banquito/domain";
-import { ButtonPrimary, FormField, InputNumber, InputText } from "@mi-banquito/ui";
+import { ButtonPrimary, FormField, InputNumber, InputText, Radio } from "@mi-banquito/ui";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import { todayISO } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
@@ -36,6 +36,13 @@ export default async function ScrRecordRepaymentPage({
         <FormField labelKey={copy.datedOn}>
           <InputText labelKey={copy.datedOn} name="datedOn" type="date" defaultValue={todayISO()} required />
         </FormField>
+        <fieldset className="grid gap-2">
+          <legend className="text-sm font-semibold text-text-primary">{copy.mode}</legend>
+          <div className="grid gap-1">
+            <Radio name="paymentMode" value="next_installment" defaultChecked label={copy.nextInstallment} />
+            <Radio name="paymentMode" value="principal_payment" label={copy.principalPayment} />
+          </div>
+        </fieldset>
         <FormField labelKey={copy.slip}>
           <InputText labelKey={copy.slip} name="slipPhotoId" />
         </FormField>
