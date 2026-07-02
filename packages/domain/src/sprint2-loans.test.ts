@@ -429,6 +429,65 @@ describe("Sprint 2 loan domain rules", () => {
     }
   });
 
+  it("shows historical accruals using the remaining principal basis after repayments", async () => {
+    const fakeDb = new FakeDb([
+      [{
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        borrowerKind: "member",
+        borrowerMemberId: "55555555-5555-4555-8555-555555555555",
+        borrowerNonMemberId: null,
+        principalAmount: "100.0000",
+        currencyCode: "USD",
+        status: "activo",
+        rateValue: "5.0000",
+        rateModel: "declining_balance",
+        termPeriods: 10,
+        originatedOn: "2026-07-02",
+      }],
+      [],
+      [],
+      [{
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        loanId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        amount: "16.0000",
+        appliedToInterest: "0.0000",
+        appliedToPrincipal: "16.0000",
+        datedOn: "2026-07-02",
+        reversesId: null,
+        reverseReason: null,
+      }],
+      [{
+        accruedOn: "2026-07-02",
+        principalBasis: "100.0000",
+        interestAmount: "0.1667",
+      }],
+      [],
+      [],
+      [{ displayName: "Pancho" }],
+    ]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+
+    try {
+      const { createLoanService } = await import("./loan");
+
+      const detail = await createLoanService().getLoanDetail(
+        "11111111-1111-4111-8111-111111111111",
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      );
+
+      expect(detail?.accruals).toEqual([{
+        accruedOn: "2026-07-02",
+        interestAmount: "0.1400",
+        principalBasis: "84.0000",
+      }]);
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.resetModules();
+    }
+  });
+
   it("subtracts active guarantor exposure before approving a non-member loan", async () => {
     const fakeDb = new FakeDb([
       [],

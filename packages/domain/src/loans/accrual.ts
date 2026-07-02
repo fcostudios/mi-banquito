@@ -189,7 +189,7 @@ function unpaidInstallmentAmount(schedule: AccrualScheduleInput): number {
   );
 }
 
-function principalBasisOn(input: {
+export function calculatePrincipalBasisOn(input: {
   principalAmount: string;
   accrualDate: string;
   principalRepayments?: AccrualPrincipalRepaymentInput[];
@@ -230,7 +230,7 @@ export function planLoanAccruals(input: {
 
   for (const accruedOn of input.accrualDates) {
     if (accruedOn >= input.loan.originatedOn && !input.existingAccrualDates.has(accruedOn)) {
-      const principalBasis = principalBasisOn({
+      const principalBasis = calculatePrincipalBasisOn({
         principalAmount: input.loan.principalAmount,
         accrualDate: accruedOn,
         principalRepayments: input.principalRepayments,

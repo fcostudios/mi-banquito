@@ -23,6 +23,7 @@ import {
 } from "@mi-banquito/db/schema";
 import { calculateInterestFirstSplit } from "./loans/repayment";
 import { evaluateLoanEligibility, resolveOriginationRate } from "./loans/eligibility";
+import { calculateDailyInterestAmount, calculatePrincipalBasisOn } from "./loans/accrual";
 import type {
   OriginateLoanInput,
   OriginateLoanResult,
@@ -289,6 +290,10 @@ export const createLoanService = (): LoanService => ({
     const [referrerMember] = referralRows[0]
       ? await db.select().from(member).where(and(eq(member.orgId, orgId), eq(member.id, referralRows[0].referrerMemberId)))
       : [];
+    const principalRepayments = repaymentRows.map((repaymentRow) => ({
+      datedOn: repaymentRow.datedOn,
+      appliedToPrincipal: money4(repaymentRow.appliedToPrincipal),
+    }));
 
     return {
       id: row.id,
@@ -324,8 +329,21 @@ export const createLoanService = (): LoanService => ({
       })),
       accruals: accrualRows.map((accrual) => ({
         accruedOn: accrual.accruedOn,
-        interestAmount: money4(accrual.interestAmount),
-        principalBasis: money4(accrual.principalBasis),
+        ...(() => {
+          const principalBasis = calculatePrincipalBasisOn({
+            principalAmount: money4(row.principalAmount),
+            accrualDate: accrual.accruedOn,
+            principalRepayments,
+          });
+          return {
+            interestAmount: calculateDailyInterestAmount({
+              principalBasis,
+              rateValue: money4(accrual.rateValue ?? row.rateValue),
+              periodDays: Number(accrual.periodDays ?? 30),
+            }),
+            principalBasis,
+          };
+        })(),
       })),
     };
   },
