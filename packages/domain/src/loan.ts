@@ -8,6 +8,7 @@ import {
   alert,
   auditLogEntry,
   availableCapital,
+  contribution,
   groupConfig,
   interestAccrual,
   loan,
@@ -96,6 +97,27 @@ const requireActiveMember = async (orgId: string, memberId: string, label: strin
 
 const sumMoney = (rows: Array<Record<string, unknown>>, key: string): string => money4(
   rows.reduce((total, row) => total + Number(row[key] ?? 0), 0),
+);
+
+const memberNetContributions = async (orgId: string, memberId: string): Promise<string> => {
+  const rows = await db.select().from(contribution)
+    .where(and(eq(contribution.orgId, orgId), eq(contribution.memberId, memberId)));
+  return sumMoney(rows as Array<Record<string, unknown>>, "amount");
+};
+
+const memberNetWithdrawals = async (orgId: string, memberId: string): Promise<string> => {
+  const rows = await db.select().from(withdrawal)
+    .where(and(eq(withdrawal.orgId, orgId), eq(withdrawal.memberId, memberId)));
+  return sumMoney(rows as Array<Record<string, unknown>>, "amount");
+};
+
+const memberAccumulatedSavings = async (
+  orgId: string,
+  memberRow: typeof member.$inferSelect,
+): Promise<string> => money4(
+  Number(memberRow.initialSavingsBalance)
+    + Number(await memberNetContributions(orgId, memberRow.id))
+    - Number(await memberNetWithdrawals(orgId, memberRow.id)),
 );
 
 const savingsAfterExposureForCap = (
@@ -217,8 +239,9 @@ export const createLoanService = (): LoanService => ({
       .where(and(eq(member.orgId, orgId), eq(member.status, "activo")));
     const membersWithCapacity = await Promise.all(activeMembers.map(async (row) => {
       const activeExposure = await memberActiveExposure(orgId, row.id);
+      const savingsBalance = await memberAccumulatedSavings(orgId, row);
       const savingsBasis = savingsAfterExposureForCap(
-        money4(row.initialSavingsBalance),
+        savingsBalance,
         currentConfig.loanToSavingsCapRatio,
         activeExposure,
       );
@@ -343,8 +366,9 @@ export const createLoanService = (): LoanService => ({
       }
       const borrower = await requireActiveMember(input.orgId, input.borrowerMemberId, "Borrower");
       const activeExposure = await memberActiveExposure(input.orgId, input.borrowerMemberId);
+      const savingsBalance = await memberAccumulatedSavings(input.orgId, borrower);
       borrowerSavingsBalance = savingsAfterExposureForCap(
-        money4(borrower.initialSavingsBalance),
+        savingsBalance,
         currentConfig.loanToSavingsCapRatio,
         activeExposure,
       );
@@ -358,8 +382,9 @@ export const createLoanService = (): LoanService => ({
       }
       const guarantor = await requireActiveMember(input.orgId, input.guarantorMemberId, "Guarantor");
       const activeExposure = await memberActiveExposure(input.orgId, input.guarantorMemberId);
+      const savingsBalance = await memberAccumulatedSavings(input.orgId, guarantor);
       guarantorSavingsBalance = savingsAfterExposureForCap(
-        money4(guarantor.initialSavingsBalance),
+        savingsBalance,
         currentConfig.loanToSavingsCapRatio,
         activeExposure,
       );
