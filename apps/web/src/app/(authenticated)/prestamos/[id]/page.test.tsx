@@ -36,25 +36,26 @@ vi.mock("@mi-banquito/domain", () => ({
           principalDue: "10.0000",
           interestDue: "5.0000",
           paidPrincipalToDate: "10.0000",
-          paidInterestToDate: "0.0000",
-          status: "parcial",
+          paidInterestToDate: "5.0000",
+          status: "pagado",
         },
         {
           periodIndex: 2,
           dueOn: "2026-09-02",
           principalDue: "10.0000",
           interestDue: "4.5000",
-          paidPrincipalToDate: "6.0000",
+          paidPrincipalToDate: "0.0000",
           paidInterestToDate: "0.0000",
-          status: "parcial",
+          status: "pendiente",
         },
       ],
-      fees: [{ feeKind: "admin", amount: "1.0000", datedOn: "2026-08-02" }],
+      fees: [{ feeKind: "admin", amount: "1.0000", paidToDate: "1.0000", datedOn: "2026-08-02" }],
       repayments: [{
         id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         amount: "16.0000",
-        appliedToInterest: "0.0000",
-        appliedToPrincipal: "16.0000",
+        appliedToFee: "1.0000",
+        appliedToInterest: "5.0000",
+        appliedToPrincipal: "10.0000",
         datedOn: "2026-07-02",
         reversesId: null,
         reverseReason: null,
@@ -74,6 +75,7 @@ describe("ScrLoanDetailPage", () => {
       params: Promise.resolve({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
       searchParams: Promise.resolve({
         repayment: "1",
+        fee: "1.0000",
         interest: "5.0000",
         principal: "10.0000",
         remaining: "90.0000",
@@ -82,14 +84,13 @@ describe("ScrLoanDetailPage", () => {
 
     expect(screen.getAllByText("$10,00").length).toBeGreaterThan(0);
     expect(screen.getAllByText("$5,00").length).toBeGreaterThan(0);
-    expect(screen.getByText("$1,00")).toBeInTheDocument();
+    expect(screen.getAllByText("$1,00").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("Cuota a pagar")).toHaveLength(2);
-    expect(screen.getByText("$16,00")).toBeInTheDocument();
-    expect(screen.getByText("$14,50")).toBeInTheDocument();
+    expect(screen.getAllByText("$16,00").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("$14,50").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("Ya registrado")).toHaveLength(2);
     expect(screen.getAllByText("Falta pagar")).toHaveLength(2);
-    expect(screen.getAllByText("$6,00").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("$8,50")).toBeInTheDocument();
+    expect(screen.getAllByText("$0,00").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("5%")).toBeInTheDocument();
     expect(container).not.toHaveTextContent("10.0000");
     expect(container).not.toHaveTextContent("5.0000");

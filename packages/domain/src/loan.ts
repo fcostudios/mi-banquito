@@ -21,7 +21,7 @@ import {
   repayment,
   withdrawal,
 } from "@mi-banquito/db/schema";
-import { calculateInterestFirstSplit } from "./loans/repayment";
+import { calculateInterestFirstSplit, calculateNextInstallmentSplit } from "./loans/repayment";
 import { evaluateLoanEligibility, resolveOriginationRate } from "./loans/eligibility";
 import { calculateDailyInterestAmount, calculatePrincipalBasisOn } from "./loans/accrual";
 import type {
@@ -168,29 +168,95 @@ const scheduledInterestDueOn = (
     .reduce((total, row) => total + Number(row.interestDue), 0),
 );
 
+const feeDueForSchedule = (
+  row: typeof loanSchedule.$inferSelect,
+  feeRows: Array<typeof loanFee.$inferSelect>,
+): string => money4(
+  feeRows
+    .filter((fee) => fee.loanScheduleId === row.id || (!fee.loanScheduleId && fee.datedOn === row.dueOn))
+    .reduce((total, fee) => total + Number(fee.amount), 0),
+);
+
+const feePaidBySchedule = (
+  rows: Array<typeof loanSchedule.$inferSelect>,
+  feeRows: Array<typeof loanFee.$inferSelect>,
+  paidFee: string,
+): Map<string, string> => {
+  let remainingFeePaid = Number(paidFee);
+  const result = new Map<string, string>();
+  for (const row of [...rows].sort((left, right) => left.periodIndex - right.periodIndex)) {
+    const feeDue = Number(feeDueForSchedule(row, feeRows));
+    const applied = Math.min(feeDue, remainingFeePaid);
+    remainingFeePaid -= applied;
+    result.set(row.id, money4(applied));
+  }
+  return result;
+};
+
+const feePaidByFeeId = (
+  feeRows: Array<typeof loanFee.$inferSelect>,
+  paidFee: string,
+): Map<string, string> => {
+  let remainingFeePaid = Number(paidFee);
+  const result = new Map<string, string>();
+  for (const fee of [...feeRows].sort((left, right) =>
+    left.datedOn.localeCompare(right.datedOn) || left.id.localeCompare(right.id),
+  )) {
+    const applied = Math.min(Number(fee.amount), remainingFeePaid);
+    remainingFeePaid -= applied;
+    result.set(fee.id, money4(applied));
+  }
+  return result;
+};
+
+const scheduledRowsForRepayment = (
+  rows: Array<typeof loanSchedule.$inferSelect>,
+  feeRows: Array<typeof loanFee.$inferSelect>,
+  paidFee: string,
+) => {
+  const paidFeeBySchedule = feePaidBySchedule(rows, feeRows, paidFee);
+  return [...rows].sort((left, right) => left.periodIndex - right.periodIndex).map((row) => ({
+    principalDue: money4(row.principalDue),
+    interestDue: money4(row.interestDue),
+    feeDue: feeDueForSchedule(row, feeRows),
+    paidPrincipalToDate: money4(row.paidPrincipalToDate),
+    paidInterestToDate: money4(row.paidInterestToDate),
+    paidFeeToDate: paidFeeBySchedule.get(row.id) ?? "0.0000",
+  }));
+};
+
 const allocateRepaymentToSchedule = (
   rows: Array<typeof loanSchedule.$inferSelect>,
-  split: { appliedToInterest: string; appliedToPrincipal: string },
+  feeRows: Array<typeof loanFee.$inferSelect>,
+  priorPaidFee: string,
+  split: { appliedToFee?: string; appliedToInterest: string; appliedToPrincipal: string },
 ): Array<{
   row: typeof loanSchedule.$inferSelect;
   paidInterestToDate: string;
   paidPrincipalToDate: string;
   status: typeof loanSchedule.$inferSelect.status;
 }> => {
+  const priorFeePaidBySchedule = feePaidBySchedule(rows, feeRows, priorPaidFee);
+  let remainingFee = Number(split.appliedToFee ?? 0);
   let remainingInterest = Number(split.appliedToInterest);
   let remainingPrincipal = Number(split.appliedToPrincipal);
   return [...rows].sort((left, right) => left.periodIndex - right.periodIndex).map((row) => {
+    const feeRoom = Math.max(0, Number(feeDueForSchedule(row, feeRows)) - Number(priorFeePaidBySchedule.get(row.id) ?? 0));
     const interestRoom = Math.max(0, Number(row.interestDue) - Number(row.paidInterestToDate));
     const principalRoom = Math.max(0, Number(row.principalDue) - Number(row.paidPrincipalToDate));
+    const feeApplied = Math.min(feeRoom, remainingFee);
+    remainingFee -= feeApplied;
     const interestApplied = Math.min(interestRoom, remainingInterest);
     remainingInterest -= interestApplied;
     const principalApplied = Math.min(principalRoom, remainingPrincipal);
     remainingPrincipal -= principalApplied;
     const paidInterestToDate = money4(Number(row.paidInterestToDate) + interestApplied);
     const paidPrincipalToDate = money4(Number(row.paidPrincipalToDate) + principalApplied);
+    const paidFeeToDate = money4(Number(priorFeePaidBySchedule.get(row.id) ?? 0) + feeApplied);
     const fullyPaid = Number(paidInterestToDate) >= Number(row.interestDue)
-      && Number(paidPrincipalToDate) >= Number(row.principalDue);
-    const partiallyPaid = Number(paidInterestToDate) > 0 || Number(paidPrincipalToDate) > 0;
+      && Number(paidPrincipalToDate) >= Number(row.principalDue)
+      && Number(paidFeeToDate) >= Number(feeDueForSchedule(row, feeRows));
+    const partiallyPaid = Number(paidInterestToDate) > 0 || Number(paidPrincipalToDate) > 0 || Number(paidFeeToDate) > 0;
     return {
       row,
       paidInterestToDate,
@@ -294,6 +360,10 @@ export const createLoanService = (): LoanService => ({
       datedOn: repaymentRow.datedOn,
       appliedToPrincipal: money4(repaymentRow.appliedToPrincipal),
     }));
+    const paidFeeByFee = feePaidByFeeId(
+      feeRows,
+      sumMoney(repaymentRows as Array<Record<string, unknown>>, "appliedToFee"),
+    );
 
     return {
       id: row.id,
@@ -317,10 +387,17 @@ export const createLoanService = (): LoanService => ({
         paidInterestToDate: money4(schedule.paidInterestToDate),
         status: schedule.status,
       })),
-      fees: feeRows.map((fee) => ({ feeKind: fee.feeKind, amount: money4(fee.amount), datedOn: fee.datedOn })),
+      fees: feeRows.map((fee) => ({
+        feeKind: fee.feeKind,
+        amount: money4(fee.amount),
+        paidToDate: paidFeeByFee.get(fee.id) ?? "0.0000",
+        datedOn: fee.datedOn,
+        loanScheduleId: fee.loanScheduleId,
+      })),
       repayments: repaymentRows.map((repaymentRow) => ({
         id: repaymentRow.id,
         amount: money4(repaymentRow.amount),
+        appliedToFee: money4(repaymentRow.appliedToFee ?? 0),
         appliedToInterest: money4(repaymentRow.appliedToInterest),
         appliedToPrincipal: money4(repaymentRow.appliedToPrincipal),
         datedOn: repaymentRow.datedOn,
@@ -583,8 +660,10 @@ export const createLoanService = (): LoanService => ({
         repaymentId: existing.id,
         paidOff: false,
         split: {
+          appliedToFee: money4(existing.appliedToFee ?? 0),
           appliedToInterest: money4(existing.appliedToInterest),
           appliedToPrincipal: money4(existing.appliedToPrincipal),
+          remainingFee: "0.0000",
           remainingInterest: "0.0000",
           remainingPrincipal: "0.0000",
           unappliedAmount: "0.0000",
@@ -599,32 +678,49 @@ export const createLoanService = (): LoanService => ({
       throw new Error("Loan is not open for repayment");
     }
 
-    const [priorRepayments, scheduleRows, accrualRows] = await Promise.all([
+    const [priorRepayments, scheduleRows, accrualRows, feeRows] = await Promise.all([
       db.select().from(repayment).where(and(eq(repayment.orgId, input.orgId), eq(repayment.loanId, input.loanId))),
       db.select().from(loanSchedule).where(and(eq(loanSchedule.orgId, input.orgId), eq(loanSchedule.loanId, input.loanId))),
       db.select().from(interestAccrual).where(and(eq(interestAccrual.orgId, input.orgId), eq(interestAccrual.loanId, input.loanId))),
+      db.select().from(loanFee).where(and(eq(loanFee.orgId, input.orgId), eq(loanFee.loanId, input.loanId))),
     ]);
     const paidPrincipal = priorRepayments.reduce((total, row) => total + Number(row.appliedToPrincipal), 0);
     const paidInterest = priorRepayments.reduce((total, row) => total + Number(row.appliedToInterest), 0);
+    const paidFee = priorRepayments.reduce((total, row) => total + Number(row.appliedToFee ?? 0), 0);
+    const outstandingFee = money4(Math.max(0, feeRows.reduce((total, row) => total + Number(row.amount), 0) - paidFee));
     const accruedInterest = accrualRows
       .filter((row) => row.accruedOn <= input.datedOn)
       .reduce((total, row) => total + Number(row.interestAmount), 0);
     const scheduledInterest = Number(scheduledInterestDueOn(scheduleRows, input.datedOn));
     const outstandingPrincipal = money4(Math.max(0, Number(currentLoan.principalAmount) - paidPrincipal));
     const outstandingInterest = money4(Math.max(0, scheduledInterest + accruedInterest - paidInterest));
-    const split = calculateInterestFirstSplit({
-      amount: money4(input.amount),
-      accruedInterest: outstandingInterest,
-      outstandingPrincipal,
-    });
+    const paymentMode = input.paymentMode ?? "next_installment";
+    const split = paymentMode === "next_installment"
+      ? calculateNextInstallmentSplit({
+        amount: money4(input.amount),
+        outstandingPrincipal,
+        rows: scheduledRowsForRepayment(scheduleRows, feeRows, money4(paidFee)),
+      })
+      : (() => {
+        const interestFirstSplit = calculateInterestFirstSplit({
+          amount: money4(input.amount),
+          accruedInterest: outstandingInterest,
+          outstandingPrincipal,
+        });
+        return {
+          ...interestFirstSplit,
+          remainingFee: outstandingFee,
+          paidOff: interestFirstSplit.paidOff && Number(outstandingFee) === 0,
+        };
+      })();
     if (Number(split.unappliedAmount) > 0) {
       throw new Error("Repayment amount exceeds the current loan balance");
     }
     const payerMemberId = await payerMemberIdForLoan(input.orgId, currentLoan);
     const repaymentId = randomUUID();
     const now = new Date();
-    const paidOff = split.paidOff;
-    const scheduleUpdates = allocateRepaymentToSchedule(scheduleRows, split);
+    const paidOff = split.paidOff && Number(split.remainingFee) === 0;
+    const scheduleUpdates = allocateRepaymentToSchedule(scheduleRows, feeRows, money4(paidFee), split);
     const borrowerDisplayName = await resolveBorrowerName(input.orgId, currentLoan);
 
     await db.transaction(async (tx) => {
@@ -637,6 +733,7 @@ export const createLoanService = (): LoanService => ({
         currencyCode: currentLoan.currencyCode,
         appliedToPrincipal: split.appliedToPrincipal,
         appliedToInterest: split.appliedToInterest,
+        appliedToFee: split.appliedToFee,
         datedOn: input.datedOn,
         recordedAt: now,
         slipPhotoId: input.slipPhotoId || null,

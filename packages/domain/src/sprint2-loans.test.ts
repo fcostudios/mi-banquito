@@ -206,8 +206,10 @@ describe("Sprint 2 loan domain rules", () => {
       accruedInterest: "40.0000",
       outstandingPrincipal: "1000.0000",
     })).toEqual({
+      appliedToFee: "0.0000",
       appliedToInterest: "40.0000",
       appliedToPrincipal: "85.0000",
+      remainingFee: "0.0000",
       remainingInterest: "0.0000",
       remainingPrincipal: "915.0000",
       unappliedAmount: "0.0000",
@@ -221,13 +223,108 @@ describe("Sprint 2 loan domain rules", () => {
       accruedInterest: "40.0000",
       outstandingPrincipal: "1000.0000",
     })).toEqual({
+      appliedToFee: "0.0000",
       appliedToInterest: "40.0000",
       appliedToPrincipal: "1000.0000",
+      remainingFee: "0.0000",
       remainingInterest: "0.0000",
       remainingPrincipal: "0.0000",
       unappliedAmount: "960.0000",
       paidOff: true,
     });
+  });
+
+  it("records an early payment as the next scheduled quota including admin fee", async () => {
+    const fakeDb = new FakeDb([
+      [],
+      [{
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        borrowerKind: "member",
+        borrowerMemberId: "55555555-5555-4555-8555-555555555555",
+        principalAmount: "100.0000",
+        currencyCode: "USD",
+        status: "activo",
+      }],
+      [],
+      [
+        {
+          id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          orgId: "11111111-1111-4111-8111-111111111111",
+          loanId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          periodIndex: 1,
+          dueOn: "2026-08-02",
+          principalDue: "10.0000",
+          interestDue: "5.0000",
+          paidPrincipalToDate: "0.0000",
+          paidInterestToDate: "0.0000",
+          status: "pendiente",
+        },
+        {
+          id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          orgId: "11111111-1111-4111-8111-111111111111",
+          loanId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          periodIndex: 2,
+          dueOn: "2026-09-02",
+          principalDue: "10.0000",
+          interestDue: "4.5000",
+          paidPrincipalToDate: "0.0000",
+          paidInterestToDate: "0.0000",
+          status: "pendiente",
+        },
+      ],
+      [],
+      [{
+        id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        loanScheduleId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        amount: "1.0000",
+        datedOn: "2026-08-02",
+        feeKind: "admin",
+      }],
+      [{ displayName: "Pancho" }],
+    ]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+
+    try {
+      const { createLoanService } = await import("./loan");
+      const result = await createLoanService().recordRepayment({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        actorId: "22222222-2222-4222-8222-222222222222",
+        clientRequestId: "33333333-3333-4333-8333-333333333333",
+        loanId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        amount: "16.0000",
+        datedOn: "2026-07-02",
+      });
+
+      expect(result.split).toMatchObject({
+        appliedToFee: "1.0000",
+        appliedToInterest: "5.0000",
+        appliedToPrincipal: "10.0000",
+        remainingFee: "0.0000",
+        remainingInterest: "4.5000",
+        remainingPrincipal: "90.0000",
+      });
+      expect(insertedRows(fakeDb, repayment)[0]).toMatchObject({
+        amount: "16.0000",
+        appliedToFee: "1.0000",
+        appliedToInterest: "5.0000",
+        appliedToPrincipal: "10.0000",
+      });
+      expect(updatedRows(fakeDb, loanSchedule)[0]).toMatchObject({
+        paidInterestToDate: "5.0000",
+        paidPrincipalToDate: "10.0000",
+        status: "pagado",
+      });
+      expect(updatedRows(fakeDb, loanSchedule)[1]).toMatchObject({
+        paidInterestToDate: "0.0000",
+        paidPrincipalToDate: "0.0000",
+        status: "pendiente",
+      });
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.resetModules();
+    }
   });
 
   it("allows exact loan cap boundaries without binary float drift", () => {
@@ -488,6 +585,83 @@ describe("Sprint 2 loan domain rules", () => {
     }
   });
 
+  it("shows repayment fee splits and paid admin fee totals in loan detail", async () => {
+    const fakeDb = new FakeDb([
+      [{
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        borrowerKind: "member",
+        borrowerMemberId: "55555555-5555-4555-8555-555555555555",
+        borrowerNonMemberId: null,
+        principalAmount: "100.0000",
+        currencyCode: "USD",
+        status: "activo",
+        rateValue: "5.0000",
+        rateModel: "declining_balance",
+        termPeriods: 10,
+        originatedOn: "2026-07-02",
+      }],
+      [{
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        periodIndex: 1,
+        dueOn: "2026-08-02",
+        principalDue: "10.0000",
+        interestDue: "5.0000",
+        paidPrincipalToDate: "10.0000",
+        paidInterestToDate: "5.0000",
+        status: "pagado",
+      }],
+      [{
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        loanScheduleId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        feeKind: "admin",
+        amount: "1.0000",
+        datedOn: "2026-08-02",
+      }],
+      [{
+        id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        loanId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        amount: "16.0000",
+        appliedToFee: "1.0000",
+        appliedToInterest: "5.0000",
+        appliedToPrincipal: "10.0000",
+        datedOn: "2026-07-02",
+        reversesId: null,
+        reverseReason: null,
+      }],
+      [],
+      [],
+      [],
+      [{ displayName: "Pancho" }],
+    ]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+
+    try {
+      const { createLoanService } = await import("./loan");
+
+      const detail = await createLoanService().getLoanDetail(
+        "11111111-1111-4111-8111-111111111111",
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      );
+
+      expect(detail?.repayments[0]).toMatchObject({
+        amount: "16.0000",
+        appliedToFee: "1.0000",
+        appliedToInterest: "5.0000",
+        appliedToPrincipal: "10.0000",
+      });
+      expect(detail?.fees[0]).toMatchObject({
+        feeKind: "admin",
+        amount: "1.0000",
+        paidToDate: "1.0000",
+      });
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.resetModules();
+    }
+  });
+
   it("subtracts active guarantor exposure before approving a non-member loan", async () => {
     const fakeDb = new FakeDb([
       [],
@@ -734,6 +908,7 @@ describe("Sprint 2 loan domain rules", () => {
           status: "pendiente",
         },
       ],
+      [],
       [],
       [{
         id: "55555555-5555-4555-8555-555555555555",
