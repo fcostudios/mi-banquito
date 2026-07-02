@@ -260,6 +260,7 @@
       "remainingPrincipal": "Principal restante",
       "paidPrincipal": "Principal pagado",
       "paidInterest": "Interés pagado",
+      "paidFee": "Comisión pagada",
       "rate": "Tasa",
       "term": "Cuotas",
       "originatedOn": "Fecha del préstamo",
@@ -276,6 +277,9 @@
       "title": "Registrar pago",
       "amount": "Monto pagado",
       "datedOn": "Fecha de pago",
+      "mode": "Tipo de pago",
+      "nextInstallment": "Pagar próxima cuota",
+      "principalPayment": "Abonar a capital",
       "slip": "Comprobante",
       "notes": "Notas",
       "submit": "Registrar pago"

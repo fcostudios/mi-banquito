@@ -378,6 +378,7 @@ export const repayment = pgTable("repayment", {
   currencyCode: text("currency_code").notNull(),
   appliedToPrincipal: numeric("applied_to_principal", { precision: 18, scale: 4 }).notNull(),
   appliedToInterest: numeric("applied_to_interest", { precision: 18, scale: 4 }).notNull(),
+  appliedToFee: numeric("applied_to_fee", { precision: 18, scale: 4 }).notNull().default("0"),
   datedOn: date("dated_on").notNull(),
   recordedAt: timestamp("recorded_at").notNull(),
   slipPhotoId: uuid("slip_photo_id").references((): AnyPgColumn => slipPhoto.id),

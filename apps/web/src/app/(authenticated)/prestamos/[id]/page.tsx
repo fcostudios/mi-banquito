@@ -36,7 +36,7 @@ export default async function ScrLoanDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ repayment?: string; interest?: string; principal?: string; remaining?: string }>;
+  searchParams?: Promise<{ repayment?: string; fee?: string; interest?: string; principal?: string; remaining?: string }>;
 }) {
   const session = await requireTreasurer();
   const { id } = await params;
@@ -57,7 +57,7 @@ export default async function ScrLoanDetailPage({
 
       {query?.repayment ? (
         <section className="rounded-md border border-border bg-surface p-4 text-sm text-text-primary" role="status">
-          {copy.paymentRecorded}: {copy.interest} {formatMoney(query.interest)} · {copy.principal} {formatMoney(query.principal)} · {copy.remainingPrincipal} {formatMoney(query.remaining)}
+          {copy.paymentRecorded}: {copy.fee} {formatMoney(query.fee)} · {copy.interest} {formatMoney(query.interest)} · {copy.principal} {formatMoney(query.principal)} · {copy.remainingPrincipal} {formatMoney(query.remaining)}
         </section>
       ) : null}
 
@@ -95,7 +95,8 @@ export default async function ScrLoanDetailPage({
           {detail.schedule.map((row) => {
             const fee = detail.fees.find((item) => item.datedOn === row.dueOn);
             const feeDue = moneyNumber(fee?.amount);
-            const paidOnRow = moneyNumber(row.paidPrincipalToDate) + moneyNumber(row.paidInterestToDate);
+            const paidFee = moneyNumber(fee?.paidToDate);
+            const paidOnRow = moneyNumber(row.paidPrincipalToDate) + moneyNumber(row.paidInterestToDate) + paidFee;
             const installmentDue = moneyNumber(row.principalDue) + moneyNumber(row.interestDue) + feeDue;
             const remainingDue = Math.max(
               0,
@@ -116,6 +117,7 @@ export default async function ScrLoanDetailPage({
                   <Amount label={copy.principal} value={formatMoney(row.principalDue)} />
                   <Amount label={copy.interest} value={formatMoney(row.interestDue)} />
                   {fee ? <Amount label={copy.fee} value={formatMoney(fee.amount)} /> : null}
+                  {fee ? <Amount label={copy.paidFee} value={formatMoney(fee.paidToDate)} /> : null}
                   <Amount label={copy.paidPrincipal} value={formatMoney(row.paidPrincipalToDate)} />
                   <Amount label={copy.paidInterest} value={formatMoney(row.paidInterestToDate)} />
                 </dl>
@@ -135,7 +137,7 @@ export default async function ScrLoanDetailPage({
         ) : detail.repayments.map((row) => (
           <div key={row.id} className="grid gap-2 border-b border-border py-2 text-sm text-text-secondary last:border-b-0 md:grid-cols-[1fr_auto] md:items-center">
             <p>
-              {row.datedOn} · {copy.interest}: {formatMoney(row.appliedToInterest)} · {copy.principal}: {formatMoney(row.appliedToPrincipal)}
+              {row.datedOn} · {copy.fee}: {formatMoney(row.appliedToFee)} · {copy.interest}: {formatMoney(row.appliedToInterest)} · {copy.principal}: {formatMoney(row.appliedToPrincipal)}
             </p>
             {!row.reversesId && !row.reverseReason ? (
               <span className="font-semibold text-primary">{copy.reverse}</span>
