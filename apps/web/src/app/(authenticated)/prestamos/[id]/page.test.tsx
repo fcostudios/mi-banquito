@@ -74,6 +74,9 @@ describe("ScrLoanDetailPage", () => {
     expect(screen.getAllByText("$10,00").length).toBeGreaterThan(0);
     expect(screen.getAllByText("$5,00").length).toBeGreaterThan(0);
     expect(screen.getByText("$1,00")).toBeInTheDocument();
+    expect(screen.getByText("Cuota a pagar")).toBeInTheDocument();
+    expect(screen.getAllByText("$15,00").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("Falta pagar")).toBeInTheDocument();
     expect(screen.getByText("5%")).toBeInTheDocument();
     expect(container).not.toHaveTextContent("10.0000");
     expect(container).not.toHaveTextContent("5.0000");

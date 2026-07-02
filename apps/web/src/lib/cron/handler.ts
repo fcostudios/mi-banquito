@@ -8,6 +8,7 @@ import {
   interestAccrual,
   loan,
   loanFee,
+  repayment,
   loanSchedule,
   organization,
 } from "@mi-banquito/db/schema";
@@ -186,6 +187,17 @@ export async function runAccrueInterestCron(request: Request): Promise<CronRunSu
               gte(loanFee.accruedOn, fromDate),
               lte(loanFee.accruedOn, toDate),
             ));
+          const principalRepayments = await db
+            .select({
+              datedOn: repayment.datedOn,
+              appliedToPrincipal: repayment.appliedToPrincipal,
+            })
+            .from(repayment)
+            .where(and(
+              eq(repayment.orgId, org.id),
+              eq(repayment.loanId, loanRow.id),
+              lte(repayment.datedOn, toDate),
+            ));
           const plan = planLoanAccruals({
             loan: normalizeLoan(loanRow),
             schedules,
@@ -193,6 +205,10 @@ export async function runAccrueInterestCron(request: Request): Promise<CronRunSu
             accrualDates: dates,
             existingAccrualDates: new Set(existingAccruals.map((row) => dateColumnToString(row.accruedOn))),
             existingMoraFeeKeys: new Set(existingMoraFees.map((row) => `${row.loanId}:mora:${dateColumnToString(row.accruedOn)}`)),
+            principalRepayments: principalRepayments.map((row) => ({
+              datedOn: dateColumnToString(row.datedOn),
+              appliedToPrincipal: String(row.appliedToPrincipal),
+            })),
           });
 
           await db.transaction(async (tx) => {
