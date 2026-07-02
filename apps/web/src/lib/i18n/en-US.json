@@ -254,6 +254,8 @@
       "actions": "Acciones",
       "principal": "Principal",
       "interest": "Interés",
+      "installmentDue": "Cuota a pagar",
+      "remainingDue": "Falta pagar",
       "remainingPrincipal": "Principal restante",
       "paidPrincipal": "Principal pagado",
       "paidInterest": "Interés pagado",
