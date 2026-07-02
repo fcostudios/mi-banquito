@@ -151,3 +151,7 @@
 {"story":"US-075","event":"done"}
 {"story":"US-081","event":"done"}
 {"story":"SPRINT-2","event":"closed_with_deferrals","notes":"Closed 2026-06-30 as implemented and locally verified. Inherited Sprint 0 external deferrals remain active for live Auth0/passwordless and production-secret/account-side evidence; no new Sprint 2 external blockers were added."}
+{"story":"US-012","event":"ac_verify","ac":3,"method":"production authenticated cron invocation","pass":true,"notes":"2026-07-02 GET /api/cron/accrue-interest with CRON_SECRET bearer returned HTTP 200 and successful summary for 2026-07-02; production cron-secret external blocker resolved."}
+{"story":"US-036","event":"ac_verify","ac":2,"method":"post-closure production correction and regression tests","pass":true,"notes":"Repayment default now pays próxima cuota with fee/interest/principal split; Abonar a capital remains explicit. Production pilot repayment corrected append-only; net split verified as fee 1, interest 5, principal 10."}
+{"story":"US-037","event":"ac_verify","ac":1,"method":"post-closure loan-detail verification","pass":true,"notes":"Loan detail now exposes fee paid-to-date and repayment split fee/interest/principal so schedule math is understandable to non-financial users."}
+{"story":"SPRINT-2","event":"closure_hygiene","notes":"2026-07-02 hygiene pass updated US-036 story text, resolved stale US-012 cron blocker evidence, preserved inherited external blockers for Auth0/passwordless and observability, and confirmed production health/cron checks."}
