@@ -255,6 +255,7 @@
       "principal": "Principal",
       "interest": "Interés",
       "installmentDue": "Cuota a pagar",
+      "schedulePaid": "Ya registrado",
       "remainingDue": "Falta pagar",
       "remainingPrincipal": "Principal restante",
       "paidPrincipal": "Principal pagado",

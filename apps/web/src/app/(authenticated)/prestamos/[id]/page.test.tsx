@@ -35,18 +35,27 @@ vi.mock("@mi-banquito/domain", () => ({
           dueOn: "2026-08-02",
           principalDue: "10.0000",
           interestDue: "5.0000",
-          paidPrincipalToDate: "0.0000",
+          paidPrincipalToDate: "10.0000",
           paidInterestToDate: "0.0000",
-          status: "pendiente",
+          status: "parcial",
+        },
+        {
+          periodIndex: 2,
+          dueOn: "2026-09-02",
+          principalDue: "10.0000",
+          interestDue: "4.5000",
+          paidPrincipalToDate: "6.0000",
+          paidInterestToDate: "0.0000",
+          status: "parcial",
         },
       ],
       fees: [{ feeKind: "admin", amount: "1.0000", datedOn: "2026-08-02" }],
       repayments: [{
         id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-        amount: "15.0000",
-        appliedToInterest: "5.0000",
-        appliedToPrincipal: "10.0000",
-        datedOn: "2026-08-02",
+        amount: "16.0000",
+        appliedToInterest: "0.0000",
+        appliedToPrincipal: "16.0000",
+        datedOn: "2026-07-02",
         reversesId: null,
         reverseReason: null,
       }],
@@ -74,9 +83,13 @@ describe("ScrLoanDetailPage", () => {
     expect(screen.getAllByText("$10,00").length).toBeGreaterThan(0);
     expect(screen.getAllByText("$5,00").length).toBeGreaterThan(0);
     expect(screen.getByText("$1,00")).toBeInTheDocument();
-    expect(screen.getByText("Cuota a pagar")).toBeInTheDocument();
-    expect(screen.getAllByText("$15,00").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("Falta pagar")).toBeInTheDocument();
+    expect(screen.getAllByText("Cuota a pagar")).toHaveLength(2);
+    expect(screen.getByText("$16,00")).toBeInTheDocument();
+    expect(screen.getByText("$14,50")).toBeInTheDocument();
+    expect(screen.getAllByText("Ya registrado")).toHaveLength(2);
+    expect(screen.getAllByText("Falta pagar")).toHaveLength(2);
+    expect(screen.getAllByText("$6,00").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("$8,50")).toBeInTheDocument();
     expect(screen.getByText("5%")).toBeInTheDocument();
     expect(container).not.toHaveTextContent("10.0000");
     expect(container).not.toHaveTextContent("5.0000");
