@@ -94,10 +94,12 @@ export default async function ScrLoanDetailPage({
         <div className="grid gap-2">
           {detail.schedule.map((row) => {
             const fee = detail.fees.find((item) => item.datedOn === row.dueOn);
-            const installmentDue = moneyNumber(row.principalDue) + moneyNumber(row.interestDue);
+            const feeDue = moneyNumber(fee?.amount);
+            const paidOnRow = moneyNumber(row.paidPrincipalToDate) + moneyNumber(row.paidInterestToDate);
+            const installmentDue = moneyNumber(row.principalDue) + moneyNumber(row.interestDue) + feeDue;
             const remainingDue = Math.max(
               0,
-              installmentDue - moneyNumber(row.paidPrincipalToDate) - moneyNumber(row.paidInterestToDate),
+              installmentDue - paidOnRow,
             );
             return (
               <div key={row.periodIndex} className="grid gap-3 border-b border-border py-4 last:border-b-0 md:grid-cols-[3rem_1fr_auto] md:items-start">
@@ -109,6 +111,7 @@ export default async function ScrLoanDetailPage({
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
                   <Amount label={copy.installmentDue} value={formatMoney(installmentDue)} emphasis />
+                  <Amount label={copy.schedulePaid} value={formatMoney(paidOnRow)} emphasis />
                   <Amount label={copy.remainingDue} value={formatMoney(remainingDue)} emphasis />
                   <Amount label={copy.principal} value={formatMoney(row.principalDue)} />
                   <Amount label={copy.interest} value={formatMoney(row.interestDue)} />
