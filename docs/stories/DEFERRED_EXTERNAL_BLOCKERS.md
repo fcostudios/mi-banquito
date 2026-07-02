@@ -1,6 +1,6 @@
 # Deferred External Blockers
 
-Last updated: 2026-06-30
+Last updated: 2026-07-02
 
 This file is the durable memory for Sprint 0 work that passed the local repo gate
 but still needs external account evidence, manual acceptance, or a product
@@ -19,9 +19,14 @@ corresponding `.nous-feedback.jsonl` event is recorded.
 | US-006 | Sentry environment variables are pending. Core Auth0/DB/cron/blob vars are configured. | `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` stored in Vercel after Sentry exists. |
 | US-010 | Real-device PWA install checks. Lighthouse PWA passes locally, but Android and iOS install behavior needs manual evidence. | Android install prompt evidence and iOS Add-to-Home-Screen evidence on real devices. |
 | US-011 | Auth0 session-to-tenant DB request E2E. Local helper/RLS tests pass, but the live passwordless session path is not proven. | E2E login followed by a tenant-scoped DB-backed request proving org isolation. |
-| US-012 | Authenticated production cron invocation. Deployed crons and 401 unauthenticated behavior are verified, but the real production `CRON_SECRET` value is not retrievable from this session. | Invoke a production cron route with the real secret and capture the successful response/log evidence. |
 | US-013 | Neon PR migration dry-run. GitHub checks and branch protection are verified, but CI currently verifies against local Postgres rather than a per-PR Neon branch. | CI or manual PR run using a Neon preview branch for schema push/verify. |
 | US-015 | Auth0 magic-link E2E. Redirect works, but magic-link email delivery, callback session establishment, expiry handling, and treasurer-email evidence are pending. | Full passwordless email login run with callback/session evidence and expected error-path checks. |
+
+## Resolved Since Previous Closure
+
+| Story | Resolved blocker | Evidence captured |
+|---|---|---|
+| US-012 | Authenticated production cron invocation. | On 2026-07-02, `GET https://mi-banquito.vercel.app/api/cron/accrue-interest?from_date=2026-07-02&to_date=2026-07-02` with the local `CRON_SECRET` bearer returned HTTP 200 and a successful `accrue-interest` summary. |
 
 ## Accepted Deviations To Reconfirm
 
@@ -45,7 +50,8 @@ US-025, US-026, US-027, US-028, US-029, US-030, US-031, and US-032.
 ## Sprint 2 Closure Note
 
 Sprint 2 has no new external blocker list of its own. It is closed with the
-Sprint 0 external deferrals still active for live Auth0/passwordless evidence,
-production cron-secret invocation, and external observability resources. Sprint
-2 local verification includes schema verification, domain/web tests, type-check,
-lint, build, and Playwright protected-route/cron guards.
+Sprint 0 external deferrals still active for live Auth0/passwordless evidence
+and external observability resources. The production cron-secret invocation
+deferral was resolved on 2026-07-02. Sprint 2 local verification includes schema
+verification, domain/web tests, type-check, lint, build, and Playwright
+protected-route/cron guards.
