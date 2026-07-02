@@ -18,6 +18,11 @@ export type AccrualScheduleInput = {
   status: string;
 };
 
+export type AccrualPrincipalRepaymentInput = {
+  datedOn: string;
+  appliedToPrincipal: string;
+};
+
 export type AccrualGroupConfigInput = {
   version: number;
   validFrom: string | Date;
@@ -184,6 +189,17 @@ function unpaidInstallmentAmount(schedule: AccrualScheduleInput): number {
   );
 }
 
+function principalBasisOn(input: {
+  principalAmount: string;
+  accrualDate: string;
+  principalRepayments?: AccrualPrincipalRepaymentInput[];
+}): string {
+  const paidPrincipal = (input.principalRepayments ?? [])
+    .filter((repayment) => repayment.datedOn <= input.accrualDate)
+    .reduce((total, repayment) => total + Number(repayment.appliedToPrincipal), 0);
+  return money4(Math.max(0, Number(input.principalAmount) - paidPrincipal));
+}
+
 function moraKey(loanId: string, accruedOn: string): string {
   return `${loanId}:mora:${accruedOn}`;
 }
@@ -199,6 +215,7 @@ export function planLoanAccruals(input: {
   accrualDates: string[];
   existingAccrualDates: ReadonlySet<string>;
   existingMoraFeeKeys: ReadonlySet<string>;
+  principalRepayments?: AccrualPrincipalRepaymentInput[];
 }): LoanAccrualPlan {
   if (!ACTIVE_LOAN_STATUSES.has(input.loan.status)) {
     return { interestAccruals: [], moraFees: [], transitionsToMora: [] };
@@ -213,15 +230,20 @@ export function planLoanAccruals(input: {
 
   for (const accruedOn of input.accrualDates) {
     if (accruedOn >= input.loan.originatedOn && !input.existingAccrualDates.has(accruedOn)) {
+      const principalBasis = principalBasisOn({
+        principalAmount: input.loan.principalAmount,
+        accrualDate: accruedOn,
+        principalRepayments: input.principalRepayments,
+      });
       interestAccruals.push({
         orgId: input.loan.orgId,
         loanId: input.loan.id,
         accruedOn,
-        principalBasis: money4(input.loan.principalAmount),
+        principalBasis,
         periodDays: 30,
         rateValue: money4(input.loan.rateValue),
         interestAmount: calculateDailyInterestAmount({
-          principalBasis: input.loan.principalAmount,
+          principalBasis,
           rateValue: input.loan.rateValue,
           periodDays: 30,
         }),

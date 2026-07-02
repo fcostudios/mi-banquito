@@ -74,6 +74,31 @@ describe("Sprint 2 cron accrual domain rules", () => {
     ]);
   });
 
+  it("accrues daily interest on remaining principal after repayments", () => {
+    const plan = planLoanAccruals({
+      loan: { ...loan, principalAmount: "100.0000", rateValue: "5.0000" },
+      schedules: [],
+      configs: [{
+        version: 1,
+        validFrom: "2026-01-01T00:00:00.000Z",
+        validTo: null,
+        moraThresholdDays: 15,
+        config: {},
+      }],
+      accrualDates: ["2026-07-02"],
+      existingAccrualDates: new Set(),
+      existingMoraFeeKeys: new Set(),
+      principalRepayments: [{ datedOn: "2026-07-02", appliedToPrincipal: "16.0000" }],
+    });
+
+    expect(plan.interestAccruals).toEqual([
+      expect.objectContaining({
+        principalBasis: "84.0000",
+        interestAmount: "0.1400",
+      }),
+    ]);
+  });
+
   it("caps mora to the overdue installment and resolves config per accrual day", () => {
     const plan = planLoanAccruals({
       loan,

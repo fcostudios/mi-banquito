@@ -21,6 +21,11 @@ function formatMoney(value: string | number | undefined): string {
   return ecCurrency.format(Number.isFinite(numeric) ? numeric : 0);
 }
 
+function moneyNumber(value: string | number | undefined): number {
+  const numeric = Number(value ?? 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
 function formatRate(value: string | number): string {
   const numeric = Number(value);
   return `${percentFormatter.format(Number.isFinite(numeric) ? numeric : 0)}%`;
@@ -89,6 +94,11 @@ export default async function ScrLoanDetailPage({
         <div className="grid gap-2">
           {detail.schedule.map((row) => {
             const fee = detail.fees.find((item) => item.datedOn === row.dueOn);
+            const installmentDue = moneyNumber(row.principalDue) + moneyNumber(row.interestDue);
+            const remainingDue = Math.max(
+              0,
+              installmentDue - moneyNumber(row.paidPrincipalToDate) - moneyNumber(row.paidInterestToDate),
+            );
             return (
               <div key={row.periodIndex} className="grid gap-3 border-b border-border py-4 last:border-b-0 md:grid-cols-[3rem_1fr_auto] md:items-start">
                 <div className="flex items-center gap-3 md:block">
@@ -98,6 +108,8 @@ export default async function ScrLoanDetailPage({
                   <p className="text-sm font-medium text-text-secondary md:mt-2">{row.dueOn}</p>
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
+                  <Amount label={copy.installmentDue} value={formatMoney(installmentDue)} emphasis />
+                  <Amount label={copy.remainingDue} value={formatMoney(remainingDue)} emphasis />
                   <Amount label={copy.principal} value={formatMoney(row.principalDue)} />
                   <Amount label={copy.interest} value={formatMoney(row.interestDue)} />
                   {fee ? <Amount label={copy.fee} value={formatMoney(fee.amount)} /> : null}
@@ -156,11 +168,13 @@ export default async function ScrLoanDetailPage({
   );
 }
 
-function Amount({ label, value }: { label: string; value: string }) {
+function Amount({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
   return (
-    <div>
+    <div className={emphasis ? "rounded-md bg-surface-muted p-3" : undefined}>
       <dt className="text-xs font-medium text-text-secondary">{label}</dt>
-      <dd className="mt-1 font-semibold text-text-primary">{value}</dd>
+      <dd className={emphasis ? "mt-1 text-base font-bold text-text-primary" : "mt-1 font-semibold text-text-primary"}>
+        {value}
+      </dd>
     </div>
   );
 }
