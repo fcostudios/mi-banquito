@@ -3,6 +3,7 @@ import { db } from "@mi-banquito/db";
 import {
   auditLogEntry,
   baseFundQuotaConfig,
+  entityVersion,
   groupConfig,
   organization,
 } from "@mi-banquito/db/schema";
@@ -16,6 +17,18 @@ export type DefaultGroupConfigArgs = {
   currencyCode: string;
   actorId: string;
   now: Date;
+};
+
+export type BusinessRuleRow = {
+  rule: string;
+  currentValue: string;
+  priorValue: string;
+  newValue: string;
+  validFrom: string;
+  validTo: string;
+  lastChangedAt: string;
+  lastChangedBy: string;
+  lastChangedByKind: string;
 };
 
 export function buildDefaultGroupConfigValues(args: DefaultGroupConfigArgs): typeof groupConfig.$inferInsert {
@@ -78,6 +91,215 @@ export function summarizeConfigForTreasurer(input: {
   return `Aporte $${aporte}; prestamos de socias al ${tasa}% ${input.loanRatePeriodUnit}; cuota base $${cuota}.`;
 }
 
+type BusinessRuleConfig = Pick<
+  typeof groupConfig.$inferSelect,
+  | "contributionCycleKind"
+  | "contributionAmount"
+  | "currencyCode"
+  | "loanRateModel"
+  | "loanRateValue"
+  | "loanRatePeriodUnit"
+  | "loanGracePeriods"
+  | "loanToSavingsCapRatio"
+  | "yearEndShareOutFormula"
+  | "safetyMarginAmount"
+  | "reconciliationToleranceAmount"
+  | "lateThresholdDays"
+  | "moraThresholdDays"
+  | "fiscalYearStartMonth"
+  | "fiscalYearStartDay"
+  | "createdAt"
+  | "createdBy"
+  | "createdByKind"
+  | "config"
+>;
+
+type ConfigJson = {
+  baseFundQuota?: {
+    fiscalYear?: number;
+    perMemberAmount?: string;
+  };
+  nonMemberLoanRateValue?: string;
+  adminFeePct?: string;
+  referralCommissionAmount?: string;
+  treasurerCompensation?: {
+    kind?: string;
+    amount?: string;
+    period?: string;
+  };
+  opensOnDay?: number;
+};
+
+const periodLabels: Record<string, string> = {
+  monthly: "mensual",
+  weekly: "semanal",
+  cycle: "por ciclo",
+};
+
+const contributionCycleLabels: Record<string, string> = {
+  monthly: "mensual",
+  weekly: "semanal",
+};
+
+const loanRateModelLabels: Record<string, string> = {
+  declining_balance: "saldo decreciente",
+};
+
+const shareOutFormulaLabels: Record<string, string> = {
+  proportional_time_weighted: "proporcional por tiempo",
+};
+
+const compensationKindLabels: Record<string, string> = {
+  fixed: "fija",
+  percentage: "porcentaje",
+};
+
+function asConfigJson(value: unknown): ConfigJson {
+  return value && typeof value === "object" ? value : {};
+}
+
+function fixedNumber(value: string | number, digits: number) {
+  return Number(value).toFixed(digits);
+}
+
+function currencySymbol(currencyCode: string) {
+  return currencyCode === "USD" ? "$" : `${currencyCode} `;
+}
+
+function money(value: string | number | undefined, currencyCode: string) {
+  if (value === undefined) {
+    return undefined;
+  }
+  return `${currencySymbol(currencyCode)}${fixedNumber(value, 2)}`;
+}
+
+function percent(value: string | number | undefined) {
+  if (value === undefined) {
+    return undefined;
+  }
+  return `${fixedNumber(value, 2)}%`;
+}
+
+function dateValue(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value);
+}
+
+function addOptionalRow(rows: BusinessRuleRow[], row: BusinessRuleRow | undefined) {
+  if (row) {
+    rows.push(row);
+  }
+}
+
+type BusinessRuleMetadata = {
+  priorValues?: Map<string, string>;
+  currentValues?: Map<string, string>;
+  validFrom?: Date;
+  validTo?: Date | null;
+  lastChangedAt?: Date;
+  lastChangedBy?: string;
+  lastChangedByKind?: string;
+};
+
+function rowForRule(
+  metadata: Required<Omit<BusinessRuleMetadata, "priorValues" | "currentValues">> & Pick<BusinessRuleMetadata, "priorValues" | "currentValues">,
+  rule: string,
+  value: string,
+): BusinessRuleRow {
+  return {
+    rule,
+    currentValue: metadata.currentValues?.get(rule) ?? value,
+    priorValue: metadata.priorValues?.get(rule) ?? "",
+    newValue: value,
+    validFrom: metadata.validFrom.toISOString(),
+    validTo: metadata.validTo?.toISOString() ?? "",
+    lastChangedAt: metadata.lastChangedAt.toISOString(),
+    lastChangedBy: metadata.lastChangedBy,
+    lastChangedByKind: metadata.lastChangedByKind,
+  };
+}
+
+function businessRuleRowsForConfig(
+  config: BusinessRuleConfig,
+  metadata: BusinessRuleMetadata = {},
+): BusinessRuleRow[] {
+  const json = asConfigJson(config.config);
+  const rowMetadata = {
+    priorValues: metadata.priorValues,
+    currentValues: metadata.currentValues,
+    validFrom: dateValue(metadata.validFrom ?? config.createdAt),
+    validTo: metadata.validTo ?? null,
+    lastChangedAt: dateValue(metadata.lastChangedAt ?? config.createdAt),
+    lastChangedBy: metadata.lastChangedBy ?? config.createdBy,
+    lastChangedByKind: metadata.lastChangedByKind ?? config.createdByKind,
+  };
+  const cycle = contributionCycleLabels[config.contributionCycleKind] ?? config.contributionCycleKind;
+  const ratePeriod = periodLabels[config.loanRatePeriodUnit] ?? config.loanRatePeriodUnit;
+  const baseQuota = money(json.baseFundQuota?.perMemberAmount, config.currencyCode);
+  const adminFee = percent(json.adminFeePct);
+  const referralCommission = money(json.referralCommissionAmount, config.currencyCode);
+  const treasurerCompensation = money(json.treasurerCompensation?.amount, config.currencyCode);
+
+  const rows: BusinessRuleRow[] = [
+    rowForRule(rowMetadata, "Aporte regular", `${money(config.contributionAmount, config.currencyCode)} ${cycle}`),
+    rowForRule(rowMetadata, "Tasa para socias", `${percent(config.loanRateValue)} ${ratePeriod}`),
+    rowForRule(rowMetadata, "Modelo de tasa", loanRateModelLabels[config.loanRateModel] ?? config.loanRateModel),
+    rowForRule(rowMetadata, "Tope préstamo / ahorro", `${fixedNumber(config.loanToSavingsCapRatio, 2)}x el ahorro`),
+    rowForRule(rowMetadata, "Periodos de gracia", `${config.loanGracePeriods}`),
+    rowForRule(rowMetadata, "Atraso", `Después de ${config.lateThresholdDays} días`),
+    rowForRule(rowMetadata, "Mora", `Después de ${config.moraThresholdDays} días`),
+    rowForRule(rowMetadata, "Fórmula de reparto", shareOutFormulaLabels[config.yearEndShareOutFormula ?? ""] ?? config.yearEndShareOutFormula ?? "No definida"),
+    rowForRule(rowMetadata, "Margen de seguridad", money(config.safetyMarginAmount, config.currencyCode) ?? "No definido"),
+    rowForRule(rowMetadata, "Tolerancia de conciliación", money(config.reconciliationToleranceAmount, config.currencyCode) ?? "No definida"),
+    rowForRule(rowMetadata, "Inicio fiscal", `${config.fiscalYearStartDay}/${config.fiscalYearStartMonth}`),
+  ];
+
+  addOptionalRow(rows, json.opensOnDay === undefined ? undefined : {
+    ...rowForRule(rowMetadata, "Día de apertura", `Día ${json.opensOnDay}`),
+  });
+  addOptionalRow(rows, json.nonMemberLoanRateValue === undefined ? undefined : {
+    ...rowForRule(rowMetadata, "Tasa para no socias", `${percent(json.nonMemberLoanRateValue)} ${ratePeriod}`),
+  });
+  addOptionalRow(rows, baseQuota === undefined ? undefined : {
+    ...rowForRule(rowMetadata, "Cuota base", json.baseFundQuota?.fiscalYear
+      ? `${baseQuota} en ${json.baseFundQuota.fiscalYear}`
+      : baseQuota),
+  });
+  addOptionalRow(rows, adminFee === undefined ? undefined : {
+    ...rowForRule(rowMetadata, "Comisión administrativa", adminFee),
+  });
+  addOptionalRow(rows, referralCommission === undefined ? undefined : {
+    ...rowForRule(rowMetadata, "Comisión por referida", referralCommission),
+  });
+  addOptionalRow(rows, treasurerCompensation === undefined ? undefined : {
+    ...rowForRule(
+      rowMetadata,
+      "Compensación tesorera",
+      `${treasurerCompensation} ${periodLabels[json.treasurerCompensation?.period ?? ""] ?? json.treasurerCompensation?.period ?? ""}`.trim(),
+    ),
+  });
+  addOptionalRow(rows, json.treasurerCompensation?.kind === undefined ? undefined : {
+    ...rowForRule(
+      rowMetadata,
+      "Tipo compensación tesorera",
+      compensationKindLabels[json.treasurerCompensation.kind] ?? json.treasurerCompensation.kind,
+    ),
+  });
+
+  return rows;
+}
+
+export function businessRuleRowsFromConfig(config: BusinessRuleConfig): BusinessRuleRow[] {
+  return businessRuleRowsForConfig(config);
+}
+
+function rowsByRule(rows: BusinessRuleRow[]): Map<string, string> {
+  return new Map(rows.map((row) => [row.rule, row.newValue]));
+}
+
+function isBusinessRuleConfig(value: unknown): value is BusinessRuleConfig {
+  return Boolean(value && typeof value === "object" && "contributionAmount" in value && "loanRateValue" in value);
+}
+
 export interface Auth0OrgProvisioner {
   createOrganization(input: { displayName: string; orgId: string }): Promise<{ auth0OrgId?: string }>;
 }
@@ -101,6 +323,8 @@ export interface PlatformService {
   listOrganizations(): Promise<Array<typeof organization.$inferSelect>>;
   getOrganization(id: string): Promise<typeof organization.$inferSelect | undefined>;
   getCurrentGroupConfig(orgId: string): Promise<typeof groupConfig.$inferSelect | undefined>;
+  listBusinessRuleRows(orgId: string): Promise<BusinessRuleRow[]>;
+  recordBusinessRulesView(orgId: string, actorId: string): Promise<void>;
   saveGroupConfig(orgId: string, input: GroupConfigForm, actorId: string, actorKind: GroupConfigActorKind): Promise<typeof groupConfig.$inferSelect>;
 }
 
@@ -192,12 +416,27 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
               platformOperatorId: actorId,
             }).returning();
 
-            await tx.insert(groupConfig).values(buildDefaultGroupConfigValues({
+            const [initialConfig] = await tx.insert(groupConfig).values(buildDefaultGroupConfigValues({
               orgId: org.id,
               currencyCode: input.currencyCode,
               actorId,
               now,
-            }));
+            })).returning();
+
+            await tx.insert(entityVersion).values({
+              orgId: org.id,
+              entityKind: "GroupConfig",
+              entityId: initialConfig.id,
+              version: initialConfig.version,
+              validFrom: initialConfig.validFrom,
+              validTo: initialConfig.validTo,
+              payloadSnapshot: initialConfig,
+              changeKind: "create",
+              changeReason: null,
+              createdAt: now,
+              createdBy: actorId,
+              createdByKind: "platform_operator",
+            });
             orgId = org.id;
             return org.id;
           },
@@ -240,6 +479,63 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
         .orderBy(desc(groupConfig.version));
       return row;
     },
+    async listBusinessRuleRows(orgId) {
+      const current = await this.getCurrentGroupConfig(orgId);
+      if (!current) {
+        return [];
+      }
+
+      const currentRows = businessRuleRowsFromConfig(current);
+      const currentValues = rowsByRule(currentRows);
+      const versions = await db.select().from(entityVersion)
+        .where(and(eq(entityVersion.orgId, orgId), eq(entityVersion.entityKind, "GroupConfig")))
+        .orderBy(desc(entityVersion.version));
+      const ascendingVersions = [...versions].reverse();
+      const priorValuesByVersion = new Map<number, Map<string, string>>();
+      let previousValues: Map<string, string> | undefined;
+
+      for (const version of ascendingVersions) {
+        if (isBusinessRuleConfig(version.payloadSnapshot)) {
+          priorValuesByVersion.set(version.version, previousValues ?? new Map());
+          previousValues = rowsByRule(businessRuleRowsForConfig(version.payloadSnapshot));
+        }
+      }
+
+      const historyRows = versions.flatMap((version) => {
+        if (!isBusinessRuleConfig(version.payloadSnapshot)) {
+          return [];
+        }
+        return businessRuleRowsForConfig(version.payloadSnapshot, {
+          priorValues: priorValuesByVersion.get(version.version),
+          currentValues,
+          validFrom: version.validFrom,
+          validTo: version.validTo,
+          lastChangedAt: version.createdAt,
+          lastChangedBy: version.createdBy,
+          lastChangedByKind: version.createdByKind,
+        });
+      });
+
+      return historyRows.length > 0 ? historyRows : currentRows;
+    },
+    async recordBusinessRulesView(orgId, actorId) {
+      const now = new Date();
+      await auditWriter({
+        tx: db,
+        entry: {
+          orgId,
+          actorKind: "platform_operator",
+          actorId,
+          actionKind: "business_rules.view",
+          subjectKind: "organization",
+          subjectId: orgId,
+          payloadSnapshot: { orgId },
+          reason: null,
+          at: now,
+          createdAt: now,
+        },
+      });
+    },
     async saveGroupConfig(orgId, input, actorId, actorKind) {
       return db.transaction(async (tx) => {
         const now = new Date();
@@ -255,6 +551,14 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
               await tx.update(groupConfig)
                 .set({ validTo: now })
                 .where(eq(groupConfig.id, current.id));
+              await tx.update(entityVersion)
+                .set({ validTo: now })
+                .where(and(
+                  eq(entityVersion.orgId, orgId),
+                  eq(entityVersion.entityKind, "GroupConfig"),
+                  eq(entityVersion.entityId, current.id),
+                  eq(entityVersion.version, current.version),
+                ));
             }
 
             const [next] = await tx.insert(groupConfig).values(groupConfigInsertFromForm({
@@ -283,6 +587,21 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
                 createdBy: actorId,
                 createdByKind: actorKind,
               },
+            });
+
+            await tx.insert(entityVersion).values({
+              orgId,
+              entityKind: "GroupConfig",
+              entityId: next.id,
+              version: next.version,
+              validFrom: next.validFrom,
+              validTo: next.validTo,
+              payloadSnapshot: next,
+              changeKind: current ? "update" : "create",
+              changeReason: null,
+              createdAt: now,
+              createdBy: actorId,
+              createdByKind: actorKind === "platform_operator" ? "platform_operator" : "member",
             });
 
             auditEntry = {
