@@ -118,4 +118,55 @@ describe("Sprint 3 schema substrate", () => {
       has_alert_action_snooze_check: true,
     });
   });
+
+  runIfDatabase("uses named append-only errors for ledger mutation triggers", async () => {
+    const { db } = await import("./index");
+
+    const result = await db.execute(sql`
+      SELECT
+        EXISTS (
+          SELECT 1
+          FROM pg_proc p
+          JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public'
+            AND p.proname = 'raise_append_only_violation'
+        ) AS has_append_only_function,
+        COALESCE(
+          array_agg(
+            (c.relname || '.' || t.tgname || '->' || p.proname)::text
+            ORDER BY c.relname, t.tgname
+          ) FILTER (WHERE t.tgname IS NOT NULL),
+          ARRAY[]::text[]
+        ) AS trigger_bindings
+      FROM (VALUES
+        ('contribution'::name, 'contribution_no_mutate'::name),
+        ('withdrawal'::name, 'withdrawal_no_mutate'::name),
+        ('expense'::name, 'expense_no_mutate'::name),
+        ('repayment'::name, 'repayment_no_mutate'::name),
+        ('interest_accrual'::name, 'interest_accrual_no_mutate'::name)
+      ) AS expected(table_name, trigger_name)
+      LEFT JOIN pg_namespace n
+        ON n.nspname = 'public'
+      LEFT JOIN pg_class c
+        ON c.relname = expected.table_name
+       AND c.relnamespace = n.oid
+      LEFT JOIN pg_trigger t
+        ON t.tgrelid = c.oid
+       AND t.tgname = expected.trigger_name
+       AND NOT t.tgisinternal
+      LEFT JOIN pg_proc p
+        ON p.oid = t.tgfoid
+    `);
+
+    expect(result.rows[0]).toEqual({
+      has_append_only_function: true,
+      trigger_bindings: [
+        "contribution.contribution_no_mutate->raise_append_only_violation",
+        "expense.expense_no_mutate->raise_append_only_violation",
+        "interest_accrual.interest_accrual_no_mutate->raise_append_only_violation",
+        "repayment.repayment_no_mutate->raise_append_only_violation",
+        "withdrawal.withdrawal_no_mutate->raise_append_only_violation",
+      ],
+    });
+  });
 });
