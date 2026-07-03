@@ -147,8 +147,8 @@ async function installRlsPolicies(pool) {
     statements.push(
       `DROP POLICY IF EXISTS ${policyName} ON ${tableName};`,
       `CREATE POLICY ${policyName} ON ${tableName}
-  USING (org_id = current_setting('app.current_org_id', true)::uuid)
-  WITH CHECK (org_id = current_setting('app.current_org_id', true)::uuid);`,
+  USING (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid)
+  WITH CHECK (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid);`,
     );
   }
 
@@ -221,12 +221,21 @@ export async function main() {
   }
 
   const existingHealth = await currentSchemaHealth(databaseUrl);
+  const pool = new pg.Pool({ connectionString: databaseUrl });
   if (existingHealth?.ok) {
-    console.log("local schema already verified");
-    return 0;
+    try {
+      await installRlsPolicies(pool);
+      await forceRls(pool);
+      console.log("local schema already verified; fail-closed RLS policies reconciled");
+      return 0;
+    } catch (err) {
+      console.error(`✗ local RLS policy reconcile failed: ${err.message}`);
+      return 1;
+    } finally {
+      await pool.end();
+    }
   }
 
-  const pool = new pg.Pool({ connectionString: databaseUrl });
   const onlyMissingUpdatedAtTriggers =
     existingHealth?.errors.length === 1 &&
     existingHealth.errors[0].startsWith("missing updated_at update triggers on:");
