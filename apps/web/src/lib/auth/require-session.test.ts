@@ -151,3 +151,19 @@ describe("requireRole", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+describe("getShellSession", () => {
+  beforeEach(() => {
+    getSession.mockReset();
+    redirect.mockClear();
+    warn.mockClear();
+  });
+
+  it("redirects anonymous authenticated-shell requests before rendering children", async () => {
+    const { getShellSession } = await import("./require-session");
+    getSession.mockResolvedValueOnce(null);
+
+    await expect(getShellSession()).rejects.toThrow("NEXT_REDIRECT:/auth/login");
+    expect(redirect).toHaveBeenCalledWith("/auth/login");
+  });
+});

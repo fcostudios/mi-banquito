@@ -47,6 +47,23 @@ still depends on the inherited live Auth0 session evidence; repository-level
 coverage verifies the protected-route, validation, domain, schema, and build
 contracts.
 
+Sprint 3 is closed as **implemented and locally verified**, with inherited
+external observability blockers still active for live Sentry and Better Stack
+resource evidence. Sprint 3 delivered append-only/RLS/period-lock substrate
+checks, same-transaction audit rollback, adjustment windows, business-rules
+history/CSV, narrated history filters, actionable alerts, Sentry redaction code,
+and a Sprint 3 closure gate. Local verification passed on 2026-07-03:
+
+- `rtk env CI=true pnpm --filter @mi-banquito/db verify`
+- `rtk env CI=true pnpm --filter @mi-banquito/db test -- --run packages/db/src/sprint3-substrate.test.ts packages/db/scripts/verify-schema.test.mjs packages/db/src/tenant.test.ts`
+- `rtk env CI=true pnpm --filter @mi-banquito/domain test -- --run packages/domain/src/audit.test.ts packages/domain/src/alerts.test.ts packages/domain/src/reconciliation.test.ts packages/domain/src/platform-business-rules.test.ts`
+- `rtk env CI=true pnpm --filter mi-banquito-web test -- --run src/lib/sentry/redaction.test.ts`
+- `rtk env CI=true pnpm --filter mi-banquito-web type-check`
+- `rtk env CI=true pnpm --filter mi-banquito-web lint`
+- `rtk env CI=true pnpm --filter mi-banquito-web build`
+- `rtk env CI=true pnpm -C apps/web exec playwright test e2e/sprint3.spec.ts`
+- `rtk node scripts/sprint3-closure-gate.mjs`
+
 ## Story Status
 
 | Story | Status | Evidence | Remaining Work |

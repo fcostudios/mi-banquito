@@ -10,7 +10,7 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
     "test:e2e": "playwright test",
-    "lint:ds": "node ../../scripts/check-status-pill.mjs ../.. && node ../../scripts/check-hardcoded-color.mjs ../.. && node ../../scripts/check-hardcoded-string.mjs ../.. && node ../../scripts/check-lucide-allowlist.mjs ../.. && node ../../scripts/sprint1-ui-closure-gate.mjs ../.. && node ../../scripts/sprint2-closure-gate.mjs ../..",
+    "lint:ds": "node ../../scripts/check-status-pill.mjs ../.. && node ../../scripts/check-hardcoded-color.mjs ../.. && node ../../scripts/check-hardcoded-string.mjs ../.. && node ../../scripts/check-lucide-allowlist.mjs ../.. && node ../../scripts/sprint1-ui-closure-gate.mjs ../.. && node ../../scripts/sprint2-closure-gate.mjs ../.. && node ../../scripts/sprint3-closure-gate.mjs ../..",
     "lint:a11y": "node ../../scripts/check-a11y.mjs ../.."
   },
   "dependencies": {

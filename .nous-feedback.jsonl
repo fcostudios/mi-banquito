@@ -155,3 +155,18 @@
 {"story":"US-036","event":"ac_verify","ac":2,"method":"post-closure production correction and regression tests","pass":true,"notes":"Repayment default now pays próxima cuota with fee/interest/principal split; Abonar a capital remains explicit. Production pilot repayment corrected append-only; net split verified as fee 1, interest 5, principal 10."}
 {"story":"US-037","event":"ac_verify","ac":1,"method":"post-closure loan-detail verification","pass":true,"notes":"Loan detail now exposes fee paid-to-date and repayment split fee/interest/principal so schedule math is understandable to non-financial users."}
 {"story":"SPRINT-2","event":"closure_hygiene","notes":"2026-07-02 hygiene pass updated US-036 story text, resolved stale US-012 cron blocker evidence, preserved inherited external blockers for Auth0/passwordless and observability, and confirmed production health/cron checks."}
+{"sprint":"3","event":"adversarial_review","check":"missing app.current_org_id returns no tenant data","pass":true}
+{"sprint":"3","event":"adversarial_review","check":"locked period rejects untagged inserts","pass":true}
+{"sprint":"3","event":"adversarial_review","check":"alert dismiss and snooze do not update append-only alert rows","pass":true}
+{"sprint":"3","event":"adversarial_review","check":"Sentry redactor removes whatsapp_number email domain and display_name","pass":true}
+{"story":"US-024","event":"done","notes":"Business-rules panel and CSV export implemented with EntityVersion history and view audit."}
+{"story":"US-055","event":"done","notes":"Alerts bell lists visible alerts, supports append-only dismiss/snooze, and WhatsApp sharing."}
+{"story":"US-056","event":"done","notes":"Historial now shows plain-Spanish audit narration."}
+{"story":"US-057","event":"done","notes":"Historial supports action, member, and date filters with URL query preservation."}
+{"story":"US-069","event":"done","notes":"Named append-only ledger trigger errors verified."}
+{"story":"US-070","event":"done","notes":"Period-lock guard verified for dated financial inserts and adjustment windows."}
+{"story":"US-071","event":"done","notes":"Same-transaction audit rollback verified across domain writes."}
+{"story":"US-072","event":"done","notes":"Fail-closed tenant RLS policies verified."}
+{"story":"US-073","event":"done_with_external_deferral","notes":"Sentry SDK and PII redaction implemented locally; real DSN/event evidence remains external."}
+{"story":"US-083","event":"done","notes":"Operator adjustment windows implemented and verified."}
+{"story":"SPRINT-3","event":"closed_with_deferrals","notes":"Closed 2026-07-03 as implemented and locally verified. Live Sentry/Better Stack evidence remains inherited external observability deferral."}
