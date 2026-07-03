@@ -34,6 +34,7 @@ import type {
   RecordRepaymentResult,
 } from "./loans/types";
 import { generateDecliningBalanceSchedule } from "./rules/loans/declining-balance";
+import { type AuditWriter, writeWithAudit } from "./audit";
 export type {
   BorrowerKind,
   EligibilityResult,
@@ -57,11 +58,27 @@ export interface LoanService {
   recordRepayment(input: RecordRepaymentInput): Promise<RecordRepaymentResult>;
 }
 
+export type LoanAuditEntry = typeof auditLogEntry.$inferInsert;
+export type LoanAuditTx = {
+  insert(table: typeof auditLogEntry): {
+    values(values: LoanAuditEntry): unknown;
+  };
+};
+export type LoanAuditWriter = AuditWriter<LoanAuditEntry, LoanAuditTx>;
+
+export interface LoanServiceOptions {
+  auditWriter?: LoanAuditWriter;
+}
+
 type GroupConfigJson = Record<string, unknown>;
 
 const ACTOR_KIND = "member";
 const money4 = (value: string | number): string => Number(value).toFixed(4);
 const ACTIVE_LOAN_STATUSES = new Set(["originated", "activo", "en_mora"]);
+
+const defaultAuditWriter: LoanAuditWriter = async ({ tx, entry }) => {
+  await tx.insert(auditLogEntry).values(entry);
+};
 
 const normalizeNullableText = (value: string | null | undefined): string | null => {
   const trimmed = value?.trim();
@@ -292,7 +309,10 @@ const resolveBorrowerName = async (orgId: string, row: typeof loan.$inferSelect)
   return "Prestataria";
 };
 
-export const createLoanService = (): LoanService => ({
+export const createLoanService = (options: LoanServiceOptions = {}): LoanService => {
+  const auditWriter = options.auditWriter ?? defaultAuditWriter;
+
+  return {
   context: "loan",
   async listEligibleGuarantorMembers(orgId) {
     const [currentConfig] = await db.select().from(groupConfig)
@@ -528,125 +548,131 @@ export const createLoanService = (): LoanService => ({
     }));
 
     await db.transaction(async (tx) => {
-      if (input.borrowerKind === "non_member" && borrowerNonMemberId) {
-        await tx.insert(nonMemberBorrower).values({
-          id: borrowerNonMemberId,
-          orgId: input.orgId,
-          displayName: input.nonMemberDisplayName?.trim() ?? "",
-          whatsappNumber: normalizeNullableText(input.nonMemberWhatsappNumber),
-          nationalIdRedacted: input.nonMemberNationalIdLast4 ? `****${input.nonMemberNationalIdLast4}` : null,
-          notes: normalizeNullableText(input.nonMemberNotes),
-          createdAt: now,
-          createdBy: input.actorId,
-          createdByKind: ACTOR_KIND,
-        });
-      }
+      await writeWithAudit({
+        write: async () => {
+          if (input.borrowerKind === "non_member" && borrowerNonMemberId) {
+            await tx.insert(nonMemberBorrower).values({
+              id: borrowerNonMemberId,
+              orgId: input.orgId,
+              displayName: input.nonMemberDisplayName?.trim() ?? "",
+              whatsappNumber: normalizeNullableText(input.nonMemberWhatsappNumber),
+              nationalIdRedacted: input.nonMemberNationalIdLast4 ? `****${input.nonMemberNationalIdLast4}` : null,
+              notes: normalizeNullableText(input.nonMemberNotes),
+              createdAt: now,
+              createdBy: input.actorId,
+              createdByKind: ACTOR_KIND,
+            });
+          }
 
-      await tx.insert(loan).values({
-        id: loanId,
-        orgId: input.orgId,
-        memberId: borrowerMemberId,
-        borrowerKind: input.borrowerKind,
-        borrowerMemberId,
-        borrowerNonMemberId,
-        principalAmount,
-        currencyCode,
-        rateValue,
-        rateModel: currentConfig.loanRateModel,
-        termPeriods: input.termPeriods,
-        gracePeriods: currentConfig.loanGracePeriods,
-        originatedOn: input.originatedOn,
-        status: "activo",
-        purpose: normalizeNullableText(input.purpose),
-        clientRequestId: input.clientRequestId,
-        groupConfigVersionAtOrigination: currentConfig.version,
-        referrerMemberId: input.referrerMemberId || null,
-        createdAt: now,
-        createdBy: input.actorId,
-        createdByKind: ACTOR_KIND,
-        updatedAt: null,
-        updatedBy: null,
-      });
+          await tx.insert(loan).values({
+            id: loanId,
+            orgId: input.orgId,
+            memberId: borrowerMemberId,
+            borrowerKind: input.borrowerKind,
+            borrowerMemberId,
+            borrowerNonMemberId,
+            principalAmount,
+            currencyCode,
+            rateValue,
+            rateModel: currentConfig.loanRateModel,
+            termPeriods: input.termPeriods,
+            gracePeriods: currentConfig.loanGracePeriods,
+            originatedOn: input.originatedOn,
+            status: "activo",
+            purpose: normalizeNullableText(input.purpose),
+            clientRequestId: input.clientRequestId,
+            groupConfigVersionAtOrigination: currentConfig.version,
+            referrerMemberId: input.referrerMemberId || null,
+            createdAt: now,
+            createdBy: input.actorId,
+            createdByKind: ACTOR_KIND,
+            updatedAt: null,
+            updatedBy: null,
+          });
 
-      await tx.insert(loanSchedule).values(scheduleRows);
+          await tx.insert(loanSchedule).values(scheduleRows);
 
-      const firstInstallment = schedule.installments[0];
-      if (firstInstallment) {
-        await tx.insert(loanFee).values({
-          orgId: input.orgId,
-          loanId,
-          loanScheduleId: scheduleRows[0]?.id ?? null,
-          feeKind: "admin",
-          amount: money4(firstInstallment.feeDue),
-          currencyCode,
-          datedOn: scheduleRows[0]?.dueOn ?? input.originatedOn,
-          accruedOn: input.originatedOn,
-          groupConfigVersion: currentConfig.version,
-          feedsSurplus: true,
-          accountId: null,
-          reconciliationStatus: null,
-          reversesId: null,
-          reverseReason: null,
-          createdAt: now,
-          createdBy: input.actorId,
-          createdByKind: ACTOR_KIND,
-        });
-      }
+          const firstInstallment = schedule.installments[0];
+          if (firstInstallment) {
+            await tx.insert(loanFee).values({
+              orgId: input.orgId,
+              loanId,
+              loanScheduleId: scheduleRows[0]?.id ?? null,
+              feeKind: "admin",
+              amount: money4(firstInstallment.feeDue),
+              currencyCode,
+              datedOn: scheduleRows[0]?.dueOn ?? input.originatedOn,
+              accruedOn: input.originatedOn,
+              groupConfigVersion: currentConfig.version,
+              feedsSurplus: true,
+              accountId: null,
+              reconciliationStatus: null,
+              reversesId: null,
+              reverseReason: null,
+              createdAt: now,
+              createdBy: input.actorId,
+              createdByKind: ACTOR_KIND,
+            });
+          }
 
-      if (input.borrowerKind === "non_member" && input.guarantorMemberId) {
-        await tx.insert(loanGuarantor).values({
-          orgId: input.orgId,
-          loanId,
-          guarantorMemberId: input.guarantorMemberId,
-          assumedAt: now,
-          releasedAt: null,
-          liabilityAmount: principalAmount,
-          currencyCode,
-          createdAt: now,
-          createdBy: input.actorId,
-          createdByKind: ACTOR_KIND,
-        });
-      }
+          if (input.borrowerKind === "non_member" && input.guarantorMemberId) {
+            await tx.insert(loanGuarantor).values({
+              orgId: input.orgId,
+              loanId,
+              guarantorMemberId: input.guarantorMemberId,
+              assumedAt: now,
+              releasedAt: null,
+              liabilityAmount: principalAmount,
+              currencyCode,
+              createdAt: now,
+              createdBy: input.actorId,
+              createdByKind: ACTOR_KIND,
+            });
+          }
 
-      if (input.referrerMemberId) {
-        await tx.insert(loanReferral).values({
-          orgId: input.orgId,
-          loanId,
-          referrerMemberId: input.referrerMemberId,
-          commissionAmount: referralCommissionAmount,
-          commissionCurrency: currencyCode,
-          accruedAt: null,
-          withdrawalId: null,
-          createdAt: now,
-          createdBy: input.actorId,
-          createdByKind: ACTOR_KIND,
-        });
-      }
-
-      await tx.insert(auditLogEntry).values({
-        orgId: input.orgId,
-        actorKind: ACTOR_KIND,
-        actorId: input.actorId,
-        actionKind: "loan.originated",
-        subjectKind: "loan",
-        subjectId: loanId,
-        payloadSnapshot: {
-          loanId,
-          borrowerKind: input.borrowerKind,
-          borrowerMemberId,
-          borrowerNonMemberId,
-          principalAmount,
-          currencyCode,
-          rateValue,
-          rateModel: currentConfig.loanRateModel,
-          termPeriods: input.termPeriods,
-          originatedOn: input.originatedOn,
-          groupConfigVersionAtOrigination: currentConfig.version,
-          referrerMemberId: input.referrerMemberId || null,
+          if (input.referrerMemberId) {
+            await tx.insert(loanReferral).values({
+              orgId: input.orgId,
+              loanId,
+              referrerMemberId: input.referrerMemberId,
+              commissionAmount: referralCommissionAmount,
+              commissionCurrency: currencyCode,
+              accruedAt: null,
+              withdrawalId: null,
+              createdAt: now,
+              createdBy: input.actorId,
+              createdByKind: ACTOR_KIND,
+            });
+          }
         },
-        reason: null,
-        at: now,
-        createdAt: now,
+        audit: () => auditWriter({
+          tx,
+          entry: {
+            orgId: input.orgId,
+            actorKind: ACTOR_KIND,
+            actorId: input.actorId,
+            actionKind: "loan.originated",
+            subjectKind: "loan",
+            subjectId: loanId,
+            payloadSnapshot: {
+              loanId,
+              borrowerKind: input.borrowerKind,
+              borrowerMemberId,
+              borrowerNonMemberId,
+              principalAmount,
+              currencyCode,
+              rateValue,
+              rateModel: currentConfig.loanRateModel,
+              termPeriods: input.termPeriods,
+              originatedOn: input.originatedOn,
+              groupConfigVersionAtOrigination: currentConfig.version,
+              referrerMemberId: input.referrerMemberId || null,
+            },
+            reason: null,
+            at: now,
+            createdAt: now,
+          },
+        }),
       });
     });
 
@@ -724,7 +750,9 @@ export const createLoanService = (): LoanService => ({
     const borrowerDisplayName = await resolveBorrowerName(input.orgId, currentLoan);
 
     await db.transaction(async (tx) => {
-      await tx.insert(repayment).values({
+      await writeWithAudit({
+        write: async () => {
+          await tx.insert(repayment).values({
         id: repaymentId,
         orgId: input.orgId,
         loanId: input.loanId,
@@ -768,89 +796,102 @@ export const createLoanService = (): LoanService => ({
             const [referrer] = await tx.select().from(member)
               .where(and(eq(member.orgId, input.orgId), eq(member.id, referral.referrerMemberId)));
             const withdrawalId = randomUUID();
-            await tx.insert(withdrawal).values({
-              id: withdrawalId,
-              orgId: input.orgId,
-              memberId: referral.referrerMemberId,
-              amount: money4(referral.commissionAmount),
-              currencyCode: referral.commissionCurrency,
-              datedOn: input.datedOn,
-              recordedAt: now,
-              kind: "referral_commission_credit",
-              shareOutId: null,
-              notes: `Comisión por préstamo ${input.loanId}`,
-              reversesId: null,
-              reverseReason: null,
-              clientRequestId: referral.id,
-              createdAt: now,
-              createdBy: input.actorId,
-              createdByKind: ACTOR_KIND,
-              yearEndShareOutLineId: null,
-            });
-            await tx.update(loanReferral)
-              .set({ accruedAt: now, withdrawalId })
-              .where(and(eq(loanReferral.orgId, input.orgId), eq(loanReferral.id, referral.id), isNull(loanReferral.accruedAt)));
-            await tx.insert(alert).values({
-              orgId: input.orgId,
-              alertKind: "loan_referral_commission",
-              severity: "low",
-              audience: "treasurer",
-              subjectKind: "loan",
-              subjectId: input.loanId,
-              payload: {
-                message: `Préstamo de ${borrowerDisplayName} pagado — comisión de ${referral.commissionCurrency} ${money4(referral.commissionAmount)} acreditada a ${referrer?.displayName ?? "la socia referidora"}`,
-                referralId: referral.id,
-                withdrawalId,
+            await writeWithAudit({
+              write: async () => {
+                await tx.insert(withdrawal).values({
+                  id: withdrawalId,
+                  orgId: input.orgId,
+                  memberId: referral.referrerMemberId,
+                  amount: money4(referral.commissionAmount),
+                  currencyCode: referral.commissionCurrency,
+                  datedOn: input.datedOn,
+                  recordedAt: now,
+                  kind: "referral_commission_credit",
+                  shareOutId: null,
+                  notes: `Comisión por préstamo ${input.loanId}`,
+                  reversesId: null,
+                  reverseReason: null,
+                  clientRequestId: referral.id,
+                  createdAt: now,
+                  createdBy: input.actorId,
+                  createdByKind: ACTOR_KIND,
+                  yearEndShareOutLineId: null,
+                });
+                await tx.update(loanReferral)
+                  .set({ accruedAt: now, withdrawalId })
+                  .where(and(eq(loanReferral.orgId, input.orgId), eq(loanReferral.id, referral.id), isNull(loanReferral.accruedAt)));
+                await tx.insert(alert).values({
+                  orgId: input.orgId,
+                  alertKind: "loan_referral_commission",
+                  severity: "low",
+                  audience: "treasurer",
+                  subjectKind: "loan",
+                  subjectId: input.loanId,
+                  payload: {
+                    message: `Préstamo de ${borrowerDisplayName} pagado — comisión de ${referral.commissionCurrency} ${money4(referral.commissionAmount)} acreditada a ${referrer?.displayName ?? "la socia referidora"}`,
+                    referralId: referral.id,
+                    withdrawalId,
+                  },
+                  dedupWindowEnd: now,
+                  dismissedAt: null,
+                  dismissedBy: null,
+                  snoozedUntil: null,
+                  createdAt: now,
+                });
               },
-              dedupWindowEnd: now,
-              dismissedAt: null,
-              dismissedBy: null,
-              snoozedUntil: null,
-              createdAt: now,
-            });
-            await tx.insert(auditLogEntry).values({
-              orgId: input.orgId,
-              actorKind: ACTOR_KIND,
-              actorId: input.actorId,
-              actionKind: "loan.referral_commission.credit",
-              subjectKind: "withdrawal",
-              subjectId: withdrawalId,
-              payloadSnapshot: {
-                loanId: input.loanId,
-                referralId: referral.id,
-                withdrawalId,
-                referrerMemberId: referral.referrerMemberId,
-                commissionAmount: money4(referral.commissionAmount),
-                commissionCurrency: referral.commissionCurrency,
-              },
-              reason: null,
-              at: now,
-              createdAt: now,
+              audit: () => auditWriter({
+                tx,
+                entry: {
+                  orgId: input.orgId,
+                  actorKind: ACTOR_KIND,
+                  actorId: input.actorId,
+                  actionKind: "loan.referral_commission.credit",
+                  subjectKind: "withdrawal",
+                  subjectId: withdrawalId,
+                  payloadSnapshot: {
+                    loanId: input.loanId,
+                    referralId: referral.id,
+                    withdrawalId,
+                    referrerMemberId: referral.referrerMemberId,
+                    commissionAmount: money4(referral.commissionAmount),
+                    commissionCurrency: referral.commissionCurrency,
+                  },
+                  reason: null,
+                  at: now,
+                  createdAt: now,
+                },
+              }),
             });
           }
         }
       }
 
-      await tx.insert(auditLogEntry).values({
-        orgId: input.orgId,
-        actorKind: ACTOR_KIND,
-        actorId: input.actorId,
-        actionKind: paidOff ? "loan.repayment.payoff" : "loan.repayment.create",
-        subjectKind: "repayment",
-        subjectId: repaymentId,
-        payloadSnapshot: {
-          repaymentId,
-          loanId: input.loanId,
-          amount: money4(input.amount),
-          split,
-          paidOff,
         },
-        reason: null,
-        at: now,
-        createdAt: now,
+        audit: () => auditWriter({
+          tx,
+          entry: {
+            orgId: input.orgId,
+            actorKind: ACTOR_KIND,
+            actorId: input.actorId,
+            actionKind: paidOff ? "loan.repayment.payoff" : "loan.repayment.create",
+            subjectKind: "repayment",
+            subjectId: repaymentId,
+            payloadSnapshot: {
+              repaymentId,
+              loanId: input.loanId,
+              amount: money4(input.amount),
+              split,
+              paidOff,
+            },
+            reason: null,
+            at: now,
+            createdAt: now,
+          },
+        }),
       });
     });
 
     return { repaymentId, paidOff, split };
   },
-});
+  };
+};
