@@ -134,6 +134,18 @@
       "baseFundQuotaPayment": "Cuota base pagada"
     }
   },
+  "shell": {
+    "header": {
+      "appName": "Mi Banquito",
+      "subtitle": "Panel de tesorería",
+      "fallbackUser": "Usuario",
+      "alertsLabel": "Notificaciones",
+      "emptyAlerts": "No hay alertas pendientes.",
+      "dismiss": "Descartar",
+      "snooze": "Recordar en 7 días",
+      "shareWhatsApp": "Enviar por WhatsApp"
+    }
+  },
   "sprint1": {
     "common": {
       "save": "Guardar",
