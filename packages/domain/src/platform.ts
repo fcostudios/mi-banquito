@@ -7,6 +7,7 @@ import {
   organization,
 } from "@mi-banquito/db/schema";
 import type { GroupConfigForm, OrganizationCreateForm } from "@mi-banquito/contracts";
+import { type AuditWriter, writeWithAudit } from "./audit";
 
 export type CreateOrganizationInput = OrganizationCreateForm;
 
@@ -82,6 +83,17 @@ export interface Auth0OrgProvisioner {
 }
 
 export type GroupConfigActorKind = "platform_operator" | "member";
+export type PlatformAuditEntry = typeof auditLogEntry.$inferInsert;
+export type PlatformAuditTx = {
+  insert(table: typeof auditLogEntry): {
+    values(values: PlatformAuditEntry): unknown;
+  };
+};
+export type PlatformAuditWriter = AuditWriter<PlatformAuditEntry, PlatformAuditTx>;
+
+export interface PlatformServiceOptions {
+  auditWriter?: PlatformAuditWriter;
+}
 
 export interface PlatformService {
   readonly context: "platform";
@@ -91,6 +103,10 @@ export interface PlatformService {
   getCurrentGroupConfig(orgId: string): Promise<typeof groupConfig.$inferSelect | undefined>;
   saveGroupConfig(orgId: string, input: GroupConfigForm, actorId: string, actorKind: GroupConfigActorKind): Promise<typeof groupConfig.$inferSelect>;
 }
+
+const defaultAuditWriter: PlatformAuditWriter = async ({ tx, entry }) => {
+  await tx.insert(auditLogEntry).values(entry);
+};
 
 function configJson(input: GroupConfigForm) {
   return {
@@ -151,121 +167,152 @@ function groupConfigInsertFromForm(args: {
   };
 }
 
-export const createPlatformService = (): PlatformService => ({
-  context: "platform",
-  async createOrganization(input, actorId, auth0) {
-    return db.transaction(async (tx) => {
-      const now = new Date();
-      const [org] = await tx.insert(organization).values({
-        displayName: input.displayName,
-        countryCode: input.countryCode,
-        currencyCode: input.currencyCode,
-        timezone: input.timezone,
-        defaultLanguage: input.defaultLanguage,
-        status: "active",
-        brandingLogoUri: input.brandingLogoUri || null,
-        createdAt: now,
-        createdBy: actorId,
-        createdByKind: "platform_operator",
-        platformOperatorId: actorId,
-      }).returning();
+export const createPlatformService = (options: PlatformServiceOptions = {}): PlatformService => {
+  const auditWriter = options.auditWriter ?? defaultAuditWriter;
 
-      await auth0.createOrganization({ displayName: input.displayName, orgId: org.id });
-      await tx.insert(groupConfig).values(buildDefaultGroupConfigValues({
-        orgId: org.id,
-        currencyCode: input.currencyCode,
-        actorId,
-        now,
-      }));
-      await tx.insert(auditLogEntry).values({
-        orgId: org.id,
-        actorKind: "platform_operator",
-        actorId,
-        actionKind: "organization.create",
-        subjectKind: "organization",
-        subjectId: org.id,
-        payloadSnapshot: createOrgAuditPayload(input),
-        reason: null,
-        at: now,
-        createdAt: now,
+  return {
+    context: "platform",
+    async createOrganization(input, actorId, auth0) {
+      const orgId = await db.transaction(async (tx) => {
+        const now = new Date();
+        let orgId: string | undefined;
+        return writeWithAudit({
+          write: async () => {
+            const [org] = await tx.insert(organization).values({
+              displayName: input.displayName,
+              countryCode: input.countryCode,
+              currencyCode: input.currencyCode,
+              timezone: input.timezone,
+              defaultLanguage: input.defaultLanguage,
+              status: "active",
+              brandingLogoUri: input.brandingLogoUri || null,
+              createdAt: now,
+              createdBy: actorId,
+              createdByKind: "platform_operator",
+              platformOperatorId: actorId,
+            }).returning();
+
+            await tx.insert(groupConfig).values(buildDefaultGroupConfigValues({
+              orgId: org.id,
+              currencyCode: input.currencyCode,
+              actorId,
+              now,
+            }));
+            orgId = org.id;
+            return org.id;
+          },
+          audit: async () => {
+            if (!orgId) {
+              throw new Error("organization audit subject is missing");
+            }
+            await auditWriter({
+              tx,
+              entry: {
+                orgId,
+                actorKind: "platform_operator",
+                actorId,
+                actionKind: "organization.create",
+                subjectKind: "organization",
+                subjectId: orgId,
+                payloadSnapshot: createOrgAuditPayload(input),
+                reason: null,
+                at: now,
+                createdAt: now,
+              },
+            });
+          },
+        });
       });
-      return org.id;
-    });
-  },
-  async listOrganizations() {
-    return db.select().from(organization).orderBy(desc(organization.createdAt));
-  },
-  async getOrganization(id) {
-    const [row] = await db.select().from(organization).where(eq(organization.id, id));
-    return row;
-  },
-  async getCurrentGroupConfig(orgId) {
-    const [row] = await db.select().from(groupConfig)
-      .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)))
-      .orderBy(desc(groupConfig.version));
-    return row;
-  },
-  async saveGroupConfig(orgId, input, actorId, actorKind) {
-    return db.transaction(async (tx) => {
-      const now = new Date();
-      const [current] = await tx.select().from(groupConfig)
+
+      await auth0.createOrganization({ displayName: input.displayName, orgId });
+      return orgId;
+    },
+    async listOrganizations() {
+      return db.select().from(organization).orderBy(desc(organization.createdAt));
+    },
+    async getOrganization(id) {
+      const [row] = await db.select().from(organization).where(eq(organization.id, id));
+      return row;
+    },
+    async getCurrentGroupConfig(orgId) {
+      const [row] = await db.select().from(groupConfig)
         .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)))
         .orderBy(desc(groupConfig.version));
-      const nextVersion = (current?.version ?? 0) + 1;
+      return row;
+    },
+    async saveGroupConfig(orgId, input, actorId, actorKind) {
+      return db.transaction(async (tx) => {
+        const now = new Date();
+        let auditEntry: PlatformAuditEntry | undefined;
+        return writeWithAudit({
+          write: async () => {
+            const [current] = await tx.select().from(groupConfig)
+              .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)))
+              .orderBy(desc(groupConfig.version));
+            const nextVersion = (current?.version ?? 0) + 1;
 
-      if (current) {
-        await tx.update(groupConfig)
-          .set({ validTo: now })
-          .where(eq(groupConfig.id, current.id));
-      }
+            if (current) {
+              await tx.update(groupConfig)
+                .set({ validTo: now })
+                .where(eq(groupConfig.id, current.id));
+            }
 
-      const [next] = await tx.insert(groupConfig).values(groupConfigInsertFromForm({
-        orgId,
-        input,
-        actorId,
-        actorKind,
-        version: nextVersion,
-        now,
-      })).returning();
+            const [next] = await tx.insert(groupConfig).values(groupConfigInsertFromForm({
+              orgId,
+              input,
+              actorId,
+              actorKind,
+              version: nextVersion,
+              now,
+            })).returning();
 
-      await tx.insert(baseFundQuotaConfig).values({
-        orgId,
-        fiscalYear: input.baseFundQuotaFiscalYear,
-        perMemberAmount: `${Number(input.baseFundQuotaAmount).toFixed(4)}`,
-        currencyCode: "USD",
-        createdAt: now,
-        createdBy: actorId,
-        createdByKind: actorKind,
-      }).onConflictDoUpdate({
-        target: [baseFundQuotaConfig.orgId, baseFundQuotaConfig.fiscalYear],
-        set: {
-          perMemberAmount: `${Number(input.baseFundQuotaAmount).toFixed(4)}`,
-          currencyCode: "USD",
-          createdAt: now,
-          createdBy: actorId,
-          createdByKind: actorKind,
-        },
+            await tx.insert(baseFundQuotaConfig).values({
+              orgId,
+              fiscalYear: input.baseFundQuotaFiscalYear,
+              perMemberAmount: `${Number(input.baseFundQuotaAmount).toFixed(4)}`,
+              currencyCode: "USD",
+              createdAt: now,
+              createdBy: actorId,
+              createdByKind: actorKind,
+            }).onConflictDoUpdate({
+              target: [baseFundQuotaConfig.orgId, baseFundQuotaConfig.fiscalYear],
+              set: {
+                perMemberAmount: `${Number(input.baseFundQuotaAmount).toFixed(4)}`,
+                currencyCode: "USD",
+                createdAt: now,
+                createdBy: actorId,
+                createdByKind: actorKind,
+              },
+            });
+
+            auditEntry = {
+              orgId,
+              actorKind,
+              actorId,
+              actionKind: "group_config.version",
+              subjectKind: "group_config",
+              subjectId: next.id,
+              payloadSnapshot: buildConfigAuditSummary({ beforeVersion: current?.version ?? 0, afterVersion: next.version }),
+              reason: summarizeConfigForTreasurer({
+                contributionAmount: next.contributionAmount,
+                memberLoanRateValue: next.loanRateValue,
+                loanRatePeriodUnit: next.loanRatePeriodUnit,
+                baseFundQuotaAmount: input.baseFundQuotaAmount,
+              }),
+              at: now,
+              createdAt: now,
+            };
+
+            return next;
+          },
+          audit: async () => {
+            if (!auditEntry) {
+              throw new Error("group config audit entry is missing");
+            }
+            await auditWriter({ tx, entry: auditEntry });
+          },
+        });
       });
-
-      await tx.insert(auditLogEntry).values({
-        orgId,
-        actorKind,
-        actorId,
-        actionKind: "group_config.version",
-        subjectKind: "group_config",
-        subjectId: next.id,
-        payloadSnapshot: buildConfigAuditSummary({ beforeVersion: current?.version ?? 0, afterVersion: next.version }),
-        reason: summarizeConfigForTreasurer({
-          contributionAmount: next.contributionAmount,
-          memberLoanRateValue: next.loanRateValue,
-          loanRatePeriodUnit: next.loanRatePeriodUnit,
-          baseFundQuotaAmount: input.baseFundQuotaAmount,
-        }),
-        at: now,
-        createdAt: now,
-      });
-
-      return next;
-    });
-  },
-});
+    },
+  };
+};
