@@ -12,6 +12,7 @@ import {
   EXPECTED_TRIGGER_TABLES,
   EXPECTED_UNIQUE_CONSTRAINT_NAMES,
   EXPECTED_UPDATED_AT_TABLES,
+  REQUIRED_FUNCTIONS,
 } from "./verify-schema.mjs";
 
 describe("schema verifier", () => {
@@ -27,6 +28,7 @@ describe("schema verifier", () => {
       checkConstraintNames: EXPECTED_CHECK_CONSTRAINT_NAMES,
       uniqueConstraintNames: EXPECTED_UNIQUE_CONSTRAINT_NAMES,
       foreignKeyConstraintNames: EXPECTED_FOREIGN_KEY_CONSTRAINT_NAMES,
+      functionNames: REQUIRED_FUNCTIONS,
       updatedAtTables: EXPECTED_UPDATED_AT_TABLES,
       updatedAtTriggerTables: EXPECTED_UPDATED_AT_TABLES,
     });
@@ -120,6 +122,7 @@ describe("schema verifier", () => {
       checkConstraintNames: EXPECTED_CHECK_CONSTRAINT_NAMES,
       uniqueConstraintNames: EXPECTED_UNIQUE_CONSTRAINT_NAMES,
       foreignKeyConstraintNames: EXPECTED_FOREIGN_KEY_CONSTRAINT_NAMES,
+      functionNames: REQUIRED_FUNCTIONS,
       updatedAtTables: ["member", "loan"],
       updatedAtTriggerTables: ["member"],
     });
