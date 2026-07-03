@@ -13,7 +13,16 @@ import {
   organization,
   repayment,
 } from "@mi-banquito/db/schema";
-import { AuditWriteFailure, createAuditFailure, writeWithAudit } from "./audit";
+import {
+  AuditWriteFailure,
+  buildAuditPdfPayload,
+  createAuditService,
+  createAuditFailure,
+  filterAuditRows,
+  narrateAuditRow,
+  narratedAuditActionKinds,
+  writeWithAudit,
+} from "./audit";
 
 type InsertRecord = {
   tableName: string;
@@ -432,5 +441,252 @@ describe("audit atomicity", () => {
     expect(insertedRows(fakeDb, repayment)).toHaveLength(0);
     expect(updatedRows(fakeDb, loanSchedule)).toHaveLength(0);
     expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(0);
+  });
+});
+
+describe("audit narration", () => {
+  it("narrates known action kinds in plain Spanish", () => {
+    const text = narrateAuditRow({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      orgId: "11111111-1111-4111-8111-111111111111",
+      actionKind: "contribution.create",
+      subjectKind: "contribution",
+      subjectId: "22222222-2222-4222-8222-222222222222",
+      payloadSnapshot: {
+        memberName: "Pancho",
+        amount: "20.00",
+        datedOn: "2026-07-02",
+      },
+      at: new Date("2026-07-02T10:00:00.000Z"),
+      actorKind: "member",
+      actorId: "33333333-3333-4333-8333-333333333333",
+      createdAt: new Date("2026-07-02T10:00:00.000Z"),
+      reason: null,
+    });
+
+    expect(text).toBe("Pancho registró un aporte de $20.00 el 2026-07-02.");
+  });
+
+  it("falls back safely for unknown actions", () => {
+    const text = narrateAuditRow({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      orgId: "11111111-1111-4111-8111-111111111111",
+      actionKind: "unknown.action",
+      subjectKind: "thing",
+      subjectId: null,
+      payloadSnapshot: {},
+      at: new Date("2026-07-02T10:00:00.000Z"),
+      actorKind: "system",
+      actorId: "33333333-3333-4333-8333-333333333333",
+      createdAt: new Date("2026-07-02T10:00:00.000Z"),
+      reason: null,
+    });
+
+    expect(text).toBe("Se registró unknown.action el 2026-07-02.");
+  });
+
+  it("exports the supported narration action kinds for UI filters", () => {
+    expect(narratedAuditActionKinds).toEqual(expect.arrayContaining([
+      "contribution.create",
+      "contribution.reverse",
+      "loan.repayment.create",
+      "loan.repayment.payoff",
+      "loan.originated",
+      "member.create",
+      "member.status_transition",
+      "group_config.version",
+      "business_rules.view",
+      "adjustment_period.open",
+      "base_fund_quota.payment",
+    ]));
+  });
+
+  it("narrates real ledger, loan, and reconciliation action kinds", () => {
+    const base = {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      orgId: "11111111-1111-4111-8111-111111111111",
+      subjectId: "22222222-2222-4222-8222-222222222222",
+      at: new Date("2026-07-02T10:00:00.000Z"),
+      actorKind: "member",
+      actorId: "33333333-3333-4333-8333-333333333333",
+      createdAt: new Date("2026-07-02T10:00:00.000Z"),
+      reason: null,
+    } as const;
+
+    expect(narrateAuditRow({
+      ...base,
+      actionKind: "loan.originated",
+      subjectKind: "loan",
+      payloadSnapshot: { memberName: "Pancho", principalAmount: "100.00", originatedOn: "2026-07-02" },
+    })).toBe("Pancho recibió un préstamo de $100.00 el 2026-07-02.");
+    expect(narrateAuditRow({
+      ...base,
+      actionKind: "loan.repayment.payoff",
+      subjectKind: "repayment",
+      payloadSnapshot: { memberName: "Pancho", amount: "16.00" },
+    })).toBe("Pancho terminó de pagar un préstamo con un pago de $16.00 el 2026-07-02.");
+    expect(narrateAuditRow({
+      ...base,
+      actionKind: "member.status_transition",
+      subjectKind: "Member",
+      payloadSnapshot: { displayName: "Pancho", status: "en_pausa" },
+    })).toBe("Pancho cambió de estado a en_pausa el 2026-07-02.");
+    expect(narrateAuditRow({
+      ...base,
+      actionKind: "adjustment_period.open",
+      subjectKind: "period_close",
+      payloadSnapshot: {},
+    })).toBe("Una operadora abrió una ventana de ajuste el 2026-07-02.");
+  });
+
+  it("filters by member, action kind, and date range with AND semantics", () => {
+    const rows = filterAuditRows({
+      rows: [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          orgId: "11111111-1111-4111-8111-111111111111",
+          memberId: "m1",
+          actionKind: "contribution.create",
+          at: new Date("2026-07-02T00:00:00.000Z"),
+        },
+        {
+          id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          orgId: "11111111-1111-4111-8111-111111111111",
+          memberId: "m2",
+          actionKind: "loan.repayment.create",
+          at: new Date("2026-07-03T00:00:00.000Z"),
+        },
+      ],
+      filters: {
+        memberId: "m1",
+        actionKind: "contribution.create",
+        from: "2026-07-01",
+        to: "2026-07-02",
+      },
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  });
+
+  it("does not infer member filters for repayment payloads that lack borrower membership", async () => {
+    const fakeDb = new FakeDb([
+      [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          orgId: "11111111-1111-4111-8111-111111111111",
+          actorKind: "member",
+          actorId: "33333333-3333-4333-8333-333333333333",
+          actionKind: "loan.repayment.create",
+          subjectKind: "repayment",
+          subjectId: "44444444-4444-4444-8444-444444444444",
+          payloadSnapshot: {
+            repaymentId: "44444444-4444-4444-8444-444444444444",
+            loanId: "55555555-5555-4555-8555-555555555555",
+            amount: "16.0000",
+            split: { appliedToPrincipal: "10.0000", appliedToInterest: "5.0000" },
+            paidOff: false,
+          },
+          reason: null,
+          at: new Date("2026-07-02T10:00:00.000Z"),
+          createdAt: new Date("2026-07-02T10:00:00.000Z"),
+        },
+      ],
+    ]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAuditService: createDynamicAuditService } = await import("./audit");
+      await expect(createDynamicAuditService().listNarratedEntries({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        memberId: "m1",
+        actionKind: "loan.repayment.create",
+      })).resolves.toEqual([]);
+    });
+  });
+
+  it("lists narrated entries for one org and builds a deterministic PDF payload", async () => {
+    const fakeDb = new FakeDb([
+      [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          orgId: "11111111-1111-4111-8111-111111111111",
+          actorKind: "member",
+          actorId: "33333333-3333-4333-8333-333333333333",
+          actionKind: "loan.repayment.create",
+          subjectKind: "repayment",
+          subjectId: "44444444-4444-4444-8444-444444444444",
+          payloadSnapshot: {
+            memberName: "Pancho",
+            amount: "16.00",
+            datedOn: "2026-07-02",
+            memberId: "m1",
+          },
+          reason: null,
+          at: new Date("2026-07-02T10:00:00.000Z"),
+          createdAt: new Date("2026-07-02T10:00:00.000Z"),
+        },
+      ],
+    ]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAuditService: createDynamicAuditService, buildAuditPdfPayload: buildDynamicPdfPayload } = await import("./audit");
+      const entries = await createDynamicAuditService().listNarratedEntries({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        memberId: "m1",
+        actionKind: "loan.repayment.create",
+        from: "2026-07-01",
+        to: "2026-07-03",
+      });
+
+      expect(entries).toEqual([
+        expect.objectContaining({
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          actionKind: "loan.repayment.create",
+          memberId: "m1",
+          text: "Pancho registró un pago de $16.00 el 2026-07-02.",
+        }),
+      ]);
+      expect(buildDynamicPdfPayload(entries)).toEqual({
+        generatedAt: expect.any(String),
+        entries: [
+          {
+            at: "2026-07-02T10:00:00.000Z",
+            actionKind: "loan.repayment.create",
+            actorKind: "member",
+            text: "Pancho registró un pago de $16.00 el 2026-07-02.",
+          },
+        ],
+      });
+    });
+  });
+
+  it("builds a PDF payload from narrated entries without mutating them", () => {
+    const entries = [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        actionKind: "contribution.create",
+        subjectKind: "contribution",
+        subjectId: "22222222-2222-4222-8222-222222222222",
+        actorKind: "member",
+        actorId: "33333333-3333-4333-8333-333333333333",
+        memberId: "m1",
+        at: new Date("2026-07-02T10:00:00.000Z"),
+        text: "Pancho registró un aporte de $20.00 el 2026-07-02.",
+      },
+    ];
+
+    expect(buildAuditPdfPayload(entries)).toEqual({
+      generatedAt: expect.any(String),
+      entries: [
+        {
+          at: "2026-07-02T10:00:00.000Z",
+          actionKind: "contribution.create",
+          actorKind: "member",
+          text: "Pancho registró un aporte de $20.00 el 2026-07-02.",
+        },
+      ],
+    });
+    expect(createAuditService().context).toBe("audit");
   });
 });
