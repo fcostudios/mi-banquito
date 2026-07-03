@@ -78,10 +78,29 @@ export function parseExpectedSchema(sql) {
     [...sql.matchAll(/ADD CONSTRAINT\s+([a-z_]+)\s+CHECK\s*\(/g)]
       .map((match) => pgIdentifierName(match[1]))
   );
-  const uniqueConstraintNames = uniqueSorted(
-    [...sql.matchAll(/CONSTRAINT\s+([a-z_]+)\s+UNIQUE\s*\(/g)]
-      .map((match) => pgIdentifierName(match[1]))
-  );
+  const uniqueConstraintEvents = [
+    ...[...sql.matchAll(/CONSTRAINT\s+([a-z_]+)\s+UNIQUE\s*\(/g)]
+      .map((match) => ({
+        index: match.index ?? 0,
+        kind: "add",
+        name: pgIdentifierName(match[1]),
+      })),
+    ...[...sql.matchAll(/DROP CONSTRAINT IF EXISTS\s+([a-z_]+)/g)]
+      .map((match) => ({
+        index: match.index ?? 0,
+        kind: "drop",
+        name: pgIdentifierName(match[1]),
+      })),
+  ].sort((left, right) => left.index - right.index);
+  const uniqueConstraintNameSet = new Set();
+  for (const event of uniqueConstraintEvents) {
+    if (event.kind === "drop") {
+      uniqueConstraintNameSet.delete(event.name);
+    } else {
+      uniqueConstraintNameSet.add(event.name);
+    }
+  }
+  const uniqueConstraintNames = uniqueSorted([...uniqueConstraintNameSet]);
   const foreignKeyConstraintNames = uniqueSorted(
     [...sql.matchAll(/ADD CONSTRAINT\s+([a-z_]+)\s+FOREIGN KEY\s*\(/g)]
       .map((match) => pgIdentifierName(match[1]))
