@@ -1,39 +1,130 @@
-import { createLedgerService, reversalSentence } from "@mi-banquito/domain";
-import { ButtonDestructive, FormField, InputText } from "@mi-banquito/ui";
+import { createAuditService, narratedAuditActionKinds } from "@mi-banquito/domain";
+import {
+  ButtonPrimary,
+  FormField,
+  InputText,
+  Select,
+} from "@mi-banquito/ui";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import messages from "@/lib/i18n/en-US.json";
-import { reverseContributionAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-const copy = messages.sprint1;
+const copy = messages.history;
 
-export default async function ScrHistoryPage() {
+type SearchValue = string | string[] | undefined;
+
+function searchValue(value: SearchValue): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+function entryDate(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+const actionLabels: Record<(typeof narratedAuditActionKinds)[number], string> = {
+  "contribution.create": copy.actions.contributionCreate,
+  "contribution.reverse": copy.actions.contributionReverse,
+  "loan.repayment.create": copy.actions.repaymentCreate,
+  "loan.repayment.payoff": copy.actions.repaymentPayoff,
+  "loan.originated": copy.actions.loanOriginate,
+  "member.create": copy.actions.memberCreate,
+  "member.status_transition": copy.actions.memberStatus,
+  "group_config.version": copy.actions.groupConfigVersion,
+  "business_rules.view": copy.actions.businessRulesView,
+  "adjustment_period.open": copy.actions.adjustmentPeriodOpen,
+  "base_fund_quota.payment": copy.actions.baseFundQuotaPayment,
+};
+
+export default async function ScrHistoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, SearchValue>>;
+}) {
   const session = await requireTreasurer();
-  const rows = await createLedgerService().listContributions(session.orgId);
+  const query = await searchParams;
+  const memberId = searchValue(query.memberId);
+  const actionKind = searchValue(query.actionKind);
+  const from = searchValue(query.from);
+  const to = searchValue(query.to);
+  const entries = await createAuditService().listNarratedEntries({
+    orgId: session.orgId,
+    memberId,
+    actionKind,
+    from,
+    to,
+  });
 
   return (
-    <main className="flex w-full flex-col gap-6 p-6">
-      <h1 className="text-2xl font-bold text-text-primary">{copy.contributions.historyTitle}</h1>
-      <div className="grid gap-3">
-        {rows.length === 0 ? <p className="text-text-secondary">{copy.contributions.empty}</p> : null}
-        {rows.map((row) => (
-          <article key={row.id} className="grid gap-3 rounded-md border border-border bg-surface p-4">
-            <p className="font-medium text-text-primary">
-              {reversalSentence({ memberName: row.memberName, amount: row.amount, datedOn: row.datedOn })}
-            </p>
-            <form action={reverseContributionAction} className="grid gap-3 md:grid-cols-[1fr_auto]">
-              <input type="hidden" name="contributionId" value={row.id} />
-              <FormField labelKey={copy.common.reason}>
-                <InputText labelKey={copy.common.reason} name="reason" required />
-              </FormField>
-              <div className="self-end">
-                <ButtonDestructive type="submit" labelKey={copy.contributions.reverse} />
+    <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6" data-screen="SCR-history">
+      <header>
+        <h1 className="text-2xl font-bold text-text-primary">{copy.title}</h1>
+        <p className="mt-2 text-text-secondary">{copy.description}</p>
+      </header>
+
+      <form method="get" className="grid gap-4 rounded-md border border-border bg-surface p-5 md:grid-cols-5">
+        <FormField labelKey={copy.memberId}>
+          <InputText
+            labelKey={copy.memberId}
+            name="memberId"
+            defaultValue={memberId}
+          />
+        </FormField>
+        <FormField labelKey={copy.actionKind}>
+          <Select name="actionKind" defaultValue={actionKind}>
+            <option value="">{copy.allActions}</option>
+            {narratedAuditActionKinds.map((kind) => (
+              <option key={kind} value={kind}>{actionLabels[kind]}</option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField labelKey={copy.from}>
+          <InputText
+            labelKey={copy.from}
+            name="from"
+            type="date"
+            defaultValue={from}
+          />
+        </FormField>
+        <FormField labelKey={copy.to}>
+          <InputText
+            labelKey={copy.to}
+            name="to"
+            type="date"
+            defaultValue={to}
+          />
+        </FormField>
+        <div className="self-end">
+          <ButtonPrimary type="submit" labelKey={copy.applyFilters} />
+        </div>
+      </form>
+
+      <section className="grid gap-3">
+        {entries.length === 0 ? (
+          <p className="rounded-md border border-border bg-surface p-5 text-text-secondary">
+            {copy.empty}
+          </p>
+        ) : null}
+        {entries.map((entry) => (
+          <article key={entry.id} className="grid gap-2 rounded-md border border-border bg-surface p-4">
+            <p className="font-medium text-text-primary">{entry.text}</p>
+            <dl className="grid gap-2 text-sm text-text-secondary md:grid-cols-3">
+              <div>
+                <dt className="font-medium text-text-primary">{copy.date}</dt>
+                <dd>{entryDate(entry.at)}</dd>
               </div>
-            </form>
+              <div>
+                <dt className="font-medium text-text-primary">{copy.actionKind}</dt>
+                <dd>{entry.actionKind}</dd>
+              </div>
+              <div>
+                <dt className="font-medium text-text-primary">{copy.actor}</dt>
+                <dd>{entry.actorKind}</dd>
+              </div>
+            </dl>
           </article>
         ))}
-      </div>
+      </section>
     </main>
   );
 }
