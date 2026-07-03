@@ -88,8 +88,13 @@ describe("schema verifier", () => {
     ]));
     expect(EXPECTED_INDEX_NAMES).toEqual(expect.arrayContaining([
       "idx_mv_cash_balances_org_id",
+      "uq_reconciliation_cycle_org_cycle_regular",
+      "uq_reconciliation_cycle_org_period_close_adjustment",
     ]));
-    expect(EXPECTED_CHECK_CONSTRAINT_NAMES).toContain("ck_loan_exactly_one_borrower");
+    expect(EXPECTED_CHECK_CONSTRAINT_NAMES).toEqual(expect.arrayContaining([
+      "ck_loan_exactly_one_borrower",
+      "ck_reconciliation_cycle_adjustment_payload",
+    ]));
     expect(EXPECTED_UNIQUE_CONSTRAINT_NAMES).toEqual(expect.arrayContaining([
       "uq_interest_accrual_loan_id_accrued_on",
       "uq_loan_fee_loan_id_fee_kind_accrued_on",
@@ -98,6 +103,7 @@ describe("schema verifier", () => {
       "uq_loan_guarantor_loan_id_guarantor_member_id_assumed_at",
       "uq_loan_referral_loan_id",
     ]));
+    expect(EXPECTED_UNIQUE_CONSTRAINT_NAMES).not.toContain("uq_reconciliation_cycle_org_id_cycle_id");
     expect(EXPECTED_FOREIGN_KEY_CONSTRAINT_NAMES).toEqual(expect.arrayContaining([
       "fk_loan_borrower_member_id",
       "fk_loan_borrower_non_member_id",

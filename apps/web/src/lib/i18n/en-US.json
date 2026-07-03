@@ -81,6 +81,15 @@
       "percentage": "Porcentaje",
       "cycle": "Ciclo",
       "proportionalTimeWeighted": "Proporcional por tiempo"
+    },
+    "adjust": {
+      "title": "Abrir período de ajuste",
+      "description": "Permite registrar correcciones del mes cerrado durante una ventana temporal de 7 días.",
+      "orgLabel": "Organización:",
+      "reason": "Razón del ajuste",
+      "reasonHelp": "Explica qué entrada faltó y por qué necesita registrarse en el período cerrado.",
+      "confirmation": "Confirmo que esta apertura es excepcional y quedará en la auditoría.",
+      "submit": "Abrir período de ajuste"
     }
   },
   "sprint1": {

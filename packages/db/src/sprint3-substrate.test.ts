@@ -105,7 +105,27 @@ describe("Sprint 3 schema substrate", () => {
           FROM pg_constraint
           WHERE conname = 'ck_alert_action_snooze_payload'
             AND conrelid = 'alert_action'::regclass
-        ) AS has_alert_action_snooze_check
+        ) AS has_alert_action_snooze_check,
+        EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'ck_reconciliation_cycle_adjustment_payload'
+            AND conrelid = 'reconciliation_cycle'::regclass
+        ) AS has_adjustment_payload_check,
+        EXISTS (
+          SELECT 1
+          FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND tablename = 'reconciliation_cycle'
+            AND indexname = 'uq_reconciliation_cycle_org_cycle_regular'
+        ) AS has_regular_reconciliation_unique_index,
+        EXISTS (
+          SELECT 1
+          FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND tablename = 'reconciliation_cycle'
+            AND indexname = 'uq_reconciliation_cycle_org_period_close_adjustment'
+        ) AS has_adjustment_reconciliation_unique_index
     `);
 
     expect(result.rows[0]).toEqual({
@@ -116,6 +136,9 @@ describe("Sprint 3 schema substrate", () => {
       has_alert_action_policy: true,
       has_alert_action_kind_check: true,
       has_alert_action_snooze_check: true,
+      has_adjustment_payload_check: true,
+      has_regular_reconciliation_unique_index: true,
+      has_adjustment_reconciliation_unique_index: true,
     });
   });
 
@@ -235,15 +258,14 @@ describe("Sprint 3 schema substrate", () => {
             test_cycle_id UUID := gen_random_uuid();
             cross_cycle_id UUID := gen_random_uuid();
             open_adjustment_parent_cycle_id UUID := gen_random_uuid();
-            expired_adjustment_parent_cycle_id UUID := gen_random_uuid();
             test_member_id UUID := gen_random_uuid();
             test_loan_id UUID := gen_random_uuid();
             test_close_cycle_id UUID := gen_random_uuid();
             test_period_close_id UUID := gen_random_uuid();
             open_adjustment_cycle_id UUID := gen_random_uuid();
-            expired_adjustment_cycle_id UUID := gen_random_uuid();
             insert_id UUID;
             got_period_locked BOOLEAN;
+            got_adjustment_payload_check BOOLEAN;
           BEGIN
             PERFORM set_config('app.current_org_id', test_org_id::text, true);
 
@@ -422,20 +444,6 @@ describe("Sprint 3 schema substrate", () => {
                 now(),
                 test_actor_id,
                 'system'
-              ),
-              (
-                expired_adjustment_parent_cycle_id,
-                test_org_id,
-                'period-lock-test-expired-adjustment-parent',
-                'monthly',
-                DATE '2026-03-01',
-                DATE '2026-03-31',
-                10,
-                'USD',
-                'open',
-                now(),
-                test_actor_id,
-                'system'
               );
 
             INSERT INTO reconciliation_cycle (
@@ -490,6 +498,46 @@ describe("Sprint 3 schema substrate", () => {
               now()
             );
 
+            got_adjustment_payload_check := false;
+            BEGIN
+              INSERT INTO reconciliation_cycle (
+                id,
+                org_id,
+                cycle_id,
+                declared_bank_balance,
+                computed_pool_balance,
+                discrepancy_amount,
+                tolerance_amount,
+                resolution_kind,
+                period_close_id,
+                closed_at,
+                created_at,
+                created_by,
+                created_by_kind
+              )
+              VALUES (
+                gen_random_uuid(),
+                test_org_id,
+                open_adjustment_parent_cycle_id,
+                0,
+                0,
+                0,
+                0,
+                'auto_within_tolerance',
+                test_period_close_id,
+                now(),
+                now(),
+                test_actor_id,
+                'system'
+              );
+            EXCEPTION
+              WHEN check_violation THEN
+                got_adjustment_payload_check := true;
+            END;
+            IF NOT got_adjustment_payload_check THEN
+              RAISE EXCEPTION 'expected non-adjustment reconciliation period_close_id to fail';
+            END IF;
+
             INSERT INTO reconciliation_cycle (
               id,
               org_id,
@@ -507,41 +555,23 @@ describe("Sprint 3 schema substrate", () => {
               created_by,
               created_by_kind
             )
-            VALUES
-              (
-                open_adjustment_cycle_id,
-                test_org_id,
-                open_adjustment_parent_cycle_id,
-                0,
-                0,
-                0,
-                0,
-                'adjustment',
-                test_period_close_id,
-                'open adjustment test',
-                now() - INTERVAL '1 hour',
-                now() + INTERVAL '1 hour',
-                now(),
-                test_actor_id,
-                'system'
-              ),
-              (
-                expired_adjustment_cycle_id,
-                test_org_id,
-                expired_adjustment_parent_cycle_id,
-                0,
-                0,
-                0,
-                0,
-                'adjustment',
-                test_period_close_id,
-                'expired adjustment test',
-                now() - INTERVAL '2 hours',
-                now() - INTERVAL '1 hour',
-                now(),
-                test_actor_id,
-                'system'
-              );
+            VALUES (
+              open_adjustment_cycle_id,
+              test_org_id,
+              open_adjustment_parent_cycle_id,
+              0,
+              0,
+              0,
+              0,
+              'adjustment',
+              test_period_close_id,
+              'open adjustment test',
+              now() - INTERVAL '1 hour',
+              now() + INTERVAL '1 hour',
+              now(),
+              test_actor_id,
+              'system'
+            );
 
             got_period_locked := false;
             BEGIN
@@ -841,6 +871,12 @@ describe("Sprint 3 schema substrate", () => {
               RAISE EXCEPTION 'expected open adjustment contribution insert to persist';
             END IF;
 
+            UPDATE reconciliation_cycle
+            SET
+              adjustment_window_opens_at = now() - INTERVAL '2 hours',
+              adjustment_window_closes_at = now() - INTERVAL '1 hour'
+            WHERE id = open_adjustment_cycle_id;
+
             got_period_locked := false;
             BEGIN
               INSERT INTO contribution (
@@ -866,7 +902,7 @@ describe("Sprint 3 schema substrate", () => {
                 'USD',
                 DATE '2026-01-15',
                 now(),
-                expired_adjustment_cycle_id,
+                open_adjustment_cycle_id,
                 now(),
                 test_actor_id,
                 'system'
