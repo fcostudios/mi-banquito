@@ -97,4 +97,47 @@ describe("tenant RLS transaction helper", () => {
     expect(rowsForA.rows).toEqual([{ org_id: orgA, display_name: `${marker}-a` }]);
     expect(rowsForB.rows).toEqual([{ org_id: orgB, display_name: `${marker}-b` }]);
   });
+
+  runIfDatabase("fails closed when app.current_org_id is missing", async () => {
+    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    try {
+      await pool.query("BEGIN");
+      try {
+        await pool.query(`SET LOCAL ROLE ${testRole}`);
+        const result = await pool.query(`
+          SELECT display_name
+          FROM member
+          ORDER BY display_name
+          LIMIT 1
+        `);
+        expect(result.rows).toEqual([]);
+      } finally {
+        await pool.query("ROLLBACK");
+      }
+    } finally {
+      await pool.end();
+    }
+  });
+
+  runIfDatabase("fails closed when app.current_org_id is empty", async () => {
+    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    try {
+      await pool.query("BEGIN");
+      try {
+        await pool.query(`SET LOCAL ROLE ${testRole}`);
+        await pool.query("SET LOCAL app.current_org_id = ''");
+        const result = await pool.query(`
+          SELECT display_name
+          FROM member
+          ORDER BY display_name
+          LIMIT 1
+        `);
+        expect(result.rows).toEqual([]);
+      } finally {
+        await pool.query("ROLLBACK");
+      }
+    } finally {
+      await pool.end();
+    }
+  });
 });
