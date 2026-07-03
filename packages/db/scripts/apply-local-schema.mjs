@@ -16,6 +16,7 @@ import {
   EXPECTED_TABLE_NAMES,
   EXPECTED_TRIGGER_TABLES,
   EXPECTED_UPDATED_AT_TABLES,
+  REQUIRED_FUNCTIONS,
   readMigrationSql,
 } from "./verify-schema.mjs";
 
@@ -162,9 +163,12 @@ async function installAppendOnlyTriggers(pool) {
   }
 
   const statements = [
-    `CREATE OR REPLACE FUNCTION block_append_only_mutation() RETURNS trigger AS $$
+    `CREATE OR REPLACE FUNCTION raise_append_only_violation() RETURNS trigger AS $$
 BEGIN
-  RAISE EXCEPTION 'append_only: % is forbidden on %', TG_OP, TG_TABLE_NAME;
+  RAISE EXCEPTION USING
+    ERRCODE = 'P0001',
+    MESSAGE = 'append_only_violation',
+    DETAIL = TG_TABLE_NAME || ' rejects ' || TG_OP;
 END;
 $$ LANGUAGE plpgsql;`,
   ];
@@ -176,7 +180,7 @@ $$ LANGUAGE plpgsql;`,
       `CREATE TRIGGER ${tableName}_no_mutate
   BEFORE UPDATE OR DELETE ON ${tableName}
   FOR EACH ROW
-  EXECUTE FUNCTION block_append_only_mutation();`,
+  EXECUTE FUNCTION raise_append_only_violation();`,
     );
   }
 
@@ -241,6 +245,8 @@ export async function main() {
       error.includes("forced RLS tables") ||
       error.includes("policies on tables") ||
       error.includes("triggers on tables") ||
+      error.includes("required functions") ||
+      error === `missing required functions: ${REQUIRED_FUNCTIONS.join(", ")}` ||
       error.startsWith("missing updated_at update triggers on:")
     );
   const onlyMissingSprint1AdditiveSchema =

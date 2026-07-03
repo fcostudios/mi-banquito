@@ -13,6 +13,8 @@ const MIGRATIONS_URL = new URL(
   import.meta.url
 );
 
+export const REQUIRED_FUNCTIONS = ["raise_append_only_violation"];
+
 function uniqueSorted(values) {
   return [...new Set(values)].sort();
 }
@@ -135,6 +137,7 @@ export const EXPECTED_CHECK_CONSTRAINTS = EXPECTED_CHECK_CONSTRAINT_NAMES.length
 export const EXPECTED_UNIQUE_CONSTRAINTS = EXPECTED_UNIQUE_CONSTRAINT_NAMES.length;
 export const EXPECTED_FOREIGN_KEY_CONSTRAINTS = EXPECTED_FOREIGN_KEY_CONSTRAINT_NAMES.length;
 export const EXPECTED_UPDATED_AT_TRIGGERS = EXPECTED_UPDATED_AT_TABLES.length;
+export const EXPECTED_FUNCTIONS = REQUIRED_FUNCTIONS.length;
 
 function normalizedList(value) {
   if (typeof value === "number") {
@@ -230,6 +233,12 @@ export function evaluateSchemaHealth(actual, expected = EXPECTED_SCHEMA) {
     label: "foreign key constraints",
     expectedNames: expected.foreignKeyConstraintNames,
     actualValue: actual.foreignKeyConstraintNames ?? actual.foreignKeyConstraintCount,
+    errors,
+  });
+  assertExpectedObjects({
+    label: "required functions",
+    expectedNames: REQUIRED_FUNCTIONS,
+    actualValue: actual.functionNames ?? actual.functionCount ?? [],
     errors,
   });
 
@@ -345,6 +354,13 @@ SELECT
     ARRAY[]::text[]
   ) AS foreign_key_constraint_names,
   COALESCE(
+    (SELECT array_agg(p.proname::text ORDER BY p.proname::text)
+       FROM pg_proc p
+       JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public'),
+    ARRAY[]::text[]
+  ) AS function_names,
+  COALESCE(
     (SELECT array_agg(table_name::text ORDER BY table_name::text)
        FROM information_schema.columns
       WHERE table_schema = 'public'
@@ -398,6 +414,7 @@ function normalizeHealthRow(row = {}) {
     checkConstraintNames: parsePgArray(row.check_constraint_names),
     uniqueConstraintNames: parsePgArray(row.unique_constraint_names),
     foreignKeyConstraintNames: parsePgArray(row.foreign_key_constraint_names),
+    functionNames: parsePgArray(row.function_names),
     updatedAtTables: parsePgArray(row.updated_at_tables),
     updatedAtTriggerTables: parsePgArray(row.updated_at_trigger_tables),
   };
@@ -444,6 +461,7 @@ export async function main() {
       `${EXPECTED_CHECK_CONSTRAINTS} check constraints,`,
       `${EXPECTED_UNIQUE_CONSTRAINTS} unique constraints,`,
       `${EXPECTED_FOREIGN_KEY_CONSTRAINTS} foreign key constraints,`,
+      `${EXPECTED_FUNCTIONS} required functions,`,
       `${EXPECTED_UPDATED_AT_TRIGGERS} updated_at trigger tables`,
       "verified.",
     ].join(" ")
