@@ -42,6 +42,22 @@
       "configLink": "Configurar reglas",
       "createdAt": "Creada"
     },
+    "businessRules": {
+      "title": "Reglas del grupo",
+      "description": "Consulta la configuración vigente del banquito como reglas operativas.",
+      "organization": "Organización",
+      "currentVersion": "Versión actual",
+      "exportCsv": "Exportar CSV",
+      "rule": "Regla",
+      "value": "Valor",
+      "priorValue": "Valor anterior",
+      "newValue": "Valor nuevo",
+      "validFrom": "Vigente desde",
+      "validTo": "Vigente hasta",
+      "lastChangedAt": "Último cambio",
+      "lastChangedBy": "Por",
+      "empty": "Esta organización todavía no tiene una configuración vigente."
+    },
     "config": {
       "title": "Configuración de reglas",
       "description": "Ajusta las reglas vigentes del grupo con versionado HR-1.",
