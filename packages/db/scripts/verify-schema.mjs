@@ -13,7 +13,10 @@ const MIGRATIONS_URL = new URL(
   import.meta.url
 );
 
-export const REQUIRED_FUNCTIONS = ["raise_append_only_violation"];
+export const REQUIRED_FUNCTIONS = [
+  "enforce_period_lock",
+  "raise_append_only_violation",
+];
 
 function uniqueSorted(values) {
   return [...new Set(values)].sort();

@@ -110,6 +110,13 @@ describe("schema verifier", () => {
     ]));
   });
 
+  it("requires Sprint 3 period-lock enforcement function", () => {
+    expect(REQUIRED_FUNCTIONS).toEqual(expect.arrayContaining([
+      "enforce_period_lock",
+      "raise_append_only_violation",
+    ]));
+  });
+
   it("fails when a table with updated_at is missing an update trigger", () => {
     const result = evaluateSchemaHealth({
       tableNames: EXPECTED_TABLE_NAMES,
