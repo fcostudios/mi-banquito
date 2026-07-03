@@ -31,6 +31,7 @@ import type {
   MemberStatusTransitionForm,
   ReverseContributionForm,
 } from "@mi-banquito/contracts";
+import { type AuditWriter, writeWithAudit } from "./audit";
 import { createPlatformService } from "./platform";
 
 // Row/input types are named for the ENTITY, not the context — a context owns
@@ -416,7 +417,25 @@ export interface LedgerService {
   recordBaseFundQuotaPayment(orgId: string, actorId: string, input: BaseFundQuotaPaymentForm): Promise<typeof baseFundQuotaPayment.$inferSelect>;
 }
 
-export const createLedgerService = (): LedgerService => ({
+export type LedgerAuditTx = {
+  insert(table: typeof auditLogEntry): {
+    values(values: AuditLogEntryInsert): unknown;
+  };
+};
+export type LedgerAuditWriter = AuditWriter<AuditLogEntryInsert, LedgerAuditTx>;
+
+export interface LedgerServiceOptions {
+  auditWriter?: LedgerAuditWriter;
+}
+
+const defaultAuditWriter: LedgerAuditWriter = async ({ tx, entry }) => {
+  await tx.insert(auditLogEntry).values(entry);
+};
+
+export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerService => {
+  const auditWriter = options.auditWriter ?? defaultAuditWriter;
+
+  return {
   context: "ledger",
   async getFirstRunState(orgId) {
     const [org] = await db.select().from(organization).where(eq(organization.id, orgId));
@@ -443,46 +462,60 @@ export const createLedgerService = (): LedgerService => ({
   async saveFirstRunName(orgId, actorId, input) {
     const now = new Date();
     await db.transaction(async (tx) => {
-      await tx.update(organization)
-        .set({
-          displayName: input.displayName,
-          brandingLogoUri: input.brandingLogoUri || null,
-          firstRunStep: 2,
-          updatedAt: now,
-          updatedBy: actorId,
-        })
-        .where(eq(organization.id, orgId));
-      await tx.insert(auditLogEntry).values({
-        orgId,
-        actorKind: "member",
-        actorId,
-        actionKind: "first_run.name",
-        subjectKind: "organization",
-        subjectId: orgId,
-        payloadSnapshot: { displayName: input.displayName, nextStep: input.nextStep },
-        reason: null,
-        at: now,
-        createdAt: now,
+      await writeWithAudit({
+        write: async () => {
+          await tx.update(organization)
+            .set({
+              displayName: input.displayName,
+              brandingLogoUri: input.brandingLogoUri || null,
+              firstRunStep: 2,
+              updatedAt: now,
+              updatedBy: actorId,
+            })
+            .where(eq(organization.id, orgId));
+        },
+        audit: () => auditWriter({
+          tx,
+          entry: {
+            orgId,
+            actorKind: "member",
+            actorId,
+            actionKind: "first_run.name",
+            subjectKind: "organization",
+            subjectId: orgId,
+            payloadSnapshot: { displayName: input.displayName, nextStep: input.nextStep },
+            reason: null,
+            at: now,
+            createdAt: now,
+          },
+        }),
       });
     });
   },
   async completeFirstRun(orgId, actorId) {
     const now = new Date();
     await db.transaction(async (tx) => {
-      await tx.update(organization)
-        .set({ firstRunStep: 3, firstRunCompletedAt: now, updatedAt: now, updatedBy: actorId })
-        .where(eq(organization.id, orgId));
-      await tx.insert(auditLogEntry).values({
-        orgId,
-        actorKind: "member",
-        actorId,
-        actionKind: "first_run.complete",
-        subjectKind: "organization",
-        subjectId: orgId,
-        payloadSnapshot: { completedAt: now },
-        reason: null,
-        at: now,
-        createdAt: now,
+      await writeWithAudit({
+        write: async () => {
+          await tx.update(organization)
+            .set({ firstRunStep: 3, firstRunCompletedAt: now, updatedAt: now, updatedBy: actorId })
+            .where(eq(organization.id, orgId));
+        },
+        audit: () => auditWriter({
+          tx,
+          entry: {
+            orgId,
+            actorKind: "member",
+            actorId,
+            actionKind: "first_run.complete",
+            subjectKind: "organization",
+            subjectId: orgId,
+            payloadSnapshot: { completedAt: now },
+            reason: null,
+            at: now,
+            createdAt: now,
+          },
+        }),
       });
     });
   },
@@ -541,10 +574,14 @@ export const createLedgerService = (): LedgerService => ({
       notes: input.notes,
     });
     return db.transaction(async (tx) => {
-      const [row] = await tx.insert(member).values(plan.member).returning();
-      await tx.insert(entityVersion).values(plan.entityVersion);
-      await tx.insert(auditLogEntry).values(plan.auditLogEntry);
-      return row;
+      return writeWithAudit({
+        write: async () => {
+          const [row] = await tx.insert(member).values(plan.member).returning();
+          await tx.insert(entityVersion).values(plan.entityVersion);
+          return row;
+        },
+        audit: () => auditWriter({ tx, entry: plan.auditLogEntry }),
+      });
     });
   },
   async transitionMemberStatus(orgId, actorId, input) {
@@ -572,13 +609,17 @@ export const createLedgerService = (): LedgerService => ({
       refundAmount: input.refundAmount,
     });
     await db.transaction(async (tx) => {
-      await tx.update(member).set(plan.memberUpdate)
-        .where(and(eq(member.orgId, orgId), eq(member.id, current.id)));
-      if (plan.refundExpense) {
-        await tx.insert(expense).values(plan.refundExpense);
-      }
-      await tx.insert(entityVersion).values(plan.entityVersion);
-      await tx.insert(auditLogEntry).values(plan.auditLogEntry);
+      await writeWithAudit({
+        write: async () => {
+          await tx.update(member).set(plan.memberUpdate)
+            .where(and(eq(member.orgId, orgId), eq(member.id, current.id)));
+          if (plan.refundExpense) {
+            await tx.insert(expense).values(plan.refundExpense);
+          }
+          await tx.insert(entityVersion).values(plan.entityVersion);
+        },
+        audit: () => auditWriter({ tx, entry: plan.auditLogEntry }),
+      });
     });
   },
   async getCurrentGroupConfig(orgId) {
@@ -588,7 +629,7 @@ export const createLedgerService = (): LedgerService => ({
     return row;
   },
   async saveTreasurerGroupConfig(orgId, actorId, input) {
-    return createPlatformService().saveGroupConfig(orgId, input, actorId, "member");
+    return createPlatformService({ auditWriter }).saveGroupConfig(orgId, input, actorId, "member");
   },
   async getCashBalances(orgId) {
     const [row] = await db.select().from(cashBalances).where(eq(cashBalances.orgId, orgId));
@@ -609,58 +650,70 @@ export const createLedgerService = (): LedgerService => ({
       .where(and(eq(contributionCycle.orgId, orgId), eq(contributionCycle.status, "open")))
       .orderBy(desc(contributionCycle.opensOn));
 
-    const activeCycle = cycle ?? await db.transaction(async (tx) => {
-      const label = input.datedOn.slice(0, 7);
-      const [currentConfig] = await tx.select().from(groupConfig)
-        .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)))
-        .orderBy(desc(groupConfig.version));
-      const [created] = await tx.insert(contributionCycle).values({
-        orgId,
-        cycleLabel: label,
-        kind: "monthly",
-        opensOn: `${label}-01`,
-        closesOn: input.datedOn,
-        expectedAmountPerMember: money4(currentConfig?.contributionAmount ?? input.amount),
-        currencyCode: "USD",
-        status: "open",
-        createdAt: now,
-        createdBy: actorId,
-        createdByKind: "member",
-      }).returning();
-      return created;
-    });
-
     return db.transaction(async (tx) => {
-      const [row] = await tx.insert(contribution).values({
-        orgId,
-        cycleId: activeCycle.id,
-        memberId: input.memberId,
-        kind: input.kind,
-        paymentSource: input.paymentSource,
-        amount: money4(input.amount),
-        currencyCode: "USD",
-        datedOn: input.datedOn,
-        recordedAt: now,
-        slipPhotoId: input.slipPhotoId || null,
-        notes: input.notes ?? null,
-        reversesId: null,
-        reverseReason: null,
-        clientRequestId: input.clientRequestId,
-        createdAt: now,
-        createdBy: actorId,
-        createdByKind: "member",
-      }).returning();
-      await tx.insert(auditLogEntry).values({
-        orgId,
-        actorKind: "member",
-        actorId,
-        actionKind: "contribution.create",
-        subjectKind: "contribution",
-        subjectId: row.id,
-        payloadSnapshot: row,
-        reason: null,
-        at: now,
-        createdAt: now,
+      let auditEntry: AuditLogEntryInsert | undefined;
+      const row = await writeWithAudit({
+        write: async () => {
+          let activeCycle = cycle;
+          if (!activeCycle) {
+            const label = input.datedOn.slice(0, 7);
+            const [currentConfig] = await tx.select().from(groupConfig)
+              .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)))
+              .orderBy(desc(groupConfig.version));
+            [activeCycle] = await tx.insert(contributionCycle).values({
+              orgId,
+              cycleLabel: label,
+              kind: "monthly",
+              opensOn: `${label}-01`,
+              closesOn: input.datedOn,
+              expectedAmountPerMember: money4(currentConfig?.contributionAmount ?? input.amount),
+              currencyCode: "USD",
+              status: "open",
+              createdAt: now,
+              createdBy: actorId,
+              createdByKind: "member",
+            }).returning();
+          }
+
+          const [created] = await tx.insert(contribution).values({
+            orgId,
+            cycleId: activeCycle.id,
+            memberId: input.memberId,
+            kind: input.kind,
+            paymentSource: input.paymentSource,
+            amount: money4(input.amount),
+            currencyCode: "USD",
+            datedOn: input.datedOn,
+            recordedAt: now,
+            slipPhotoId: input.slipPhotoId || null,
+            notes: input.notes ?? null,
+            reversesId: null,
+            reverseReason: null,
+            clientRequestId: input.clientRequestId,
+            createdAt: now,
+            createdBy: actorId,
+            createdByKind: "member",
+          }).returning();
+          auditEntry = {
+            orgId,
+            actorKind: "member",
+            actorId,
+            actionKind: "contribution.create",
+            subjectKind: "contribution",
+            subjectId: created.id,
+            payloadSnapshot: created,
+            reason: null,
+            at: now,
+            createdAt: now,
+          };
+          return created;
+        },
+        audit: async () => {
+          if (!auditEntry) {
+            throw new Error("contribution audit entry is missing");
+          }
+          await auditWriter({ tx, entry: auditEntry });
+        },
       });
       await tx.execute(sql`SELECT refresh_sprint1_read_models()`);
       return row;
@@ -684,36 +737,47 @@ export const createLedgerService = (): LedgerService => ({
       .where(and(eq(contribution.orgId, orgId), eq(contribution.reversesId, original.id)));
     if (existingReversal) throw new Error("Contribution already reversed");
     await db.transaction(async (tx) => {
-      const [row] = await tx.insert(contribution).values({
-        orgId,
-        cycleId: original.cycleId,
-        memberId: original.memberId,
-        kind: original.kind,
-        paymentSource: original.paymentSource,
-        amount: money4(-Number(original.amount)),
-        currencyCode: original.currencyCode,
-        datedOn: original.datedOn,
-        recordedAt: now,
-        slipPhotoId: null,
-        notes: null,
-        reversesId: original.id,
-        reverseReason: input.reason,
-        clientRequestId: randomUUID(),
-        createdAt: now,
-        createdBy: actorId,
-        createdByKind: "member",
-      }).returning();
-      await tx.insert(auditLogEntry).values({
-        orgId,
-        actorKind: "member",
-        actorId,
-        actionKind: "contribution.reverse",
-        subjectKind: "contribution",
-        subjectId: row.id,
-        payloadSnapshot: { originalId: original.id, reversalId: row.id },
-        reason: input.reason,
-        at: now,
-        createdAt: now,
+      let auditEntry: AuditLogEntryInsert | undefined;
+      await writeWithAudit({
+        write: async () => {
+          const [row] = await tx.insert(contribution).values({
+            orgId,
+            cycleId: original.cycleId,
+            memberId: original.memberId,
+            kind: original.kind,
+            paymentSource: original.paymentSource,
+            amount: money4(-Number(original.amount)),
+            currencyCode: original.currencyCode,
+            datedOn: original.datedOn,
+            recordedAt: now,
+            slipPhotoId: null,
+            notes: null,
+            reversesId: original.id,
+            reverseReason: input.reason,
+            clientRequestId: randomUUID(),
+            createdAt: now,
+            createdBy: actorId,
+            createdByKind: "member",
+          }).returning();
+          auditEntry = {
+            orgId,
+            actorKind: "member",
+            actorId,
+            actionKind: "contribution.reverse",
+            subjectKind: "contribution",
+            subjectId: row.id,
+            payloadSnapshot: { originalId: original.id, reversalId: row.id },
+            reason: input.reason,
+            at: now,
+            createdAt: now,
+          };
+        },
+        audit: async () => {
+          if (!auditEntry) {
+            throw new Error("contribution reversal audit entry is missing");
+          }
+          await auditWriter({ tx, entry: auditEntry });
+        },
       });
       await tx.execute(sql`SELECT refresh_sprint1_read_models()`);
     });
@@ -728,43 +792,56 @@ export const createLedgerService = (): LedgerService => ({
   async recordBaseFundQuotaPayment(orgId, actorId, input) {
     const now = new Date();
     return db.transaction(async (tx) => {
-      const [row] = await tx.insert(baseFundQuotaPayment).values({
-        orgId,
-        memberId: input.memberId,
-        fiscalYear: input.fiscalYear,
-        amount: money4(input.amount),
-        currencyCode: "USD",
-        paidOn: input.paidOn,
-        slipPhotoId: input.slipPhotoId || null,
-        paidViaContributionId: null,
-        createdAt: now,
-        createdBy: actorId,
-        createdByKind: "member",
-      }).onConflictDoUpdate({
-        target: [baseFundQuotaPayment.orgId, baseFundQuotaPayment.memberId, baseFundQuotaPayment.fiscalYear],
-        set: {
-          amount: money4(input.amount),
-          paidOn: input.paidOn,
-          slipPhotoId: input.slipPhotoId || null,
-          createdAt: now,
-          createdBy: actorId,
-          createdByKind: "member",
+      let auditEntry: AuditLogEntryInsert | undefined;
+      const row = await writeWithAudit({
+        write: async () => {
+          const [paid] = await tx.insert(baseFundQuotaPayment).values({
+            orgId,
+            memberId: input.memberId,
+            fiscalYear: input.fiscalYear,
+            amount: money4(input.amount),
+            currencyCode: "USD",
+            paidOn: input.paidOn,
+            slipPhotoId: input.slipPhotoId || null,
+            paidViaContributionId: null,
+            createdAt: now,
+            createdBy: actorId,
+            createdByKind: "member",
+          }).onConflictDoUpdate({
+            target: [baseFundQuotaPayment.orgId, baseFundQuotaPayment.memberId, baseFundQuotaPayment.fiscalYear],
+            set: {
+              amount: money4(input.amount),
+              paidOn: input.paidOn,
+              slipPhotoId: input.slipPhotoId || null,
+              createdAt: now,
+              createdBy: actorId,
+              createdByKind: "member",
+            },
+          }).returning();
+          auditEntry = {
+            orgId,
+            actorKind: "member",
+            actorId,
+            actionKind: "base_fund_quota.payment",
+            subjectKind: "base_fund_quota_payment",
+            subjectId: paid.id,
+            payloadSnapshot: paid,
+            reason: null,
+            at: now,
+            createdAt: now,
+          };
+          return paid;
         },
-      }).returning();
-      await tx.insert(auditLogEntry).values({
-        orgId,
-        actorKind: "member",
-        actorId,
-        actionKind: "base_fund_quota.payment",
-        subjectKind: "base_fund_quota_payment",
-        subjectId: row.id,
-        payloadSnapshot: row,
-        reason: null,
-        at: now,
-        createdAt: now,
+        audit: async () => {
+          if (!auditEntry) {
+            throw new Error("base fund quota audit entry is missing");
+          }
+          await auditWriter({ tx, entry: auditEntry });
+        },
       });
       await tx.execute(sql`SELECT refresh_sprint1_read_models()`);
       return row;
     });
   },
-});
+  };
+};
