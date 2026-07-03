@@ -29,7 +29,7 @@ export const member_role_enum = pgEnum("member_role_enum", ["aportante", "tesore
 export const member_status_enum = pgEnum("member_status_enum", ["activo", "en_pausa", "baja"]);
 export const organization_status_enum = pgEnum("organization_status_enum", ["active", "paused", "archived"]);
 export const platform_operator_status_enum = pgEnum("platform_operator_status_enum", ["active", "disabled"]);
-export const reconciliation_cycle_resolution_kind_enum = pgEnum("reconciliation_cycle_resolution_kind_enum", ["auto_within_tolerance", "resolved_by_correction", "annotated_acceptance"]);
+export const reconciliation_cycle_resolution_kind_enum = pgEnum("reconciliation_cycle_resolution_kind_enum", ["auto_within_tolerance", "resolved_by_correction", "annotated_acceptance", "adjustment"]);
 export const slip_photo_attached_to_kind_enum = pgEnum("slip_photo_attached_to_kind_enum", ["contribution", "repayment"]);
 export const statement_archive_kind_enum = pgEnum("statement_archive_kind_enum", ["monthly_close", "monthly_member", "year_end_member", "year_end_share_out", "year_end_snapshot", "balance_banquito", "year_end_economic_summary", "monthly_summary"]);
 export const surplus_governance_decision_status_enum = pgEnum("surplus_governance_decision_status_enum", ["draft", "approved", "locked"]);
@@ -52,6 +52,18 @@ export const alert = pgTable("alert", {
   dismissedAt: timestamp("dismissed_at"),
   dismissedBy: uuid("dismissed_by"),
   snoozedUntil: timestamp("snoozed_until"),
+  createdAt: timestamp("created_at").notNull(),
+});
+
+export const alertAction = pgTable("alert_action", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  alertId: uuid("alert_id").references((): AnyPgColumn => alert.id).notNull(),
+  actionKind: text("action_kind").notNull(),
+  snoozedUntil: timestamp("snoozed_until"),
+  actorId: uuid("actor_id").notNull(),
+  actorKind: text("actor_kind").notNull(),
+  reason: text("reason"),
   createdAt: timestamp("created_at").notNull(),
 });
 
@@ -98,6 +110,7 @@ export const interestAccrual = pgTable("interest_accrual", {
   recordedAt: timestamp("recorded_at").notNull(),
   createdAt: timestamp("created_at").notNull(),
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
+  adjustmentCycleId: uuid("adjustment_cycle_id").references((): AnyPgColumn => reconciliationCycle.id),
 });
 
 export const member = pgTable("member", {
@@ -148,6 +161,7 @@ export const contribution = pgTable("contribution", {
   notes: text("notes"),
   reversesId: uuid("reverses_id"),  // self-ref FK (constraint in migration)
   reverseReason: text("reverse_reason"),
+  adjustmentCycleId: uuid("adjustment_cycle_id").references((): AnyPgColumn => reconciliationCycle.id),
   clientRequestId: uuid("client_request_id"),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
@@ -167,6 +181,7 @@ export const withdrawal = pgTable("withdrawal", {
   notes: text("notes"),
   reversesId: uuid("reverses_id"),  // self-ref FK (constraint in migration)
   reverseReason: text("reverse_reason"),
+  adjustmentCycleId: uuid("adjustment_cycle_id").references((): AnyPgColumn => reconciliationCycle.id),
   clientRequestId: uuid("client_request_id"),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
@@ -187,6 +202,7 @@ export const expense = pgTable("expense", {
   recordedAt: timestamp("recorded_at").notNull(),
   reversesId: uuid("reverses_id"),  // self-ref FK (constraint in migration)
   reverseReason: text("reverse_reason"),
+  adjustmentCycleId: uuid("adjustment_cycle_id").references((): AnyPgColumn => reconciliationCycle.id),
   clientRequestId: uuid("client_request_id"),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
@@ -385,6 +401,7 @@ export const repayment = pgTable("repayment", {
   notes: text("notes"),
   reversesId: uuid("reverses_id"),  // self-ref FK (constraint in migration)
   reverseReason: text("reverse_reason"),
+  adjustmentCycleId: uuid("adjustment_cycle_id").references((): AnyPgColumn => reconciliationCycle.id),
   clientRequestId: uuid("client_request_id"),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
@@ -585,6 +602,10 @@ export const reconciliationCycle = pgTable("reconciliation_cycle", {
   resolutionKind: reconciliation_cycle_resolution_kind_enum("resolution_kind").notNull(),
   resolutionNote: text("resolution_note"),
   closedAt: timestamp("closed_at"),
+  periodCloseId: uuid("period_close_id").references((): AnyPgColumn => periodClose.id),
+  adjustmentReason: text("adjustment_reason"),
+  adjustmentWindowOpensAt: timestamp("adjustment_window_opens_at"),
+  adjustmentWindowClosesAt: timestamp("adjustment_window_closes_at"),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
