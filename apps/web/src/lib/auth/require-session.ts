@@ -207,6 +207,10 @@ export async function getShellSession(): Promise<ShellSession> {
   const orgId = getDbOrgIdFromUser(user) ?? getConfiguredDbOrgIdFromNativeOrg(user?.org_id);
   const claimRoles = getRolesFromUser(user);
 
+  if (!userId) {
+    redirect(ROUTE_LOGIN);
+  }
+
   if (!userId || !orgId) {
     return { displayName, email, orgId, roles: claimRoles };
   }

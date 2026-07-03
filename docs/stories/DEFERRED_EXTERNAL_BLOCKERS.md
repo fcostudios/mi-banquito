@@ -55,3 +55,11 @@ and external observability resources. The production cron-secret invocation
 deferral was resolved on 2026-07-02. Sprint 2 local verification includes schema
 verification, domain/web tests, type-check, lint, build, and Playwright
 protected-route/cron guards.
+
+## Sprint 3 Closure Note
+
+Sprint 3 has no new non-observability external blockers. It is closed locally
+with Sentry/Better Stack still inherited from Sprint 0 as external evidence:
+the repository now includes Sentry SDK initialization and PII redaction tests,
+but a real Sentry project, DSNs in Vercel, a captured redacted event, and a
+Better Stack monitor are still required before US-005/US-006 are fully closed.
