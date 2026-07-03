@@ -108,6 +108,32 @@
       "submit": "Abrir período de ajuste"
     }
   },
+  "history": {
+    "title": "Historial",
+    "description": "Revisa movimientos y cambios importantes con una explicación clara.",
+    "memberId": "ID de socia",
+    "actionKind": "Tipo de movimiento",
+    "allActions": "Todos",
+    "from": "Desde",
+    "to": "Hasta",
+    "applyFilters": "Filtrar",
+    "empty": "No encontramos movimientos con esos filtros.",
+    "date": "Fecha",
+    "actor": "Registrado por",
+    "actions": {
+      "contributionCreate": "Aporte registrado",
+      "contributionReverse": "Aporte reversado",
+      "repaymentCreate": "Pago registrado",
+      "repaymentPayoff": "Préstamo pagado",
+      "loanOriginate": "Préstamo creado",
+      "memberCreate": "Socia registrada",
+      "memberStatus": "Estado de socia",
+      "groupConfigVersion": "Reglas actualizadas",
+      "businessRulesView": "Reglas consultadas",
+      "adjustmentPeriodOpen": "Período de ajuste",
+      "baseFundQuotaPayment": "Cuota base pagada"
+    }
+  },
   "sprint1": {
     "common": {
       "save": "Guardar",
