@@ -256,6 +256,8 @@ export const baseFundQuotaPaymentFormSchema = z.object({
   slipPhotoId: uuidString.optional().or(z.literal("")),
 });
 
+export const loanDisbursementSourceSchema = z.enum(["bank_transfer", "petty_cash"]);
+
 export const loanOriginationFormSchema = z.object({
   clientRequestId: uuidString,
   borrowerKind: z.enum(["member", "non_member"]).default("member"),
@@ -269,6 +271,7 @@ export const loanOriginationFormSchema = z.object({
   principalAmount: moneyString,
   termPeriods: z.coerce.number().int().min(1).max(120),
   originatedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  disbursementSource: loanDisbursementSourceSchema.default("bank_transfer"),
   purpose: z.string().max(500).optional(),
 }).superRefine((value, ctx) => {
   if (value.borrowerKind === "member" && !value.borrowerMemberId) {
@@ -351,8 +354,6 @@ export const chaseAttemptFormSchema = z.object({
     });
   }
 });
-
-export const loanDisbursementSourceSchema = z.enum(["bank_transfer", "petty_cash"]);
 
 export const liquiditySandboxSchema = z.object({
   hypotheticalLoanAmount: moneyString.optional().or(z.literal("")),

@@ -339,6 +339,9 @@
       "principalAmount": "Monto principal",
       "termPeriods": "Número de cuotas",
       "originatedOn": "Fecha del préstamo",
+      "disbursementSource": "De dónde sale el dinero",
+      "disbursementSourceBankTransfer": "Transferencia bancaria",
+      "disbursementSourcePettyCash": "Caja chica",
       "purpose": "Propósito",
       "submit": "Registrar préstamo"
     },
