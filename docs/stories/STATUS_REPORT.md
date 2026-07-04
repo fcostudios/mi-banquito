@@ -133,6 +133,17 @@ Passed on 2026-06-29:
 
 Known non-fatal warning: the Auth0 SDK emits a DPoP dynamic dependency webpack warning.
 
+## Sprint 4 Closure
+
+Sprint 4 is closed as **implemented and locally verified**, with two accepted
+forward-dependent deferrals: public verifier PDF-footer embedding waits for the
+statement PDF generator, and treasurer compensation monthly-close PDF visibility
+waits for the monthly close PDF story. Sprint 4 delivered A/R aging, promise
+tracking, promise reminder cron, WhatsApp chase audit attempts, loan
+disbursement source, offline queued-write visibility, public hash verification,
+liquidity projection, treasurer compensation disbursement, pilot log,
+Playwright smoke coverage, and a Sprint 4 closure gate.
+
 ## Local Evidence Commands
 
 ```bash

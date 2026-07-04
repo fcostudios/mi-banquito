@@ -170,3 +170,13 @@
 {"story":"US-073","event":"done_with_external_deferral","notes":"Sentry SDK and PII redaction implemented locally; real DSN/event evidence remains external."}
 {"story":"US-083","event":"done","notes":"Operator adjustment windows implemented and verified."}
 {"story":"SPRINT-3","event":"closed_with_deferrals","notes":"Closed 2026-07-03 as implemented and locally verified. Live Sentry/Better Stack evidence remains inherited external observability deferral."}
+{"story":"US-040","event":"done","notes":"A/R aging implemented with sorted/filterable rows and org-scoped view."}
+{"story":"US-041","event":"done","notes":"Promise marking implemented with validation, supersede behavior, and audit."}
+{"story":"US-042","event":"done","notes":"WhatsApp chase intent implemented with audit attempt record and disabled missing-number state."}
+{"story":"US-043","event":"done","notes":"Promise reminder cron implemented and idempotency ledger added."}
+{"story":"US-050","event":"done_with_deferral","notes":"Compensation cron/disbursement/withdrawal/alert/audit implemented; monthly-close PDF rendering deferred to monthly-close PDF story."}
+{"story":"US-054","event":"done","notes":"Liquidity projection and read-only sandbox implemented."}
+{"story":"US-076","event":"done","notes":"Loan disbursement source captured at origination and audited."}
+{"story":"US-077","event":"done","notes":"Queued write copy and count indicator implemented; client_request_id dedupe already enforced by write tables."}
+{"story":"US-085","event":"done_with_deferral","notes":"Public verifier endpoint/page implemented; QR/PDF footer embedding deferred to statement PDF generator story."}
+{"story":"US-087","event":"done","notes":"Pilot log page, entries, checklist, and report route implemented."}
