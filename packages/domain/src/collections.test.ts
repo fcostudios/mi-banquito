@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildChaseMessage,
   buildWhatsAppChaseUrl,
+  createCollectionsService,
   defaultPromiseDate,
   normalizePromiseSourceRef,
   promiseReminderCandidates,
@@ -61,6 +62,14 @@ describe("collections", () => {
     expect(defaultPromiseDate("2026-12-28")).toBe("2027-01-04");
   });
 
+  it("rejects impossible date-only values instead of rolling them forward", () => {
+    expect(() => defaultPromiseDate("2026-02-30")).toThrow("date_must_be_valid");
+    expect(() => promiseReminderCandidates([
+      { id: "bad", status: "open", promisedOn: "2026-02-30" },
+    ], "2026-07-04")).toThrow("date_must_be_valid");
+    expect(() => promiseReminderCandidates([], "2026-13-01")).toThrow("date_must_be_valid");
+  });
+
   it("normalizes overdue row source refs to exactly one promise source", () => {
     expect(normalizePromiseSourceRef({ sourceKind: "loan", sourceId: "loan-1" })).toEqual({
       loanId: "loan-1",
@@ -90,17 +99,25 @@ describe("collections", () => {
 
   it("builds warm Spanish WhatsApp chase copy for aporte rows", () => {
     expect(buildChaseMessage({
-      member: "María",
-      obligationKind: "aporte",
-      period: "julio 2026",
+      memberName: "María",
+      reasonKind: "aporte",
+      periodLabel: "julio 2026",
     })).toBe("Hola María, te comparto que tu aporte de julio 2026 aún está pendiente. ¿Cuándo crees poder hacerlo? - Mi Banquito.");
+  });
+
+  it("keeps backwards compatibility for previous chase copy input names", () => {
+    expect(buildChaseMessage({
+      member: "María",
+      obligationKind: "cuota",
+      period: "julio 2026",
+    })).toBe("Hola María, te comparto que tu cuota de julio 2026 aún está pendiente. ¿Cuándo crees poder hacerlo? - Mi Banquito.");
   });
 
   it("builds wa.me chase URLs only when a number exists", () => {
     const message = buildChaseMessage({
-      member: "María",
-      obligationKind: "aporte",
-      period: "julio 2026",
+      memberName: "María",
+      reasonKind: "aporte",
+      periodLabel: "julio 2026",
     });
 
     expect(buildWhatsAppChaseUrl({ whatsappNumber: "+593 99 123 4567", message }))
@@ -124,5 +141,15 @@ describe("collections", () => {
       { id: "due-yesterday", status: "open", promisedOn: "2026-07-03" },
       { id: "due-today", status: "open", promisedOn: "2026-07-04" },
     ]);
+  });
+
+  it("exposes the collections service boundary without opening a DB connection", () => {
+    const service = createCollectionsService();
+
+    expect(service.context).toBe("collections");
+    expect(service.listAgingRows).toEqual(expect.any(Function));
+    expect(service.markPromise).toEqual(expect.any(Function));
+    expect(service.recordChaseAttempt).toEqual(expect.any(Function));
+    expect(service.emitPromiseReminders).toEqual(expect.any(Function));
   });
 });
