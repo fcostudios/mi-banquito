@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const copy = messages.atrasos;
 
 type SearchValue = string | string[] | undefined;
-type SortKey = "default" | "member" | "dueDate" | "amount";
+type SortKey = "default" | "daysLate" | "member" | "reason" | "dueDate" | "amount" | "lastAction";
 
 function searchValue(value: SearchValue): string {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
@@ -20,7 +20,14 @@ function reasonFilter(value: string): CollectionsAgingReasonKind | undefined {
 }
 
 function sortKey(value: string): SortKey {
-  return value === "member" || value === "dueDate" || value === "amount" ? value : "default";
+  return value === "daysLate"
+    || value === "member"
+    || value === "reason"
+    || value === "dueDate"
+    || value === "amount"
+    || value === "lastAction"
+    ? value
+    : "default";
 }
 
 function dateValue(value: Date | string | null | undefined): string {
@@ -42,7 +49,16 @@ function sortRows(rows: CollectionsAgingRow[], sort: SortKey): CollectionsAgingR
     if (sort === "dueDate") {
       return dateValue(a.dueDate).localeCompare(dateValue(b.dueDate));
     }
-    return Number(b.amountDue) - Number(a.amountDue);
+    if (sort === "amount") {
+      return Number(b.amountDue) - Number(a.amountDue);
+    }
+    if (sort === "lastAction") {
+      return dateValue(b.lastActionAt).localeCompare(dateValue(a.lastActionAt));
+    }
+    if (sort === "reason") {
+      return a.reasonKind.localeCompare(b.reasonKind, "es");
+    }
+    return b.daysLate - a.daysLate;
   });
 }
 
@@ -55,6 +71,8 @@ export default async function ScrArAgingPage({
   const query = await searchParams;
   const reason = reasonFilter(searchValue(query.reason));
   const sort = sortKey(searchValue(query.sort));
+  const error = searchValue(query.error);
+  const promiseSaved = searchValue(query.promise) === "1";
   const rows = sortRows(
     await createCollectionsService().listAgingRows(session.orgId, reason),
     sort,
@@ -66,25 +84,38 @@ export default async function ScrArAgingPage({
         <h1 className="text-2xl font-bold text-text-primary">{copy.title}</h1>
         <p className="mt-2 max-w-3xl text-text-secondary">{copy.description}</p>
       </header>
+      {error ? (
+        <p className="rounded-md border border-error bg-error/10 p-4 text-text-primary" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {promiseSaved ? (
+        <p className="rounded-md border border-success bg-success/10 p-4 text-text-primary" role="status">
+          {copy.promiseSaved}
+        </p>
+      ) : null}
 
       <form
         method="get"
         className="grid gap-4 rounded-md border border-border bg-surface p-5 sm:grid-cols-[minmax(12rem,1fr)_minmax(12rem,1fr)_auto] sm:items-end"
         data-testid="filter_bar"
       >
-        <FormField labelKey={copy.reason}>
-          <Select name="reason" defaultValue={reason ?? ""}>
+        <FormField labelKey={copy.reason} controlId="atrasos-reason">
+          <Select id="atrasos-reason" name="reason" defaultValue={reason ?? ""}>
             <option value="">{copy.allReasons}</option>
             <option value="aporte">{copy.reasonAporte}</option>
             <option value="cuota">{copy.reasonCuota}</option>
           </Select>
         </FormField>
-        <FormField labelKey={copy.sort}>
-          <Select name="sort" defaultValue={sort}>
+        <FormField labelKey={copy.sort} controlId="atrasos-sort">
+          <Select id="atrasos-sort" name="sort" defaultValue={sort}>
             <option value="default">{copy.sortDefault}</option>
+            <option value="daysLate">{copy.sortDaysLate}</option>
             <option value="member">{copy.sortMember}</option>
+            <option value="reason">{copy.sortReason}</option>
             <option value="dueDate">{copy.sortDueDate}</option>
             <option value="amount">{copy.sortAmount}</option>
+            <option value="lastAction">{copy.sortLastAction}</option>
           </Select>
         </FormField>
         <button

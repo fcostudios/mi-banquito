@@ -1,4 +1,5 @@
 import { getTableName } from "drizzle-orm";
+import { ViewBaseConfig } from "drizzle-orm/view-common";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -22,7 +23,16 @@ type SelectRecord = {
   tableName: string;
 };
 
-const tableNameOf = (table: unknown): string => getTableName(table as Parameters<typeof getTableName>[0]);
+const tableNameOf = (table: unknown): string => {
+  const tableName = getTableName(table as Parameters<typeof getTableName>[0]);
+  if (tableName) {
+    return tableName;
+  }
+  if (typeof table === "object" && table !== null && ViewBaseConfig in table) {
+    return (table as { [ViewBaseConfig]: { name: string } })[ViewBaseConfig].name;
+  }
+  return "";
+};
 
 class FakeSelectBuilder {
   private tableName: string | null = null;
@@ -293,8 +303,137 @@ describe("collections", () => {
     expect(service.context).toBe("collections");
     expect(service.listAgingRows).toEqual(expect.any(Function));
     expect(service.markPromise).toEqual(expect.any(Function));
+    expect(service.buildChaseAttempt).toEqual(expect.any(Function));
     expect(service.recordChaseAttempt).toEqual(expect.any(Function));
     expect(service.emitPromiseReminders).toEqual(expect.any(Function));
+  });
+
+  it("builds chase attempts from the org-scoped aging row instead of caller-supplied text", async () => {
+    const systemDb = new FakeDb("system");
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(arAging)]: [[{
+        orgId: "org-1",
+        memberId: "member-1",
+        memberName: "Ana Mora",
+        whatsappNumber: "+593 99 123 4567",
+        reasonKind: "cuota",
+        loanId: "loan-1",
+        cycleId: null,
+        periodLabel: "julio 2026",
+      }]],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().buildChaseAttempt({
+        orgId: "org-1",
+        memberId: "member-1",
+        loanId: "loan-1",
+        periodLabel: "julio 2026",
+      })).resolves.toEqual({
+        message: "Hola Ana Mora, te comparto que tu cuota de julio 2026 aún está pendiente. ¿Cuándo crees poder hacerlo? - Mi Banquito.",
+        whatsappUrl: "https://wa.me/593991234567?text=Hola%20Ana%20Mora%2C%20te%20comparto%20que%20tu%20cuota%20de%20julio%202026%20a%C3%BAn%20est%C3%A1%20pendiente.%20%C2%BFCu%C3%A1ndo%20crees%20poder%20hacerlo%3F%20-%20Mi%20Banquito.",
+      });
+    });
+
+    expect(tenantDb.selects).toEqual([{ context: "tenant:org-1", tableName: tableNameOf(arAging) }]);
+  });
+
+  it("stores and audits promises for the selected overdue period only", async () => {
+    const systemDb = new FakeDb("system");
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(arAging)]: [[{
+        orgId: "org-1",
+        memberId: "member-1",
+        memberName: "Ana Mora",
+        whatsappNumber: "+593991234567",
+        reasonKind: "cuota",
+        loanId: "loan-1",
+        cycleId: null,
+        periodLabel: "2",
+      }]],
+      [tableNameOf(promise)]: [[]],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().markPromise({
+        orgId: "org-1",
+        actorId: "actor-1",
+        memberId: "member-1",
+        loanId: "loan-1",
+        periodLabel: "2",
+        promisedOn: "2026-07-11",
+        todayIso: "2026-07-04",
+      })).resolves.toEqual({ promiseId: expect.any(String) });
+    });
+
+    expect(insertedRows(tenantDb, promise)).toEqual([
+      expect.objectContaining({
+        orgId: "org-1",
+        memberId: "member-1",
+        loanId: "loan-1",
+        cycleId: null,
+        periodLabel: "2",
+        promisedOn: "2026-07-11",
+        status: "open",
+      }),
+    ]);
+    expect(insertedRows(tenantDb, auditLogEntry)).toEqual([
+      expect.objectContaining({
+        actionKind: "collections.promise.marked",
+        payloadSnapshot: expect.objectContaining({
+          memberId: "member-1",
+          loanId: "loan-1",
+          cycleId: null,
+          periodLabel: "2",
+        }),
+      }),
+    ]);
+  });
+
+  it("audits WhatsApp chase attempts for the selected overdue period only", async () => {
+    const systemDb = new FakeDb("system");
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(arAging)]: [[{
+        orgId: "org-1",
+        memberId: "member-1",
+        memberName: "Ana Mora",
+        whatsappNumber: "+593991234567",
+        reasonKind: "cuota",
+        loanId: "loan-1",
+        cycleId: null,
+        periodLabel: "2",
+      }]],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().recordChaseAttempt({
+        orgId: "org-1",
+        actorId: "actor-1",
+        memberId: "member-1",
+        loanId: "loan-1",
+        periodLabel: "2",
+        message: "Mensaje desde base",
+      })).resolves.toBeUndefined();
+    });
+
+    expect(insertedRows(tenantDb, auditLogEntry)).toEqual([
+      expect.objectContaining({
+        actionKind: "collections.chase.whatsapp_attempted",
+        payloadSnapshot: expect.objectContaining({
+          memberId: "member-1",
+          loanId: "loan-1",
+          cycleId: null,
+          periodLabel: "2",
+          message: "Mensaje desde base",
+        }),
+      }),
+    ]);
   });
 
   it("emits promise reminders by opening tenant transactions per active organization", async () => {
@@ -392,6 +531,7 @@ describe("collections", () => {
         actorId: "actor-1",
         memberId: "member-1",
         loanId: "loan-1",
+        periodLabel: "1",
         promisedOn: "2026-07-11",
         todayIso: "2026-07-04",
       })).rejects.toThrow("collections_obligation_not_found");

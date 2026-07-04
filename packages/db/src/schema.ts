@@ -416,6 +416,7 @@ export const promise = pgTable("promise", {
   memberId: uuid("member_id").references((): AnyPgColumn => member.id).notNull(),
   loanId: uuid("loan_id").references((): AnyPgColumn => loan.id),
   cycleId: uuid("cycle_id").references((): AnyPgColumn => contributionCycle.id),
+  periodLabel: text("period_label").notNull(),
   promisedOn: date("promised_on").notNull(),
   note: text("note"),
   status: promise_status_enum("status").default("open").notNull(),

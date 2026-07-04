@@ -312,6 +312,7 @@ export const markPromiseFormSchema = z.object({
   memberId: uuidString,
   loanId: optionalUuidString,
   cycleId: optionalUuidString,
+  periodLabel: z.string().trim().min(1),
   promisedOn: dateString,
   note: z.string().max(500).optional(),
 }).superRefine((value, ctx) => {
@@ -329,7 +330,7 @@ export const markPromiseFormSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["loanId"],
-      message: "Select exactly one promise source",
+      message: "Elige un solo atraso para registrar la promesa.",
     });
   }
 });
@@ -338,8 +339,17 @@ export const chaseAttemptFormSchema = z.object({
   memberId: uuidString,
   loanId: optionalUuidString,
   cycleId: optionalUuidString,
-  reasonKind: z.enum(["aporte", "cuota"]),
   periodLabel: z.string().trim().min(1),
+}).superRefine((value, ctx) => {
+  const sourceCount = Number(Boolean(value.loanId)) + Number(Boolean(value.cycleId));
+
+  if (sourceCount !== 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["loanId"],
+      message: "Elige un solo atraso para registrar el aviso.",
+    });
+  }
 });
 
 export const loanDisbursementSourceSchema = z.enum(["bank_transfer", "petty_cash"]);

@@ -6,10 +6,12 @@ import {
   type CollectionsAgingRow,
   type DateOnlyString,
 } from "@mi-banquito/domain";
-import { ButtonPrimary, FormField, InputText } from "@mi-banquito/ui";
+import { currentEcuadorDateString } from "@mi-banquito/contracts";
+import { ButtonPrimary } from "@mi-banquito/ui";
 import { ecCurrency } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
 import { markPromiseAction, recordChaseAttemptAction } from "./actions";
+import { PromiseDialog } from "./promise-dialog";
 
 const copy = messages.atrasos;
 
@@ -19,7 +21,7 @@ const reasonLabels: Record<ChaseObligationKind, string> = {
 };
 
 function todayIso(): DateOnlyString {
-  return new Date().toISOString().slice(0, 10) as DateOnlyString;
+  return currentEcuadorDateString() as DateOnlyString;
 }
 
 function formatMoney(value: string | number): string {
@@ -56,6 +58,7 @@ function hiddenSourceFields(row: CollectionsAgingRow) {
       <input type="hidden" name="memberId" value={row.memberId ?? ""} />
       <input type="hidden" name="loanId" value={row.loanId ?? ""} />
       <input type="hidden" name="cycleId" value={row.cycleId ?? ""} />
+      <input type="hidden" name="periodLabel" value={row.periodLabel} />
     </>
   );
 }
@@ -89,9 +92,10 @@ export function AgingTable({ rows }: { rows: CollectionsAgingRow[] }) {
 
   return (
     <section className="grid gap-3" data-testid="aging_table" aria-label={copy.title}>
-      {rows.map((row) => {
+      {rows.map((row, index) => {
         const rowWhatsappUrl = whatsappUrl(row);
         const canAct = hasActionSource(row);
+        const controlId = `promise-${index}`;
 
         return (
           <article
@@ -106,7 +110,10 @@ export function AgingTable({ rows }: { rows: CollectionsAgingRow[] }) {
                   {reasonLabel(row.reasonKind)} · {row.periodLabel}
                 </p>
               </div>
-              <p className="text-xl font-bold text-text-primary">{formatMoney(row.amountDue)}</p>
+              <div className="text-left md:text-right">
+                <p className="text-sm text-text-secondary">{copy.amountDue}</p>
+                <p className="text-xl font-bold text-text-primary">{formatMoney(row.amountDue)}</p>
+              </div>
             </div>
 
             <dl className="grid gap-3 text-sm text-text-secondary sm:grid-cols-2 lg:grid-cols-4">
@@ -133,36 +140,21 @@ export function AgingTable({ rows }: { rows: CollectionsAgingRow[] }) {
             </dl>
 
             {canAct ? (
-              <div className="grid gap-3 border-t border-border pt-4 lg:grid-cols-[1fr_auto]">
-                <form action={markPromiseAction} className="grid gap-3 sm:grid-cols-[minmax(10rem,14rem)_1fr_auto] sm:items-end">
-                  {hiddenSourceFields(row)}
-                  <FormField labelKey={copy.promiseDate}>
-                    <InputText
-                      labelKey={copy.promiseDate}
-                      name="promisedOn"
-                      type="date"
-                      defaultValue={defaultPromisedOn}
-                      required
-                    />
-                  </FormField>
-                  <FormField labelKey={copy.promiseNote}>
-                    <InputText
-                      labelKey={copy.promiseNote}
-                      name="note"
-                      placeholderKey={copy.promiseNotePlaceholder}
-                    />
-                  </FormField>
-                  <ButtonPrimary type="submit" labelKey={copy.markPromise} />
-                </form>
-
-                <div className="flex flex-wrap items-end gap-2">
+              <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+                <PromiseDialog
+                  action={markPromiseAction}
+                  memberId={row.memberId ?? ""}
+                  loanId={row.loanId ?? null}
+                  cycleId={row.cycleId ?? null}
+                  memberName={row.memberName}
+                  periodLabel={row.periodLabel}
+                  defaultPromisedOn={defaultPromisedOn}
+                  controlId={controlId}
+                />
+                <div className="flex flex-wrap gap-2">
                   {rowWhatsappUrl ? (
                     <form action={recordChaseAttemptAction}>
                       {hiddenSourceFields(row)}
-                      <input type="hidden" name="reasonKind" value={reasonKind(row.reasonKind) ?? ""} />
-                      <input type="hidden" name="periodLabel" value={row.periodLabel} />
-                      <input type="hidden" name="memberName" value={row.memberName} />
-                      <input type="hidden" name="whatsappNumber" value={row.whatsappNumber ?? ""} />
                       <ButtonPrimary type="submit" labelKey={copy.whatsapp} />
                     </form>
                   ) : (
