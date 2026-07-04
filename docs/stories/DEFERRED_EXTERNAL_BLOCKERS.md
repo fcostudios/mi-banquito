@@ -63,3 +63,13 @@ with Sentry/Better Stack still inherited from Sprint 0 as external evidence:
 the repository now includes Sentry SDK initialization and PII redaction tests,
 but a real Sentry project, DSNs in Vercel, a captured redacted event, and a
 Better Stack monitor are still required before US-005/US-006 are fully closed.
+
+## Sprint 4 Closure Note
+
+Sprint 4 has no new external account blocker. Two forward-dependent product
+evidence items remain tracked:
+
+- US-085 AC-4: QR/footer embedding into generated statement PDFs requires the
+  later statement PDF generation stories.
+- US-050 AC-5: monthly-close PDF visibility for treasurer compensation requires
+  the later monthly close PDF story.

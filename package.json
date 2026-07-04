@@ -12,7 +12,8 @@
     "audit:sprint0": "node scripts/sprint0-ac-audit.mjs",
     "audit:sprint1-ui": "node scripts/sprint1-ui-closure-gate.mjs",
     "audit:sprint2": "node scripts/sprint2-closure-gate.mjs",
-    "audit:sprint3": "node scripts/sprint3-closure-gate.mjs"
+    "audit:sprint3": "node scripts/sprint3-closure-gate.mjs",
+    "audit:sprint4": "node scripts/sprint4-closure-gate.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

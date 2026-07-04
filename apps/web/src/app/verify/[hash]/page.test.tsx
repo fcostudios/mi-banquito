@@ -1,8 +1,5 @@
-import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import PublicVerifyPage from "./page";
 import { GET } from "./route";
 
 const verifyStatementHash = vi.fn();
@@ -17,21 +14,26 @@ vi.mock("@mi-banquito/domain", async (importOriginal) => {
   };
 });
 
-describe("PublicVerifyPage", () => {
-  it("renders a public match without requiring an authenticated session", async () => {
+describe("public verifier route", () => {
+  it("renders public HTML without requiring an authenticated session", async () => {
     verifyStatementHash.mockResolvedValueOnce({
       matched: true,
       groupName: "Mi Banquito",
       generatedAt: "2026-07-04T10:00:00.000Z",
     });
 
-    render(await PublicVerifyPage({
+    const response = await GET(new Request("http://localhost/verify/hash", {
+      headers: { accept: "text/html" },
+    }), {
       params: Promise.resolve({ hash: "A".repeat(64) }),
-    }));
+    });
+    const html = await response.text();
 
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
     expect(verifyStatementHash).toHaveBeenCalledWith("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-    expect(screen.getByRole("heading", { name: "Verificación de documento" })).toBeInTheDocument();
-    expect(screen.getByText("Este documento coincide con el registro del grupo Mi Banquito al 2026-07-04.")).toBeInTheDocument();
+    expect(html).toContain("Verificación de documento");
+    expect(html).toContain("Este documento coincide con el registro del grupo Mi Banquito al 2026-07-04.");
   });
 
   it("returns minimal JSON from the public route", async () => {

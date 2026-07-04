@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { InputNumber } from "@mi-banquito/ui";
-import { applyHypotheticalLoan, liquidityNarrative, type LiquidityPoint } from "@mi-banquito/domain";
+import { applyHypotheticalLoan, liquidityNarrative, type LiquidityPoint } from "@mi-banquito/domain/liquidity-client";
 
 type LiquiditySandboxCopy = {
   amount: string;
