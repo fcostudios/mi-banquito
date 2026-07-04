@@ -29,6 +29,7 @@ export const member_role_enum = pgEnum("member_role_enum", ["aportante", "tesore
 export const member_status_enum = pgEnum("member_status_enum", ["activo", "en_pausa", "baja"]);
 export const organization_status_enum = pgEnum("organization_status_enum", ["active", "paused", "archived"]);
 export const platform_operator_status_enum = pgEnum("platform_operator_status_enum", ["active", "disabled"]);
+export const promise_status_enum = pgEnum("promise_status_enum", ["open", "kept", "broken", "closed"]);
 export const reconciliation_cycle_resolution_kind_enum = pgEnum("reconciliation_cycle_resolution_kind_enum", ["auto_within_tolerance", "resolved_by_correction", "annotated_acceptance", "adjustment"]);
 export const slip_photo_attached_to_kind_enum = pgEnum("slip_photo_attached_to_kind_enum", ["contribution", "repayment"]);
 export const statement_archive_kind_enum = pgEnum("statement_archive_kind_enum", ["monthly_close", "monthly_member", "year_end_member", "year_end_share_out", "year_end_snapshot", "balance_banquito", "year_end_economic_summary", "monthly_summary"]);
@@ -36,8 +37,9 @@ export const surplus_governance_decision_status_enum = pgEnum("surplus_governanc
 export const user_account_status_enum = pgEnum("user_account_status_enum", ["active", "disabled"]);
 export const user_org_membership_status_enum = pgEnum("user_org_membership_status_enum", ["active", "revoked"]);
 export const withdrawal_created_by_kind_enum = pgEnum("withdrawal_created_by_kind_enum", ["member", "system"]);
-export const withdrawal_kind_enum = pgEnum("withdrawal_kind_enum", ["member_refund", "year_end_share_out", "other", "referral_commission_credit"]);
+export const withdrawal_kind_enum = pgEnum("withdrawal_kind_enum", ["member_refund", "year_end_share_out", "other", "referral_commission_credit", "treasurer_compensation_disbursement"]);
 export const year_end_share_out_status_enum = pgEnum("year_end_share_out_status_enum", ["draft", "approved", "distributed", "locked"]);
+export const loan_disbursement_source_enum = pgEnum("loan_disbursement_source_enum", ["bank_transfer", "petty_cash"]);
 
 export const alert = pgTable("alert", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -408,6 +410,70 @@ export const repayment = pgTable("repayment", {
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
 });
 
+export const promise = pgTable("promise", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  memberId: uuid("member_id").references((): AnyPgColumn => member.id).notNull(),
+  loanId: uuid("loan_id").references((): AnyPgColumn => loan.id),
+  cycleId: uuid("cycle_id").references((): AnyPgColumn => contributionCycle.id),
+  promisedOn: date("promised_on").notNull(),
+  note: text("note"),
+  status: promise_status_enum("status").default("open").notNull(),
+  supersededById: uuid("superseded_by_id"),
+  createdBy: uuid("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+});
+
+export const promiseReminder = pgTable("promise_reminder", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  promiseId: uuid("promise_id").references((): AnyPgColumn => promise.id).notNull(),
+  reminderDate: date("reminder_date").notNull(),
+  alertId: uuid("alert_id").references((): AnyPgColumn => alert.id),
+  createdAt: timestamp("created_at").notNull(),
+});
+
+export const loanDisbursement = pgTable("loan_disbursement", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  loanId: uuid("loan_id").references((): AnyPgColumn => loan.id).notNull(),
+  disbursementSource: loan_disbursement_source_enum("disbursement_source").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 4 }).notNull(),
+  currencyCode: text("currency_code").notNull(),
+  disbursedOn: date("disbursed_on").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+  createdBy: uuid("created_by").notNull(),
+  createdByKind: text("created_by_kind").notNull(),
+});
+
+export const treasurerCompensationDisbursement = pgTable("treasurer_compensation_disbursement", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  memberId: uuid("member_id").references((): AnyPgColumn => member.id).notNull(),
+  periodLabel: text("period_label").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 4 }).notNull(),
+  currencyCode: text("currency_code").notNull(),
+  kindAtDisbursement: jsonb("kind_at_disbursement").notNull(),
+  withdrawalId: uuid("withdrawal_id").references((): AnyPgColumn => withdrawal.id),
+  disbursedOn: date("disbursed_on").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+});
+
+export const pilotLogEntry = pgTable("pilot_log_entry", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  observedOn: date("observed_on").notNull(),
+  vocabularyAnswer: text("vocabulary_answer").notNull(),
+  paperValue: numeric("paper_value", { precision: 18, scale: 4 }).notNull(),
+  systemValue: numeric("system_value", { precision: 18, scale: 4 }).notNull(),
+  discrepancy: numeric("discrepancy", { precision: 18, scale: 4 }).notNull(),
+  wouldNotReturnToPaper: boolean("would_not_return_to_paper").default(false).notNull(),
+  cleanMonth: boolean("clean_month").default(false).notNull(),
+  note: text("note"),
+  loggedBy: uuid("logged_by").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+});
+
 export const organization = pgTable("organization", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   displayName: text("display_name").notNull(),
@@ -504,6 +570,32 @@ export const availableCapital = pgMaterializedView("mv_available_capital", {
   poolBalance: numeric("pool_balance", { precision: 18, scale: 4 }).notNull(),
   baseFundPool: numeric("base_fund_pool", { precision: 18, scale: 4 }).notNull(),
   availableCapital: numeric("available_capital", { precision: 18, scale: 4 }).notNull(),
+  refreshedAt: timestamp("refreshed_at").notNull(),
+}).existing();
+
+export const arAging = pgMaterializedView("mv_ar_aging", {
+  orgId: uuid("org_id").notNull(),
+  memberId: uuid("member_id").notNull(),
+  memberName: text("member_name").notNull(),
+  whatsappNumber: text("whatsapp_number"),
+  reasonKind: text("reason_kind").notNull(),
+  cycleId: uuid("cycle_id"),
+  loanId: uuid("loan_id"),
+  periodLabel: text("period_label").notNull(),
+  dueDate: date("due_date").notNull(),
+  daysLate: integer("days_late").notNull(),
+  amountDue: numeric("amount_due", { precision: 18, scale: 4 }).notNull(),
+  lastActionAt: timestamp("last_action_at"),
+}).existing();
+
+export const projectedLiquidity = pgMaterializedView("mv_liquidez_proyectada", {
+  orgId: uuid("org_id").notNull(),
+  monthOn: date("month_on").notNull(),
+  projectedBalance: numeric("projected_balance", { precision: 18, scale: 4 }).notNull(),
+  baseFundPool: numeric("base_fund_pool", { precision: 18, scale: 4 }).notNull(),
+  availableCapital: numeric("available_capital", { precision: 18, scale: 4 }).notNull(),
+  yearEndShareOutFormula: text("year_end_share_out_formula"),
+  currencyCode: text("currency_code").notNull(),
   refreshedAt: timestamp("refreshed_at").notNull(),
 }).existing();
 
