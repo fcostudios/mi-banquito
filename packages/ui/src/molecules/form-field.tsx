@@ -4,15 +4,16 @@ import { type ReactNode } from "react";
 
 export interface FormFieldProps {
   labelKey: string;
+  controlId?: string;
   helperTextKey?: string;
   errorMessageKey?: string;
   children: ReactNode;
 }
 
-export function FormField({ labelKey, helperTextKey, errorMessageKey, children }: FormFieldProps) {
+export function FormField({ labelKey, controlId, helperTextKey, errorMessageKey, children }: FormFieldProps) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-text-primary">{labelKey}</label>
+      <label className="text-text-primary" htmlFor={controlId}>{labelKey}</label>
       {children}
       {helperTextKey ? <span className="text-text-secondary">{helperTextKey}</span> : null}
       {errorMessageKey ? <span className="text-error">{errorMessageKey}</span> : null}

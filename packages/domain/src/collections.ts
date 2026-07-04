@@ -46,6 +46,7 @@ export type MarkPromiseInput = PromiseSourceInput & {
   actorId: string;
   memberId: string;
   promisedOn: DateOnlyString;
+  periodLabel: string;
   note?: string | null;
   todayIso?: DateOnlyString;
 };
@@ -54,7 +55,19 @@ export type RecordChaseAttemptInput = PromiseSourceInput & {
   orgId: string;
   actorId: string;
   memberId: string;
+  periodLabel: string;
   message: string;
+};
+
+export type BuildChaseAttemptInput = PromiseSourceInput & {
+  orgId: string;
+  memberId: string;
+  periodLabel: string;
+};
+
+export type ChaseAttemptTarget = {
+  message: string;
+  whatsappUrl: string | null;
 };
 
 export type EmitPromiseRemindersResult = {
@@ -66,6 +79,7 @@ export interface CollectionsService {
   readonly context: "collections";
   listAgingRows(orgId: string, reasonKind?: CollectionsAgingReasonKind): Promise<CollectionsAgingRow[]>;
   markPromise(input: MarkPromiseInput): Promise<{ promiseId: string }>;
+  buildChaseAttempt(input: BuildChaseAttemptInput): Promise<ChaseAttemptTarget>;
   recordChaseAttempt(input: RecordChaseAttemptInput): Promise<void>;
   emitPromiseReminders(todayIso: DateOnlyString): Promise<EmitPromiseRemindersResult>;
 }
@@ -255,18 +269,21 @@ async function assertSourceObligationExists(
   tx: TenantTransaction,
   input: { orgId: string; memberId: string },
   source: PromiseSourceRef,
-): Promise<void> {
+  periodLabel: string,
+): Promise<typeof arAging.$inferSelect> {
   const rows = await tx.select().from(arAging)
     .where(and(
       eq(arAging.orgId, input.orgId),
       eq(arAging.memberId, input.memberId),
       source.loanId ? eq(arAging.loanId, source.loanId) : isNull(arAging.loanId),
       source.cycleId ? eq(arAging.cycleId, source.cycleId) : isNull(arAging.cycleId),
+      eq(arAging.periodLabel, periodLabel),
     ));
 
   if (rows.length === 0) {
     throw new Error("collections_obligation_not_found");
   }
+  return rows[0];
 }
 
 export function createCollectionsService(): CollectionsService {
@@ -294,7 +311,7 @@ export function createCollectionsService(): CollectionsService {
       const note = trimmedNote(input.note);
 
       await withTenantTransaction(input.orgId, async (tx) => {
-        await assertSourceObligationExists(tx, input, source);
+        await assertSourceObligationExists(tx, input, source, input.periodLabel);
 
         const openRows = await tx.select().from(promise)
           .where(and(
@@ -302,6 +319,7 @@ export function createCollectionsService(): CollectionsService {
             eq(promise.memberId, input.memberId),
             source.loanId ? eq(promise.loanId, source.loanId) : isNull(promise.loanId),
             source.cycleId ? eq(promise.cycleId, source.cycleId) : isNull(promise.cycleId),
+            eq(promise.periodLabel, input.periodLabel),
             eq(promise.status, "open"),
           ));
 
@@ -317,6 +335,7 @@ export function createCollectionsService(): CollectionsService {
           memberId: input.memberId,
           loanId: source.loanId,
           cycleId: source.cycleId,
+          periodLabel: input.periodLabel,
           promisedOn: input.promisedOn,
           note,
           status: "open",
@@ -342,6 +361,7 @@ export function createCollectionsService(): CollectionsService {
             memberId: input.memberId,
             loanId: source.loanId,
             cycleId: source.cycleId,
+            periodLabel: input.periodLabel,
             promisedOn: input.promisedOn,
             supersededPromiseIds: openRows.map((row) => row.id),
           },
@@ -353,12 +373,38 @@ export function createCollectionsService(): CollectionsService {
 
       return { promiseId };
     },
+    async buildChaseAttempt(input) {
+      const source = normalizePromiseSourceRef(input);
+
+      return withTenantTransaction(input.orgId, async (tx) => {
+        const row = await assertSourceObligationExists(tx, input, source, input.periodLabel);
+        const kind = row.reasonKind === "aporte" || row.reasonKind === "cuota"
+          ? row.reasonKind
+          : null;
+        if (!kind) {
+          throw new Error("collections_obligation_kind_not_supported");
+        }
+
+        const message = buildChaseMessage({
+          memberName: row.memberName,
+          reasonKind: kind,
+          periodLabel: row.periodLabel,
+        });
+        return {
+          message,
+          whatsappUrl: buildWhatsAppChaseUrl({
+            whatsappNumber: row.whatsappNumber,
+            message,
+          }),
+        };
+      });
+    },
     async recordChaseAttempt(input) {
       const source = normalizePromiseSourceRef(input);
       const now = new Date();
 
       await withTenantTransaction(input.orgId, async (tx) => {
-        await assertSourceObligationExists(tx, input, source);
+        await assertSourceObligationExists(tx, input, source, input.periodLabel);
 
         await tx.insert(auditLogEntry).values({
           orgId: input.orgId,
@@ -371,6 +417,7 @@ export function createCollectionsService(): CollectionsService {
             memberId: input.memberId,
             loanId: source.loanId,
             cycleId: source.cycleId,
+            periodLabel: input.periodLabel,
             channel: "whatsapp",
             messageTemplateId: "collections_chase_v1",
             message: input.message,

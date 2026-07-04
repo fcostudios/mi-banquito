@@ -3,10 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ZodError } from "zod";
-import { chaseAttemptFormSchema, markPromiseFormSchema } from "@mi-banquito/contracts";
+import { chaseAttemptFormSchema, currentEcuadorDateString, markPromiseFormSchema } from "@mi-banquito/contracts";
 import {
-  buildChaseMessage,
-  buildWhatsAppChaseUrl,
   createCollectionsService,
   type DateOnlyString,
 } from "@mi-banquito/domain";
@@ -18,10 +16,22 @@ const copy = messages.atrasos;
 
 function validationMessage(error: unknown): string {
   if (error instanceof ZodError) {
-    return error.issues[0]?.message ?? copy.actionInvalid;
+    const message = error.issues[0]?.message;
+    return message?.startsWith("Elige ") || message?.startsWith("La fecha ")
+      ? message
+      : copy.actionInvalid;
   }
   if (error instanceof Error) {
-    return error.message;
+    if (error.message === "collections_obligation_not_found") {
+      return copy.missingSource;
+    }
+    if (error.message === "collections_obligation_kind_not_supported") {
+      return copy.unsupportedSource;
+    }
+    if (error.message === copy.missingContact) {
+      return copy.missingContact;
+    }
+    return copy.actionFailed;
   }
   return copy.actionFailed;
 }
@@ -42,14 +52,17 @@ export async function markPromiseAction(formData: FormData) {
       memberId: parsed.memberId,
       loanId: parsed.loanId,
       cycleId: parsed.cycleId,
+      periodLabel: parsed.periodLabel,
       promisedOn: parsed.promisedOn as DateOnlyString,
       note: parsed.note,
+      todayIso: currentEcuadorDateString() as DateOnlyString,
     });
   } catch (error) {
     redirect(`/atrasos?error=${encodeURIComponent(validationMessage(error))}`);
   }
 
   revalidateCollectionsViews();
+  redirect("/atrasos?promise=1");
 }
 
 export async function recordChaseAttemptAction(formData: FormData) {
@@ -59,27 +72,27 @@ export async function recordChaseAttemptAction(formData: FormData) {
 
   try {
     const parsed = chaseAttemptFormSchema.parse(values);
-    const memberName = values.memberName?.trim() || copy.genericMember;
-    const message = buildChaseMessage({
-      memberName,
-      reasonKind: parsed.reasonKind,
+    const service = createCollectionsService();
+    const target = await service.buildChaseAttempt({
+      orgId: session.orgId,
+      memberId: parsed.memberId,
+      loanId: parsed.loanId,
+      cycleId: parsed.cycleId,
       periodLabel: parsed.periodLabel,
     });
-    rowWhatsappUrl = buildWhatsAppChaseUrl({
-      whatsappNumber: values.whatsappNumber,
-      message,
-    });
+    rowWhatsappUrl = target.whatsappUrl;
     if (!rowWhatsappUrl) {
       throw new Error(copy.missingContact);
     }
 
-    await createCollectionsService().recordChaseAttempt({
+    await service.recordChaseAttempt({
       orgId: session.orgId,
       actorId: session.actorId,
       memberId: parsed.memberId,
       loanId: parsed.loanId,
       cycleId: parsed.cycleId,
-      message,
+      message: target.message,
+      periodLabel: parsed.periodLabel,
     });
   } catch (error) {
     redirect(`/atrasos?error=${encodeURIComponent(validationMessage(error))}`);

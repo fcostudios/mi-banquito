@@ -64,10 +64,10 @@ describe("ScrArAgingPage", () => {
     expect(within(row).queryByRole("link", { name: "Avisar por WhatsApp" })).not.toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "Avisar por WhatsApp" })).toBeInTheDocument();
     expect(within(row).queryByRole("button", { name: "Registrar aviso" })).not.toBeInTheDocument();
-    expect(container.querySelector('input[name="whatsappNumber"]')).toHaveValue("+593991234567");
-    expect(container.querySelector('input[name="reasonKind"]')).toHaveValue("cuota");
+    expect(container.querySelector('input[name="whatsappNumber"]')).toBeNull();
+    expect(container.querySelector('input[name="reasonKind"]')).toBeNull();
     expect(container.querySelector('input[name="periodLabel"]')).toHaveValue("julio 2026");
-    expect(container.querySelector('input[name="memberName"]')).toHaveValue("Ana Mora");
+    expect(container.querySelector('input[name="memberName"]')).toBeNull();
   });
 
   it("passes the reason filter to the collections service", async () => {

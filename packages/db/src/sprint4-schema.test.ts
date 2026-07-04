@@ -21,6 +21,7 @@ describe("Sprint 4 schema substrate", () => {
           ('promise', 'member_id'),
           ('promise', 'loan_id'),
           ('promise', 'cycle_id'),
+          ('promise', 'period_label'),
           ('promise', 'promised_on'),
           ('promise', 'note'),
           ('promise', 'status'),
@@ -151,6 +152,7 @@ describe("Sprint 4 schema substrate", () => {
             AND indexdef ILIKE '%WHERE%'
             AND indexdef ILIKE '%status%'
             AND indexdef ILIKE '%open%'
+            AND indexdef ILIKE '%period_label%'
         ) AS has_open_promise_partial_unique_index,
         (
           SELECT count(*)::integer
