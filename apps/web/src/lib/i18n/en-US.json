@@ -188,6 +188,9 @@
     "projection": "Proyección",
     "empty": "No hay datos de liquidez proyectada todavía."
   },
+  "verifier": {
+    "title": "Verificación de documento"
+  },
   "shell": {
     "header": {
       "appName": "Mi Banquito",
