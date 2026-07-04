@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
-import { createCollectionsService, type DateOnlyString } from "@mi-banquito/domain";
+import { createCollectionsService, createCompensationService, type DateOnlyString } from "@mi-banquito/domain";
 import {
   alert,
   cronRun,
@@ -40,6 +40,11 @@ export type CronRunSummary = {
   transitionsToMora: number;
   promisesScanned?: number;
   remindersEmitted?: number;
+  compensationConfigsScanned?: number;
+  compensationDueConfigs?: number;
+  compensationDisbursementsAwarded?: number;
+  compensationSkippedExistingDisbursements?: number;
+  compensationConfigsAdvanced?: number;
   failures: Array<{ orgId: string; loanId?: string; message: string }>;
 };
 
@@ -403,6 +408,65 @@ async function runPromiseReminderCron(request: Request): Promise<CronRunSummary>
   return summary;
 }
 
+async function runTreasurerCompensationCron(
+  request: Request,
+  options: { job?: CronJobName; endpoint?: string } = {},
+): Promise<CronRunSummary> {
+  const startedAt = new Date();
+  const endpoint = options.endpoint ?? "/api/cron/award-treasurer-compensation";
+  const url = new URL(request.url);
+  const requestedDate = url.searchParams.get("date");
+  const fallbackDate = isoToday();
+  let today = fallbackDate;
+  const summary: CronRunSummary = {
+    job: options.job ?? "award-treasurer-compensation",
+    endpoint,
+    fromDate: fallbackDate,
+    toDate: fallbackDate,
+    orgsProcessed: 0,
+    loansProcessed: 0,
+    interestAccrualsPlanned: 0,
+    moraFeesPlanned: 0,
+    transitionsToMora: 0,
+    compensationConfigsScanned: 0,
+    compensationDueConfigs: 0,
+    compensationDisbursementsAwarded: 0,
+    compensationSkippedExistingDisbursements: 0,
+    compensationConfigsAdvanced: 0,
+    failures: [],
+  };
+
+  try {
+    today = requestedDate ? parseDateOnlyParam(requestedDate) : fallbackDate;
+    summary.fromDate = today;
+    summary.toDate = today;
+    const result = await createCompensationService().awardDueTreasurerCompensation(today);
+    summary.orgsProcessed = result.orgsProcessed;
+    summary.compensationConfigsScanned = result.configsScanned;
+    summary.compensationDueConfigs = result.dueConfigs;
+    summary.compensationDisbursementsAwarded = result.disbursementsAwarded;
+    summary.compensationSkippedExistingDisbursements = result.skippedExistingDisbursements;
+    summary.compensationConfigsAdvanced = result.configsAdvanced;
+    summary.failures.push(...result.failures);
+  } catch (error) {
+    summary.failures.push({
+      orgId: "system",
+      message: error instanceof Error ? error.message : "Treasurer compensation cron failed",
+    });
+  }
+
+  await recordCronRun({
+    endpoint,
+    startedAt,
+    finishedAt: new Date(),
+    replayFrom: summary.fromDate,
+    replayTo: summary.toDate,
+    summary,
+  });
+
+  return summary;
+}
+
 export function createCronHandler(job: CronJobName) {
   return async function GET(request: Request) {
     const expected = process.env.CRON_SECRET;
@@ -422,6 +486,25 @@ export function createCronHandler(job: CronJobName) {
 
     if (job === "promise-reminders") {
       const summary = await runPromiseReminderCron(request);
+      if (summary.failures.length > 0) {
+        return NextResponse.json({ job, ran: false, summary }, { status: 500 });
+      }
+      return NextResponse.json({ job, ran: true, summary });
+    }
+
+    if (job === "award-treasurer-compensation") {
+      const summary = await runTreasurerCompensationCron(request);
+      if (summary.failures.length > 0) {
+        return NextResponse.json({ job, ran: false, summary }, { status: 500 });
+      }
+      return NextResponse.json({ job, ran: true, summary });
+    }
+
+    if (job === "daily") {
+      const summary = await runTreasurerCompensationCron(request, {
+        job: "daily",
+        endpoint: "/api/cron/daily",
+      });
       if (summary.failures.length > 0) {
         return NextResponse.json({ job, ran: false, summary }, { status: 500 });
       }

@@ -1,4 +1,23 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  createCompensationService: vi.fn(),
+  awardDueTreasurerCompensation: vi.fn(),
+  insert: vi.fn(),
+  values: vi.fn(),
+}));
+
+vi.mock("@mi-banquito/domain", () => ({
+  createCollectionsService: vi.fn(),
+  createCompensationService: mocks.createCompensationService,
+}));
+
+vi.mock("@mi-banquito/db", () => ({
+  db: {
+    insert: mocks.insert,
+  },
+}));
+
 import { GET as accrueInterest } from "../accrue-interest/route";
 import { GET as awardTreasurerCompensation } from "../award-treasurer-compensation/route";
 import { GET as daily } from "./route";
@@ -12,8 +31,28 @@ const routes = [
   ["/api/cron/drift-check", "drift-check", driftCheck],
 ] as const;
 
+beforeEach(() => {
+  mocks.values.mockResolvedValue(undefined);
+  mocks.insert.mockReturnValue({
+    values: mocks.values,
+  });
+  mocks.awardDueTreasurerCompensation.mockResolvedValue({
+    orgsProcessed: 1,
+    configsScanned: 0,
+    dueConfigs: 0,
+    disbursementsAwarded: 0,
+    skippedExistingDisbursements: 0,
+    configsAdvanced: 0,
+    failures: [],
+  });
+  mocks.createCompensationService.mockReturnValue({
+    awardDueTreasurerCompensation: mocks.awardDueTreasurerCompensation,
+  });
+});
+
 afterEach(() => {
   process.env.CRON_SECRET = originalSecret;
+  vi.clearAllMocks();
 });
 
 describe("daily cron route", () => {
@@ -47,6 +86,26 @@ describe("daily cron route", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ job, ran: true });
+    if (job === "award-treasurer-compensation") {
+      expect(await response.json()).toMatchObject({ job, ran: true });
+    } else if (job === "daily") {
+      expect(await response.json()).toMatchObject({
+        job,
+        ran: true,
+        summary: {
+          job: "daily",
+          endpoint: "/api/cron/daily",
+          orgsProcessed: 1,
+          compensationConfigsScanned: 0,
+          compensationDueConfigs: 0,
+          compensationDisbursementsAwarded: 0,
+          compensationSkippedExistingDisbursements: 0,
+          compensationConfigsAdvanced: 0,
+          failures: [],
+        },
+      });
+    } else {
+      expect(await response.json()).toEqual({ job, ran: true });
+    }
   });
 });
