@@ -419,7 +419,7 @@ export const promise = pgTable("promise", {
   promisedOn: date("promised_on").notNull(),
   note: text("note"),
   status: promise_status_enum("status").default("open").notNull(),
-  supersededById: uuid("superseded_by_id"),
+  supersededById: uuid("superseded_by_id").references((): AnyPgColumn => promise.id),
   createdBy: uuid("created_by").notNull(),
   createdAt: timestamp("created_at").notNull(),
 });
@@ -464,9 +464,9 @@ export const pilotLogEntry = pgTable("pilot_log_entry", {
   orgId: uuid("org_id").notNull(),
   observedOn: date("observed_on").notNull(),
   vocabularyAnswer: text("vocabulary_answer").notNull(),
-  paperValue: numeric("paper_value", { precision: 18, scale: 4 }).notNull(),
-  systemValue: numeric("system_value", { precision: 18, scale: 4 }).notNull(),
-  discrepancy: numeric("discrepancy", { precision: 18, scale: 4 }).notNull(),
+  paperValue: text("paper_value").notNull(),
+  systemValue: text("system_value").notNull(),
+  discrepancy: text("discrepancy").notNull(),
   wouldNotReturnToPaper: boolean("would_not_return_to_paper").default(false).notNull(),
   cleanMonth: boolean("clean_month").default(false).notNull(),
   note: text("note"),
@@ -575,7 +575,7 @@ export const availableCapital = pgMaterializedView("mv_available_capital", {
 
 export const arAging = pgMaterializedView("mv_ar_aging", {
   orgId: uuid("org_id").notNull(),
-  memberId: uuid("member_id").notNull(),
+  memberId: uuid("member_id"),
   memberName: text("member_name").notNull(),
   whatsappNumber: text("whatsapp_number"),
   reasonKind: text("reason_kind").notNull(),

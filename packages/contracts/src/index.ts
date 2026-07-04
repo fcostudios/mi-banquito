@@ -133,6 +133,14 @@ const signedMoneyString = z.string().regex(/^-?\d+(\.\d{1,4})?$/, "Use a decimal
 const uuidString = z.string().uuid();
 const optionalUuidString = uuidString.optional().or(z.literal(""));
 const e164 = z.string().regex(/^\+[1-9]\d{7,14}$/, "Use E.164 format, for example +593987654321");
+const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+export function isPromiseDateOnOrAfterToday(
+  promisedOn: string,
+  today = new Date().toISOString().slice(0, 10),
+): boolean {
+  return promisedOn >= today;
+}
 
 export const organizationCreateFormSchema = z.object({
   displayName: z.string().trim().min(1),
@@ -288,10 +296,18 @@ export const markPromiseFormSchema = z.object({
   memberId: uuidString,
   loanId: optionalUuidString,
   cycleId: optionalUuidString,
-  promisedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  promisedOn: dateString,
   note: z.string().max(500).optional(),
 }).superRefine((value, ctx) => {
   const sourceCount = Number(Boolean(value.loanId)) + Number(Boolean(value.cycleId));
+
+  if (!isPromiseDateOnOrAfterToday(value.promisedOn)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["promisedOn"],
+      message: "La fecha de promesa debe ser hoy o una fecha futura.",
+    });
+  }
 
   if (sourceCount !== 1) {
     ctx.addIssue({
@@ -321,9 +337,9 @@ export const verifyHashSchema = z.string().regex(/^[0-9a-fA-F]{64}$/, "Use a 64 
 export const pilotLogEntryFormSchema = z.object({
   observedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   vocabularyAnswer: z.string().trim().min(1),
-  paperValue: moneyString,
-  systemValue: moneyString,
-  discrepancy: signedMoneyString,
+  paperValue: z.string().trim().min(1),
+  systemValue: z.string().trim().min(1),
+  discrepancy: z.string().trim().min(1),
   wouldNotReturnToPaper: z.enum(["yes", "no"]).default("no"),
   cleanMonth: z.enum(["yes", "no"]).default("no"),
   note: z.string().max(500).optional(),

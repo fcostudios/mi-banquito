@@ -78,6 +78,29 @@ describe("Sprint 4 schema substrate", () => {
     expect(result.rows).toEqual([]);
   });
 
+  runIfDatabase("models pilot log free-text comparison fields", async () => {
+    const { db } = await import("./index");
+
+    const result = await db.execute(sql`
+      WITH expected(column_name, data_type) AS (
+        VALUES
+          ('paper_value', 'text'),
+          ('system_value', 'text'),
+          ('discrepancy', 'text')
+      )
+      SELECT e.column_name, c.data_type
+      FROM expected e
+      LEFT JOIN information_schema.columns c
+        ON c.table_schema = 'public'
+       AND c.table_name = 'pilot_log_entry'
+       AND c.column_name = e.column_name
+      WHERE c.data_type IS DISTINCT FROM e.data_type
+      ORDER BY e.column_name
+    `);
+
+    expect(result.rows).toEqual([]);
+  });
+
   runIfDatabase("exposes Sprint 4 materialized views, uniqueness, indexes, and RLS policies", async () => {
     const { db } = await import("./index");
 
@@ -93,6 +116,16 @@ describe("Sprint 4 schema substrate", () => {
           SELECT 1
           FROM pg_matviews
           WHERE schemaname = 'public'
+            AND matviewname = 'mv_ar_aging'
+            AND definition ILIKE '%LEFT JOIN%member%'
+            AND definition ILIKE '%LEFT JOIN%non_member_borrower%'
+            AND definition ILIKE '%borrower_non_member_id%'
+            AND definition ILIKE '%COALESCE%'
+        ) AS ar_aging_supports_non_member_loans,
+        EXISTS (
+          SELECT 1
+          FROM pg_matviews
+          WHERE schemaname = 'public'
             AND matviewname = 'mv_liquidez_proyectada'
         ) AS has_projected_liquidity,
         EXISTS (
@@ -102,21 +135,25 @@ describe("Sprint 4 schema substrate", () => {
             AND tablename = 'statement_archive'
             AND indexname = 'idx_statement_archive_hash_public_verify'
         ) AS has_statement_hash_index,
-        (
-          EXISTS (
-            SELECT 1
-            FROM pg_indexes
-            WHERE schemaname = 'public'
-              AND tablename = 'promise'
-              AND indexname = 'uq_promise_open_obligation'
-          )
-          OR EXISTS (
-            SELECT 1
-            FROM pg_constraint
-            WHERE conrelid = to_regclass('public.promise')
-              AND conname = 'uq_promise_open_obligation'
-          )
-        ) AS has_open_promise_uniqueness,
+        EXISTS (
+          SELECT 1
+          FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND tablename = 'promise'
+            AND indexname = 'uq_promise_open_obligation'
+            AND indexdef ILIKE 'CREATE UNIQUE INDEX%'
+            AND indexdef ILIKE '%WHERE%'
+            AND indexdef ILIKE '%status%'
+            AND indexdef ILIKE '%open%'
+        ) AS has_open_promise_partial_unique_index,
+        EXISTS (
+          SELECT 1
+          FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND tablename = 'mv_ar_aging'
+            AND indexname = 'idx_mv_ar_aging_unique_obligation'
+            AND indexdef ILIKE '%COALESCE(member_id%'
+        ) AS has_nullable_member_ar_aging_unique_index,
         (
           EXISTS (
             SELECT 1
@@ -152,9 +189,11 @@ describe("Sprint 4 schema substrate", () => {
 
     expect(result.rows[0]).toEqual({
       has_ar_aging: true,
+      ar_aging_supports_non_member_loans: true,
       has_projected_liquidity: true,
       has_statement_hash_index: true,
-      has_open_promise_uniqueness: true,
+      has_open_promise_partial_unique_index: true,
+      has_nullable_member_ar_aging_unique_index: true,
       has_compensation_period_uniqueness: true,
       all_new_tables_force_rls: true,
       all_new_tables_have_tenant_policy: true,
