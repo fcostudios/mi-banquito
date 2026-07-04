@@ -1,5 +1,7 @@
 import { config } from "dotenv";
 import { sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import pg from "pg";
 import { describe, expect, it } from "vitest";
 
 config({ path: "../../.env.local" });
@@ -119,8 +121,12 @@ describe("Sprint 4 schema substrate", () => {
             AND matviewname = 'mv_ar_aging'
             AND definition ILIKE '%LEFT JOIN%member%'
             AND definition ILIKE '%LEFT JOIN%non_member_borrower%'
+            AND definition ILIKE '%loan_guarantor%'
+            AND definition ILIKE '%guarantor_member_id%'
             AND definition ILIKE '%borrower_non_member_id%'
             AND definition ILIKE '%COALESCE%'
+            AND definition ILIKE '%assumed_at DESC%'
+            AND definition ILIKE '%created_at DESC%'
         ) AS ar_aging_supports_non_member_loans,
         EXISTS (
           SELECT 1
@@ -146,6 +152,27 @@ describe("Sprint 4 schema substrate", () => {
             AND indexdef ILIKE '%status%'
             AND indexdef ILIKE '%open%'
         ) AS has_open_promise_partial_unique_index,
+        (
+          SELECT count(*)::integer
+          FROM pg_constraint c
+          JOIN pg_attribute a
+            ON a.attrelid = c.conrelid
+           AND a.attnum = ANY(c.conkey)
+          WHERE c.conrelid = 'promise'::regclass
+            AND c.confrelid = 'promise'::regclass
+            AND a.attname = 'superseded_by_id'
+        ) AS promise_superseded_self_fk_count,
+        EXISTS (
+          SELECT 1
+          FROM pg_constraint c
+          JOIN pg_attribute a
+            ON a.attrelid = c.conrelid
+           AND a.attnum = ANY(c.conkey)
+          WHERE c.conrelid = 'promise'::regclass
+            AND c.confrelid = 'promise'::regclass
+            AND c.conname = 'fk_promise_superseded_by'
+            AND a.attname = 'superseded_by_id'
+        ) AS has_promise_superseded_self_fk,
         EXISTS (
           SELECT 1
           FROM pg_indexes
@@ -193,10 +220,170 @@ describe("Sprint 4 schema substrate", () => {
       has_projected_liquidity: true,
       has_statement_hash_index: true,
       has_open_promise_partial_unique_index: true,
+      promise_superseded_self_fk_count: 1,
+      has_promise_superseded_self_fk: true,
       has_nullable_member_ar_aging_unique_index: true,
       has_compensation_period_uniqueness: true,
       all_new_tables_force_rls: true,
       all_new_tables_have_tenant_policy: true,
     });
+  });
+
+  runIfDatabase("anchors non-member loan obligations to the active guarantor while displaying borrower details", async () => {
+    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    const client = await pool.connect();
+    const orgId = randomUUID();
+    const actorId = randomUUID();
+    const guarantorId = randomUUID();
+    const repaymentMemberId = randomUUID();
+    const borrowerId = randomUUID();
+    const loanId = randomUUID();
+
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT set_config('app.current_org_id', $1, true)", [orgId]);
+      await client.query(
+        `
+          INSERT INTO member (
+            id,
+            org_id,
+            display_name,
+            whatsapp_number,
+            joined_on,
+            role,
+            status,
+            initial_savings_balance,
+            created_at,
+            created_by,
+            created_by_kind
+          )
+          VALUES
+            ($1, $2, 'Garantia Activa', '+593987650001', '2026-01-01', 'aportante', 'activo', 0, now(), $3, 'system'),
+            ($4, $2, 'Pago de Otra Socia', '+593987650002', '2026-01-01', 'aportante', 'activo', 0, now(), $3, 'system')
+        `,
+        [guarantorId, orgId, actorId, repaymentMemberId],
+      );
+      await client.query(
+        `
+          INSERT INTO non_member_borrower (
+            id,
+            org_id,
+            display_name,
+            whatsapp_number,
+            created_at,
+            created_by,
+            created_by_kind
+          )
+          VALUES ($1, $2, 'Persona Externa', '+593987650099', now(), $3, 'system')
+        `,
+        [borrowerId, orgId, actorId],
+      );
+      await client.query(
+        `
+          INSERT INTO loan (
+            id,
+            org_id,
+            borrower_kind,
+            borrower_non_member_id,
+            principal_amount,
+            currency_code,
+            rate_value,
+            rate_model,
+            term_periods,
+            grace_periods,
+            originated_on,
+            status,
+            created_at,
+            created_by,
+            created_by_kind
+          )
+          VALUES ($1, $2, 'non_member', $3, 100, 'USD', 5, 'declining_balance', 1, 0, '2026-01-01', 'activo', now(), $4, 'system')
+        `,
+        [loanId, orgId, borrowerId, actorId],
+      );
+      await client.query(
+        `
+          INSERT INTO loan_guarantor (
+            org_id,
+            loan_id,
+            guarantor_member_id,
+            assumed_at,
+            liability_amount,
+            currency_code,
+            created_at,
+            created_by,
+            created_by_kind
+          )
+          VALUES ($1, $2, $3, '2026-01-01T00:00:00Z', 100, 'USD', now(), $4, 'system')
+        `,
+        [orgId, loanId, guarantorId, actorId],
+      );
+      await client.query(
+        `
+          INSERT INTO loan_schedule (
+            org_id,
+            loan_id,
+            period_index,
+            due_on,
+            principal_due,
+            interest_due,
+            status,
+            paid_principal_to_date,
+            paid_interest_to_date,
+            created_at,
+            created_by_kind
+          )
+          VALUES ($1, $2, 1, CURRENT_DATE - INTERVAL '3 days', 80, 20, 'parcial', 10, 5, now(), 'system')
+        `,
+        [orgId, loanId],
+      );
+      await client.query(
+        `
+          INSERT INTO repayment (
+            org_id,
+            loan_id,
+            member_id,
+            amount,
+            currency_code,
+            applied_to_principal,
+            applied_to_interest,
+            applied_to_fee,
+            dated_on,
+            recorded_at,
+            client_request_id,
+            created_at,
+            created_by,
+            created_by_kind
+          )
+          VALUES ($1, $2, $3, 15, 'USD', 10, 5, 0, CURRENT_DATE - INTERVAL '1 day', now(), $4, now(), $5, 'system')
+        `,
+        [orgId, loanId, repaymentMemberId, randomUUID(), actorId],
+      );
+
+      await client.query("REFRESH MATERIALIZED VIEW mv_ar_aging");
+      const result = await client.query(
+        `
+          SELECT member_id, member_name, whatsapp_number, amount_due
+          FROM mv_ar_aging
+          WHERE org_id = $1
+            AND loan_id = $2
+            AND reason_kind = 'cuota'
+        `,
+        [orgId, loanId],
+      );
+
+      expect(result.rows).toEqual([
+        {
+          member_id: guarantorId,
+          member_name: "Persona Externa",
+          whatsapp_number: "+593987650099",
+          amount_due: "85.0000",
+        },
+      ]);
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+      await pool.end();
+    }
   });
 });
