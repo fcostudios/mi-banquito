@@ -175,6 +175,19 @@
     "actionFailed": "No se pudo guardar. Intenta nuevamente.",
     "genericMember": "socia"
   },
+  "liquidez": {
+    "title": "Liquidez proyectada",
+    "description": "Mira si el banquito aguanta nuevos préstamos sin tocar la cuota base.",
+    "availableCapital": "Capital disponible",
+    "poolBalance": "Dinero total",
+    "baseFundPool": "Cuota base protegida",
+    "baseFundExplanation": "Capital disponible = dinero total menos cuota base protegida.",
+    "summary": "Resumen",
+    "sandboxTitle": "Considerar un préstamo",
+    "sandboxAmount": "Monto del préstamo de prueba",
+    "projection": "Proyección",
+    "empty": "No hay datos de liquidez proyectada todavía."
+  },
   "shell": {
     "header": {
       "appName": "Mi Banquito",
