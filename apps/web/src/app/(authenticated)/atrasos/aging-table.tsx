@@ -157,26 +157,19 @@ export function AgingTable({ rows }: { rows: CollectionsAgingRow[] }) {
 
                 <div className="flex flex-wrap items-end gap-2">
                   {rowWhatsappUrl ? (
-                    <a
-                      href={rowWhatsappUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex min-h-12 items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-semibold text-text-primary"
-                    >
-                      {copy.whatsapp}
-                    </a>
+                    <form action={recordChaseAttemptAction}>
+                      {hiddenSourceFields(row)}
+                      <input type="hidden" name="reasonKind" value={reasonKind(row.reasonKind) ?? ""} />
+                      <input type="hidden" name="periodLabel" value={row.periodLabel} />
+                      <input type="hidden" name="memberName" value={row.memberName} />
+                      <input type="hidden" name="whatsappNumber" value={row.whatsappNumber ?? ""} />
+                      <ButtonPrimary type="submit" labelKey={copy.whatsapp} />
+                    </form>
                   ) : (
                     <span className="inline-flex min-h-12 items-center text-sm text-text-secondary">
                       {copy.missingContact}
                     </span>
                   )}
-                  <form action={recordChaseAttemptAction}>
-                    {hiddenSourceFields(row)}
-                    <input type="hidden" name="reasonKind" value={reasonKind(row.reasonKind) ?? ""} />
-                    <input type="hidden" name="periodLabel" value={row.periodLabel} />
-                    <input type="hidden" name="memberName" value={row.memberName} />
-                    <ButtonPrimary type="submit" labelKey={copy.recordChase} />
-                  </form>
                 </div>
               </div>
             ) : (

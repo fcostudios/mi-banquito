@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ZodError } from "zod";
 import { chaseAttemptFormSchema, markPromiseFormSchema } from "@mi-banquito/contracts";
-import { buildChaseMessage, createCollectionsService, type DateOnlyString } from "@mi-banquito/domain";
+import {
+  buildChaseMessage,
+  buildWhatsAppChaseUrl,
+  createCollectionsService,
+  type DateOnlyString,
+} from "@mi-banquito/domain";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import { formDataToObject } from "@/lib/forms/sprint1";
 import messages from "@/lib/i18n/en-US.json";
@@ -50,6 +55,7 @@ export async function markPromiseAction(formData: FormData) {
 export async function recordChaseAttemptAction(formData: FormData) {
   const session = await requireTreasurer();
   const values = formDataToObject(formData);
+  let rowWhatsappUrl: string | null = null;
 
   try {
     const parsed = chaseAttemptFormSchema.parse(values);
@@ -59,6 +65,13 @@ export async function recordChaseAttemptAction(formData: FormData) {
       reasonKind: parsed.reasonKind,
       periodLabel: parsed.periodLabel,
     });
+    rowWhatsappUrl = buildWhatsAppChaseUrl({
+      whatsappNumber: values.whatsappNumber,
+      message,
+    });
+    if (!rowWhatsappUrl) {
+      throw new Error(copy.missingContact);
+    }
 
     await createCollectionsService().recordChaseAttempt({
       orgId: session.orgId,
@@ -73,4 +86,5 @@ export async function recordChaseAttemptAction(formData: FormData) {
   }
 
   revalidateCollectionsViews();
+  redirect(rowWhatsappUrl);
 }

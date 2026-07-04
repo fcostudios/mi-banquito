@@ -29,7 +29,7 @@ vi.mock("@mi-banquito/domain", () => ({
 }));
 
 describe("ScrArAgingPage", () => {
-  it("renders aging rows with readable amounts, days late, promise form, and WhatsApp link", async () => {
+  it("renders aging rows with readable amounts, days late, promise form, and audited WhatsApp action", async () => {
     listAgingRows.mockResolvedValueOnce([
       {
         id: "aging-1",
@@ -61,10 +61,13 @@ describe("ScrArAgingPage", () => {
     expect(within(row).getByText("2026-07-02")).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "Marcar promesa" })).toBeInTheDocument();
     expect(container.querySelector('input[name="promisedOn"]')).toHaveValue("2026-07-11");
-    expect(within(row).getByRole("link", { name: "Avisar por WhatsApp" })).toHaveAttribute(
-      "href",
-      "https://wa.me/593991234567?text=Hola%20Ana%20Mora%3A%20cuota%20julio%202026",
-    );
+    expect(within(row).queryByRole("link", { name: "Avisar por WhatsApp" })).not.toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Avisar por WhatsApp" })).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Registrar aviso" })).not.toBeInTheDocument();
+    expect(container.querySelector('input[name="whatsappNumber"]')).toHaveValue("+593991234567");
+    expect(container.querySelector('input[name="reasonKind"]')).toHaveValue("cuota");
+    expect(container.querySelector('input[name="periodLabel"]')).toHaveValue("julio 2026");
+    expect(container.querySelector('input[name="memberName"]')).toHaveValue("Ana Mora");
   });
 
   it("passes the reason filter to the collections service", async () => {
