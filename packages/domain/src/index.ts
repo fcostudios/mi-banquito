@@ -1,6 +1,7 @@
 export * from "./alerts";
 export * from "./audit";
 export * from "./collections";
+export * from "./compensation";
 export * from "./interest";
 export * from "./ledger";
 export * from "./liquidity";
