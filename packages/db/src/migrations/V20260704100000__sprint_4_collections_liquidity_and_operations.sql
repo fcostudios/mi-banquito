@@ -92,15 +92,20 @@ CREATE TABLE IF NOT EXISTS pilot_log_entry (
   org_id UUID NOT NULL,
   observed_on DATE NOT NULL,
   vocabulary_answer TEXT NOT NULL,
-  paper_value NUMERIC(18, 4) NOT NULL,
-  system_value NUMERIC(18, 4) NOT NULL,
-  discrepancy NUMERIC(18, 4) NOT NULL,
+  paper_value TEXT NOT NULL,
+  system_value TEXT NOT NULL,
+  discrepancy TEXT NOT NULL,
   would_not_return_to_paper BOOLEAN NOT NULL DEFAULT false,
   clean_month BOOLEAN NOT NULL DEFAULT false,
   note TEXT,
   logged_by UUID NOT NULL,
   created_at TIMESTAMPTZ NOT NULL
 );
+
+ALTER TABLE pilot_log_entry
+  ALTER COLUMN paper_value TYPE TEXT USING paper_value::text,
+  ALTER COLUMN system_value TYPE TEXT USING system_value::text,
+  ALTER COLUMN discrepancy TYPE TEXT USING discrepancy::text;
 
 CREATE INDEX IF NOT EXISTS idx_pilot_log_entry_org_observed
   ON pilot_log_entry(org_id, observed_on DESC);
@@ -149,9 +154,9 @@ WITH contribution_obligations AS (
 loan_obligations AS (
   SELECT
     ls.org_id,
-    m.id AS member_id,
-    m.display_name AS member_name,
-    m.whatsapp_number,
+    COALESCE(l.borrower_member_id, repayment_summary.member_id) AS member_id,
+    COALESCE(m.display_name, nmb.display_name) AS member_name,
+    COALESCE(m.whatsapp_number, nmb.whatsapp_number) AS whatsapp_number,
     'cuota'::text AS reason_kind,
     NULL::uuid AS cycle_id,
     l.id AS loan_id,
@@ -162,25 +167,36 @@ loan_obligations AS (
       (ls.principal_due + ls.interest_due) - (ls.paid_principal_to_date + ls.paid_interest_to_date),
       0
     )::NUMERIC(18, 4) AS amount_due,
-    MAX(r.recorded_at) AS last_action_at
+    repayment_summary.last_action_at
   FROM loan_schedule ls
   JOIN loan l
     ON l.id = ls.loan_id
    AND l.org_id = ls.org_id
-  JOIN member m
-    ON m.id = COALESCE(l.borrower_member_id, l.member_id)
+  LEFT JOIN LATERAL (
+    SELECT
+      MAX(r.member_id::text)::uuid AS member_id,
+      MAX(r.recorded_at) AS last_action_at
+    FROM repayment r
+    WHERE r.org_id = ls.org_id
+      AND r.loan_id = l.id
+  ) repayment_summary ON TRUE
+  LEFT JOIN member m
+    ON m.id = COALESCE(l.borrower_member_id, repayment_summary.member_id)
    AND m.org_id = ls.org_id
-  LEFT JOIN repayment r
-    ON r.org_id = ls.org_id
-   AND r.loan_id = l.id
-   AND r.member_id = m.id
+  LEFT JOIN non_member_borrower nmb
+    ON nmb.id = l.borrower_non_member_id
+   AND nmb.org_id = ls.org_id
   WHERE ls.due_on < CURRENT_DATE
     AND ls.status IN ('pendiente', 'parcial', 'atrasado', 'en_mora')
   GROUP BY
     ls.org_id,
-    m.id,
+    l.borrower_member_id,
+    repayment_summary.member_id,
+    repayment_summary.last_action_at,
     m.display_name,
     m.whatsapp_number,
+    nmb.display_name,
+    nmb.whatsapp_number,
     l.id,
     ls.period_index,
     ls.due_on,
@@ -201,7 +217,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_ar_aging_unique_obligation
   ON mv_ar_aging(
     org_id,
     reason_kind,
-    member_id,
+    COALESCE(member_id, '00000000-0000-0000-0000-000000000000'::uuid),
     COALESCE(cycle_id, '00000000-0000-0000-0000-000000000000'::uuid),
     COALESCE(loan_id, '00000000-0000-0000-0000-000000000000'::uuid),
     period_label

@@ -91,10 +91,18 @@ function normalizeSchedule(row: typeof loanSchedule.$inferSelect): AccrualSchedu
   };
 }
 
-async function refreshProjectedLiquidity() {
+async function refreshDerivedViews() {
   await db.execute(sql.raw(`
 DO $$
 BEGIN
+  IF to_regclass('mv_available_capital') IS NOT NULL THEN
+    EXECUTE 'REFRESH MATERIALIZED VIEW mv_available_capital';
+  END IF;
+
+  IF to_regclass('mv_ar_aging') IS NOT NULL THEN
+    EXECUTE 'REFRESH MATERIALIZED VIEW mv_ar_aging';
+  END IF;
+
   IF to_regclass('mv_liquidez_proyectada') IS NOT NULL THEN
     EXECUTE 'REFRESH MATERIALIZED VIEW mv_liquidez_proyectada';
   END IF;
@@ -303,11 +311,11 @@ export async function runAccrueInterestCron(request: Request): Promise<CronRunSu
   }
 
   try {
-    await refreshProjectedLiquidity();
+    await refreshDerivedViews();
   } catch (error) {
     summary.failures.push({
       orgId: "system",
-      message: error instanceof Error ? error.message : "Projected liquidity refresh failed",
+      message: error instanceof Error ? error.message : "Derived views refresh failed",
     });
   }
 
