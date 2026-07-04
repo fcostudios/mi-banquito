@@ -6,6 +6,7 @@ export * from "./interest";
 export * from "./ledger";
 export * from "./liquidity";
 export * from "./loan";
+export * from "./pilot";
 export * from "./platform";
 export * from "./reconciliation";
 export * from "./reporting";

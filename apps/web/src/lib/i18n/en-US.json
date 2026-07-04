@@ -196,6 +196,26 @@
     "onePending": "1 guardado pendiente",
     "manyPendingSuffix": "guardados pendientes"
   },
+  "pilotLog": {
+    "title": "Bitácora del piloto",
+    "description": "Registra observaciones de paridad entre cuaderno y sistema.",
+    "exitCriteria": "Criterios de salida",
+    "ready": "Listo",
+    "pending": "Pendiente",
+    "threeCleanMonths": "3 meses limpios consecutivos",
+    "wouldNotReturn": "No volvería al papel",
+    "readyToClose": "Piloto listo para cierre",
+    "monitoring": "Piloto en seguimiento",
+    "observedOn": "Fecha observada",
+    "vocabularyAnswer": "Respuesta de vocabulario",
+    "paperValue": "Cuaderno",
+    "systemValue": "Sistema",
+    "discrepancy": "Diferencia",
+    "cleanMonth": "Mes limpio",
+    "wouldNotReturnCheckbox": "No volvería al papel",
+    "note": "Nota",
+    "save": "Guardar observación"
+  },
   "shell": {
     "header": {
       "appName": "Mi Banquito",
