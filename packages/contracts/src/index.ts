@@ -19,11 +19,16 @@ import {
   extraordinaryCollection,
   extraordinaryCollectionLine,
   loan,
+  loanDisbursement,
   loanSchedule,
   loanFee,
   repayment,
+  promise,
+  promiseReminder,
   organization,
   groupConfig,
+  arAging,
+  projectedLiquidity,
   platformOperator,
   impersonation,
   userAccount,
@@ -34,6 +39,8 @@ import {
   periodClose,
   statementArchive,
   surplusGovernanceDecision,
+  treasurerCompensationDisbursement,
+  pilotLogEntry,
   yearEndShareOut,
   yearEndShareOutLine,
   yearEndBalanceSnapshot,
@@ -70,16 +77,24 @@ export const insertExtraordinaryCollectionLineSchema = createInsertSchema(extrao
 export const selectExtraordinaryCollectionLineSchema = createSelectSchema(extraordinaryCollectionLine);
 export const insertLoanSchema = createInsertSchema(loan);
 export const selectLoanSchema = createSelectSchema(loan);
+export const insertLoanDisbursementSchema = createInsertSchema(loanDisbursement);
+export const selectLoanDisbursementSchema = createSelectSchema(loanDisbursement);
 export const insertLoanScheduleSchema = createInsertSchema(loanSchedule);
 export const selectLoanScheduleSchema = createSelectSchema(loanSchedule);
 export const insertLoanFeeSchema = createInsertSchema(loanFee);
 export const selectLoanFeeSchema = createSelectSchema(loanFee);
 export const insertRepaymentSchema = createInsertSchema(repayment);
 export const selectRepaymentSchema = createSelectSchema(repayment);
+export const insertPromiseSchema = createInsertSchema(promise);
+export const selectPromiseSchema = createSelectSchema(promise);
+export const insertPromiseReminderSchema = createInsertSchema(promiseReminder);
+export const selectPromiseReminderSchema = createSelectSchema(promiseReminder);
 export const insertOrganizationSchema = createInsertSchema(organization);
 export const selectOrganizationSchema = createSelectSchema(organization);
 export const insertGroupConfigSchema = createInsertSchema(groupConfig);
 export const selectGroupConfigSchema = createSelectSchema(groupConfig);
+export const selectArAgingSchema = createSelectSchema(arAging);
+export const selectProjectedLiquiditySchema = createSelectSchema(projectedLiquidity);
 export const insertPlatformOperatorSchema = createInsertSchema(platformOperator);
 export const selectPlatformOperatorSchema = createSelectSchema(platformOperator);
 export const insertImpersonationSchema = createInsertSchema(impersonation);
@@ -100,6 +115,10 @@ export const insertStatementArchiveSchema = createInsertSchema(statementArchive)
 export const selectStatementArchiveSchema = createSelectSchema(statementArchive);
 export const insertSurplusGovernanceDecisionSchema = createInsertSchema(surplusGovernanceDecision);
 export const selectSurplusGovernanceDecisionSchema = createSelectSchema(surplusGovernanceDecision);
+export const insertTreasurerCompensationDisbursementSchema = createInsertSchema(treasurerCompensationDisbursement);
+export const selectTreasurerCompensationDisbursementSchema = createSelectSchema(treasurerCompensationDisbursement);
+export const insertPilotLogEntrySchema = createInsertSchema(pilotLogEntry);
+export const selectPilotLogEntrySchema = createSelectSchema(pilotLogEntry);
 export const insertYearEndShareOutSchema = createInsertSchema(yearEndShareOut);
 export const selectYearEndShareOutSchema = createSelectSchema(yearEndShareOut);
 export const insertYearEndShareOutLineSchema = createInsertSchema(yearEndShareOutLine);
@@ -110,7 +129,9 @@ export const insertYearEndBalanceSnapshotLineSchema = createInsertSchema(yearEnd
 export const selectYearEndBalanceSnapshotLineSchema = createSelectSchema(yearEndBalanceSnapshotLine);
 
 const moneyString = z.string().regex(/^\d+(\.\d{1,4})?$/, "Use a non-negative decimal amount");
+const signedMoneyString = z.string().regex(/^-?\d+(\.\d{1,4})?$/, "Use a decimal amount");
 const uuidString = z.string().uuid();
+const optionalUuidString = uuidString.optional().or(z.literal(""));
 const e164 = z.string().regex(/^\+[1-9]\d{7,14}$/, "Use E.164 format, for example +593987654321");
 
 export const organizationCreateFormSchema = z.object({
@@ -263,6 +284,51 @@ export const loanRepaymentFormSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
+export const markPromiseFormSchema = z.object({
+  memberId: uuidString,
+  loanId: optionalUuidString,
+  cycleId: optionalUuidString,
+  promisedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  note: z.string().max(500).optional(),
+}).superRefine((value, ctx) => {
+  const sourceCount = Number(Boolean(value.loanId)) + Number(Boolean(value.cycleId));
+
+  if (sourceCount !== 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["loanId"],
+      message: "Select exactly one promise source",
+    });
+  }
+});
+
+export const chaseAttemptFormSchema = z.object({
+  memberId: uuidString,
+  loanId: optionalUuidString,
+  cycleId: optionalUuidString,
+  reasonKind: z.enum(["aporte", "cuota"]),
+  periodLabel: z.string().trim().min(1),
+});
+
+export const loanDisbursementSourceSchema = z.enum(["bank_transfer", "petty_cash"]);
+
+export const liquiditySandboxSchema = z.object({
+  hypotheticalLoanAmount: moneyString.optional().or(z.literal("")),
+});
+
+export const verifyHashSchema = z.string().regex(/^[0-9a-fA-F]{64}$/, "Use a 64 character hexadecimal hash");
+
+export const pilotLogEntryFormSchema = z.object({
+  observedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  vocabularyAnswer: z.string().trim().min(1),
+  paperValue: moneyString,
+  systemValue: moneyString,
+  discrepancy: signedMoneyString,
+  wouldNotReturnToPaper: z.enum(["yes", "no"]).default("no"),
+  cleanMonth: z.enum(["yes", "no"]).default("no"),
+  note: z.string().max(500).optional(),
+});
+
 export const cronReplayFormSchema = z.object({
   endpoint: z.enum(["accrue-interest", "award-treasurer-compensation", "drift-check"]),
   fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -283,4 +349,8 @@ export type ReverseContributionForm = z.infer<typeof reverseContributionFormSche
 export type BaseFundQuotaPaymentForm = z.infer<typeof baseFundQuotaPaymentFormSchema>;
 export type LoanOriginationForm = z.infer<typeof loanOriginationFormSchema>;
 export type LoanRepaymentForm = z.infer<typeof loanRepaymentFormSchema>;
+export type MarkPromiseForm = z.infer<typeof markPromiseFormSchema>;
+export type ChaseAttemptForm = z.infer<typeof chaseAttemptFormSchema>;
+export type LiquiditySandbox = z.infer<typeof liquiditySandboxSchema>;
+export type PilotLogEntryForm = z.infer<typeof pilotLogEntryFormSchema>;
 export type CronReplayForm = z.infer<typeof cronReplayFormSchema>;
