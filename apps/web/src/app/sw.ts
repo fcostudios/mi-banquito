@@ -18,4 +18,17 @@ const serwist = new Serwist({
   runtimeCaching: defaultCache,
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "MI_BANQUITO_OUTBOX_COUNT") {
+    self.clients.matchAll({ type: "window" }).then((clients) => {
+      for (const client of clients) {
+        client.postMessage({
+          type: "MI_BANQUITO_OUTBOX_COUNT",
+          count: event.data.count,
+        });
+      }
+    });
+  }
+});
+
 serwist.addEventListeners();
