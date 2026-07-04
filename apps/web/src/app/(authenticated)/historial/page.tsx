@@ -27,6 +27,7 @@ const actionLabels: Record<(typeof narratedAuditActionKinds)[number], string> = 
   "contribution.reverse": copy.actions.contributionReverse,
   "loan.repayment.create": copy.actions.repaymentCreate,
   "loan.repayment.payoff": copy.actions.repaymentPayoff,
+  "loan.repayment.data_correction": copy.actions.repaymentDataCorrection,
   "loan.originated": copy.actions.loanOriginate,
   "member.create": copy.actions.memberCreate,
   "member.status_transition": copy.actions.memberStatus,
@@ -35,6 +36,10 @@ const actionLabels: Record<(typeof narratedAuditActionKinds)[number], string> = 
   "adjustment_period.open": copy.actions.adjustmentPeriodOpen,
   "base_fund_quota.payment": copy.actions.baseFundQuotaPayment,
 };
+
+function actionLabel(actionKind: string) {
+  return actionLabels[actionKind as keyof typeof actionLabels] ?? actionKind;
+}
 
 export default async function ScrHistoryPage({
   searchParams,
@@ -115,7 +120,7 @@ export default async function ScrHistoryPage({
               </div>
               <div>
                 <dt className="font-medium text-text-primary">{copy.actionKind}</dt>
-                <dd>{entry.actionKind}</dd>
+                <dd>{actionLabel(entry.actionKind)}</dd>
               </div>
               <div>
                 <dt className="font-medium text-text-primary">{copy.actor}</dt>

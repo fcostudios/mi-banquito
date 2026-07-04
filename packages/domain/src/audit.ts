@@ -129,6 +129,10 @@ const templates: Record<string, (input: AuditNarrationInput) => string> = {
     const payload = payloadObject(input.payloadSnapshot);
     return `${memberName(payload)} terminó de pagar un préstamo con un pago de $${money(stringField(payload, "amount"))} el ${stringField(payload, "datedOn") ?? dateOnly(input.at)}.`;
   },
+  "loan.repayment.data_correction": (input) => {
+    const payload = payloadObject(input.payloadSnapshot);
+    return `Se corrigió el registro de pago de ${memberName(payload)} por $${money(stringField(payload, "amount"))} el ${stringField(payload, "datedOn") ?? dateOnly(input.at)}.`;
+  },
   "loan.originated": (input) => {
     const payload = payloadObject(input.payloadSnapshot);
     return `${memberName(payload)} recibió un préstamo de $${money(stringField(payload, "principalAmount"))} el ${stringField(payload, "originatedOn") ?? dateOnly(input.at)}.`;
