@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseExternalProviderEnv,
   parsePublicEnv,
+  parseServerEnvForAuthClient,
   parseServerEnv,
 } from "./env";
 
@@ -48,6 +49,26 @@ describe("environment validation", () => {
         NEXT_PUBLIC_API_URL: "http://localhost:3000",
       }),
     ).toEqual({ NEXT_PUBLIC_API_URL: "http://localhost:3000" });
+  });
+
+  it("allows Vercel preview builds to import the Auth0 client without runtime secrets", () => {
+    expect(
+      parseServerEnvForAuthClient({
+        VERCEL: "1",
+        VERCEL_ENV: "preview",
+      }),
+    ).toMatchObject({
+      APP_BASE_URL: "https://preview.invalid",
+      AUTH0_CLIENT_ID: "preview-build-client-id",
+      AUTH0_SECRET: "00000000000000000000000000000000",
+    });
+
+    expect(() =>
+      parseServerEnvForAuthClient({
+        VERCEL: "1",
+        VERCEL_ENV: "production",
+      }),
+    ).toThrow(/Invalid environment configuration/);
   });
 
   it("tracks external provider variables separately until US-005 provisions them", () => {

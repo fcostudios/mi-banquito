@@ -46,6 +46,34 @@ export function parseServerEnv(source: EnvSource = process.env): ServerEnv {
   return parsed.data;
 }
 
+export function parseServerEnvForAuthClient(source: EnvSource = process.env): ServerEnv {
+  const parsed = serverEnvSchema.safeParse(source);
+  if (parsed.success) {
+    return parsed.data;
+  }
+
+  if (source.VERCEL === "1" && source.VERCEL_ENV === "preview") {
+    return {
+      APP_BASE_URL: source.APP_BASE_URL ?? "https://preview.invalid",
+      AUTH0_CLIENT_ID: source.AUTH0_CLIENT_ID ?? "preview-build-client-id",
+      AUTH0_CLIENT_SECRET: source.AUTH0_CLIENT_SECRET ?? "preview-build-client-secret",
+      AUTH0_DOMAIN: source.AUTH0_DOMAIN ?? "preview.invalid",
+      AUTH0_ORGANIZATION: source.AUTH0_ORGANIZATION,
+      AUTH0_ORGANIZATION_DB_ORG_ID: source.AUTH0_ORGANIZATION_DB_ORG_ID,
+      AUTH0_SECRET: source.AUTH0_SECRET ?? "00000000000000000000000000000000",
+      CRON_SECRET: source.CRON_SECRET ?? "preview-build-cron-secret",
+      DATABASE_URL:
+        source.DATABASE_URL ?? "postgresql://preview:preview@localhost:5432/preview",
+      DB_DRIVER:
+        source.DB_DRIVER === "pg" || source.DB_DRIVER === "neon" || source.DB_DRIVER === "neon-http"
+          ? source.DB_DRIVER
+          : undefined,
+    };
+  }
+
+  throw formatEnvError(parsed.error);
+}
+
 export function parsePublicEnv(source: EnvSource = process.env): PublicEnv {
   const parsed = publicEnvSchema.safeParse(source);
   if (!parsed.success) {
