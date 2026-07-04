@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNull, lte } from "drizzle-orm";
 
 import { db } from "@mi-banquito/db";
-import { alert, arAging, auditLogEntry, promise, promiseReminder } from "@mi-banquito/db/schema";
+import { alert, arAging, auditLogEntry, organization, promise, promiseReminder } from "@mi-banquito/db/schema";
 import { withTenantTransaction } from "@mi-banquito/db/tenant";
 
 export type AgingRow = {
@@ -240,6 +240,35 @@ function systemActorId(): string {
   return "00000000-0000-0000-0000-000000000000";
 }
 
+type TenantTransaction = Parameters<Parameters<typeof withTenantTransaction>[1]>[0];
+
+// System scheduler bootstrap read: this enumerates only active organization IDs
+// outside tenant context so forced-RLS tenant tables are touched inside
+// withTenantTransaction. It assumes the scheduler DB role may read organizations.
+async function listActiveOrganizationIdsForSystemScheduler(): Promise<string[]> {
+  const rows = await db.select({ id: organization.id }).from(organization)
+    .where(eq(organization.status, "active"));
+  return rows.map((row) => row.id);
+}
+
+async function assertSourceObligationExists(
+  tx: TenantTransaction,
+  input: { orgId: string; memberId: string },
+  source: PromiseSourceRef,
+): Promise<void> {
+  const rows = await tx.select().from(arAging)
+    .where(and(
+      eq(arAging.orgId, input.orgId),
+      eq(arAging.memberId, input.memberId),
+      source.loanId ? eq(arAging.loanId, source.loanId) : isNull(arAging.loanId),
+      source.cycleId ? eq(arAging.cycleId, source.cycleId) : isNull(arAging.cycleId),
+    ));
+
+  if (rows.length === 0) {
+    throw new Error("collections_obligation_not_found");
+  }
+}
+
 export function createCollectionsService(): CollectionsService {
   return {
     context: "collections",
@@ -265,6 +294,8 @@ export function createCollectionsService(): CollectionsService {
       const note = trimmedNote(input.note);
 
       await withTenantTransaction(input.orgId, async (tx) => {
+        await assertSourceObligationExists(tx, input, source);
+
         const openRows = await tx.select().from(promise)
           .where(and(
             eq(promise.orgId, input.orgId),
@@ -327,6 +358,8 @@ export function createCollectionsService(): CollectionsService {
       const now = new Date();
 
       await withTenantTransaction(input.orgId, async (tx) => {
+        await assertSourceObligationExists(tx, input, source);
+
         await tx.insert(auditLogEntry).values({
           orgId: input.orgId,
           actorKind: "member",
@@ -350,67 +383,78 @@ export function createCollectionsService(): CollectionsService {
     },
     async emitPromiseReminders(todayIso) {
       dateParts(todayIso);
-      const openPromises = await db.select().from(promise)
-        .where(and(eq(promise.status, "open"), lte(promise.promisedOn, todayIso)));
+      const orgIds = await listActiveOrganizationIdsForSystemScheduler();
+      let promisesScanned = 0;
       let remindersEmitted = 0;
 
-      for (const row of openPromises) {
-        const emitted = await withTenantTransaction(row.orgId, async (tx) => {
-          const now = new Date();
-          const [reminder] = await tx.insert(promiseReminder).values({
-            orgId: row.orgId,
-            promiseId: row.id,
-            reminderDate: todayIso,
-            alertId: null,
-            createdAt: now,
-          }).onConflictDoNothing().returning();
+      for (const orgId of orgIds) {
+        const result = await withTenantTransaction(orgId, async (tx) => {
+          const duePromises = await tx.select().from(promise)
+            .where(and(
+              eq(promise.orgId, orgId),
+              eq(promise.status, "open"),
+              lte(promise.promisedOn, todayIso),
+            ));
+          let orgRemindersEmitted = 0;
 
-          if (!reminder) {
-            return false;
+          for (const row of duePromises) {
+            const now = new Date();
+            const [reminder] = await tx.insert(promiseReminder).values({
+              orgId: row.orgId,
+              promiseId: row.id,
+              reminderDate: todayIso,
+              alertId: null,
+              createdAt: now,
+            }).onConflictDoNothing().returning();
+
+            if (!reminder) {
+              continue;
+            }
+
+            const alertId = randomUUID();
+            await tx.insert(alert).values({
+              id: alertId,
+              orgId: row.orgId,
+              alertKind: "promise_due",
+              severity: "medium",
+              audience: "treasurer",
+              subjectKind: row.loanId ? "loan" : "contribution_cycle",
+              subjectId: row.loanId ?? row.cycleId,
+              payload: { promiseId: row.id, memberId: row.memberId, promisedOn: row.promisedOn },
+              dedupWindowEnd: new Date(now.getTime() + 86_400_000),
+              dismissedAt: null,
+              dismissedBy: null,
+              snoozedUntil: null,
+              createdAt: now,
+            });
+            await tx.update(promiseReminder)
+              .set({ alertId })
+              .where(and(
+                eq(promiseReminder.orgId, row.orgId),
+                eq(promiseReminder.id, reminder.id),
+              ));
+            await tx.insert(auditLogEntry).values({
+              orgId: row.orgId,
+              actorKind: "system",
+              actorId: systemActorId(),
+              actionKind: "collections.promise.reminder_emitted",
+              subjectKind: "promise",
+              subjectId: row.id,
+              payloadSnapshot: { promiseId: row.id, alertId, reminderDate: todayIso },
+              reason: null,
+              at: now,
+              createdAt: now,
+            });
+            orgRemindersEmitted += 1;
           }
 
-          const alertId = randomUUID();
-          await tx.insert(alert).values({
-            id: alertId,
-            orgId: row.orgId,
-            alertKind: "promise_due",
-            severity: "medium",
-            audience: "treasurer",
-            subjectKind: row.loanId ? "loan" : "contribution_cycle",
-            subjectId: row.loanId ?? row.cycleId,
-            payload: { promiseId: row.id, memberId: row.memberId, promisedOn: row.promisedOn },
-            dedupWindowEnd: new Date(now.getTime() + 86_400_000),
-            dismissedAt: null,
-            dismissedBy: null,
-            snoozedUntil: null,
-            createdAt: now,
-          });
-          await tx.update(promiseReminder)
-            .set({ alertId })
-            .where(and(
-              eq(promiseReminder.orgId, row.orgId),
-              eq(promiseReminder.id, reminder.id),
-            ));
-          await tx.insert(auditLogEntry).values({
-            orgId: row.orgId,
-            actorKind: "system",
-            actorId: systemActorId(),
-            actionKind: "collections.promise.reminder_emitted",
-            subjectKind: "promise",
-            subjectId: row.id,
-            payloadSnapshot: { promiseId: row.id, alertId, reminderDate: todayIso },
-            reason: null,
-            at: now,
-            createdAt: now,
-          });
-          return true;
+          return { promisesScanned: duePromises.length, remindersEmitted: orgRemindersEmitted };
         });
-        if (emitted) {
-          remindersEmitted += 1;
-        }
+        promisesScanned += result.promisesScanned;
+        remindersEmitted += result.remindersEmitted;
       }
 
-      return { promisesScanned: openPromises.length, remindersEmitted };
+      return { promisesScanned, remindersEmitted };
     },
   };
 }

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { getTableName } from "drizzle-orm";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildChaseMessage,
@@ -9,6 +10,149 @@ import {
   promiseReminderCandidates,
   sortAgingRows,
 } from "./collections";
+import { alert, arAging, auditLogEntry, organization, promise, promiseReminder } from "@mi-banquito/db/schema";
+
+type InsertRecord = {
+  tableName: string;
+  values: Record<string, unknown> | Array<Record<string, unknown>>;
+};
+
+type SelectRecord = {
+  context: string;
+  tableName: string;
+};
+
+const tableNameOf = (table: unknown): string => getTableName(table as Parameters<typeof getTableName>[0]);
+
+class FakeSelectBuilder {
+  private tableName: string | null = null;
+
+  constructor(
+    private readonly context: string,
+    private readonly selects: SelectRecord[],
+    private readonly nextResult: (tableName: string) => unknown[],
+  ) {}
+
+  from(table: unknown) {
+    this.tableName = tableNameOf(table);
+    this.selects.push({ context: this.context, tableName: this.tableName });
+    return this;
+  }
+
+  where() {
+    return this;
+  }
+
+  orderBy() {
+    return this;
+  }
+
+  then<TResult1 = unknown[], TResult2 = never>(
+    onfulfilled?: ((value: unknown[]) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2> {
+    return Promise.resolve(this.nextResult(this.tableName ?? "")).then(onfulfilled, onrejected);
+  }
+}
+
+class FakeInsertBuilder {
+  private returningRows: unknown[];
+
+  constructor(
+    private readonly table: unknown,
+    private readonly inserts: InsertRecord[],
+    nextReturning: (tableName: string) => unknown[],
+  ) {
+    this.returningRows = nextReturning(tableNameOf(table));
+  }
+
+  values(values: Record<string, unknown> | Array<Record<string, unknown>>) {
+    this.inserts.push({ tableName: tableNameOf(this.table), values });
+    return this;
+  }
+
+  onConflictDoNothing() {
+    return this;
+  }
+
+  returning() {
+    return Promise.resolve(this.returningRows);
+  }
+}
+
+class FakeUpdateBuilder {
+  set() {
+    return this;
+  }
+
+  where() {
+    return Promise.resolve([]);
+  }
+}
+
+class FakeDb {
+  readonly inserts: InsertRecord[] = [];
+  readonly selects: SelectRecord[] = [];
+  private readonly insertReturningByTableName: Record<string, unknown[][]>;
+  private readonly selectResultsByTableName: Record<string, unknown[][]>;
+
+  constructor(
+    readonly context: string,
+    selectResultsByTableName: Record<string, unknown[][]> = {},
+    insertReturningByTableName: Record<string, unknown[][]> = {},
+  ) {
+    this.selectResultsByTableName = { ...selectResultsByTableName };
+    this.insertReturningByTableName = { ...insertReturningByTableName };
+  }
+
+  select() {
+    return new FakeSelectBuilder(this.context, this.selects, (tableName) => (
+      this.selectResultsByTableName[tableName]?.shift() ?? []
+    ));
+  }
+
+  insert(table: unknown) {
+    return new FakeInsertBuilder(table, this.inserts, (tableName) => (
+      this.insertReturningByTableName[tableName]?.shift() ?? []
+    ));
+  }
+
+  update() {
+    return new FakeUpdateBuilder();
+  }
+}
+
+function insertedRows(fakeDbs: FakeDb | FakeDb[], table: unknown): Array<Record<string, unknown>> {
+  return [fakeDbs].flat()
+    .flatMap((fakeDb) => fakeDb.inserts)
+    .filter((entry) => entry.tableName === tableNameOf(table))
+    .flatMap((entry) => Array.isArray(entry.values) ? entry.values : [entry.values]);
+}
+
+async function withMockedCollectionsDb<T>(
+  input: {
+    systemDb: FakeDb;
+    tenantDbs?: Record<string, FakeDb>;
+    tenantCalls?: string[];
+  },
+  callback: () => Promise<T>,
+): Promise<T> {
+  vi.resetModules();
+  vi.doMock("@mi-banquito/db", () => ({ db: input.systemDb }));
+  vi.doMock("@mi-banquito/db/tenant", () => ({
+    withTenantTransaction: async <R>(orgId: string, run: (tx: FakeDb) => Promise<R>): Promise<R> => {
+      input.tenantCalls?.push(orgId);
+      return run(input.tenantDbs?.[orgId] ?? input.systemDb);
+    },
+  }));
+  try {
+    return await callback();
+  } finally {
+    vi.doUnmock("@mi-banquito/db");
+    vi.doUnmock("@mi-banquito/db/tenant");
+    vi.resetModules();
+  }
+}
 
 describe("collections", () => {
   if (false) {
@@ -151,5 +295,110 @@ describe("collections", () => {
     expect(service.markPromise).toEqual(expect.any(Function));
     expect(service.recordChaseAttempt).toEqual(expect.any(Function));
     expect(service.emitPromiseReminders).toEqual(expect.any(Function));
+  });
+
+  it("emits promise reminders by opening tenant transactions per active organization", async () => {
+    const orgRows = [{ id: "org-1" }, { id: "org-2" }];
+    const org1Promise = {
+      id: "promise-1",
+      orgId: "org-1",
+      memberId: "member-1",
+      loanId: "loan-1",
+      cycleId: null,
+      promisedOn: "2026-07-04",
+      status: "open",
+    };
+    const org2Promise = {
+      id: "promise-2",
+      orgId: "org-2",
+      memberId: "member-2",
+      loanId: null,
+      cycleId: "cycle-2",
+      promisedOn: "2026-07-03",
+      status: "open",
+    };
+    const systemDb = new FakeDb("system", {
+      [tableNameOf(organization)]: [orgRows],
+    });
+    const tenantDbs = {
+      "org-1": new FakeDb("tenant:org-1", {
+        [tableNameOf(promise)]: [[org1Promise]],
+      }, {
+        [tableNameOf(promiseReminder)]: [[{ id: "reminder-1" }]],
+      }),
+      "org-2": new FakeDb("tenant:org-2", {
+        [tableNameOf(promise)]: [[org2Promise]],
+      }, {
+        [tableNameOf(promiseReminder)]: [[{ id: "reminder-2" }]],
+      }),
+    };
+    const tenantCalls: string[] = [];
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs, tenantCalls }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().emitPromiseReminders("2026-07-04"))
+        .resolves.toEqual({ promisesScanned: 2, remindersEmitted: 2 });
+    });
+
+    expect(tenantCalls).toEqual(["org-1", "org-2"]);
+    expect(systemDb.selects).toEqual([{ context: "system", tableName: tableNameOf(organization) }]);
+    expect(tenantDbs["org-1"].selects).toEqual([{ context: "tenant:org-1", tableName: tableNameOf(promise) }]);
+    expect(tenantDbs["org-2"].selects).toEqual([{ context: "tenant:org-2", tableName: tableNameOf(promise) }]);
+  });
+
+  it("does not create alert or audit rows when an existing promise reminder conflicts", async () => {
+    const duePromise = {
+      id: "promise-1",
+      orgId: "org-1",
+      memberId: "member-1",
+      loanId: "loan-1",
+      cycleId: null,
+      promisedOn: "2026-07-04",
+      status: "open",
+    };
+    const systemDb = new FakeDb("system", {
+      [tableNameOf(organization)]: [[{ id: "org-1" }]],
+    });
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(promise)]: [[duePromise]],
+    }, {
+      [tableNameOf(promiseReminder)]: [[]],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().emitPromiseReminders("2026-07-04"))
+        .resolves.toEqual({ promisesScanned: 1, remindersEmitted: 0 });
+    });
+
+    expect(insertedRows(tenantDb, promiseReminder)).toHaveLength(1);
+    expect(insertedRows(tenantDb, alert)).toHaveLength(0);
+    expect(insertedRows(tenantDb, auditLogEntry)).toHaveLength(0);
+  });
+
+  it("rejects marking a promise for a source obligation that is not in aging rows", async () => {
+    const systemDb = new FakeDb("system");
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(arAging)]: [[]],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().markPromise({
+        orgId: "org-1",
+        actorId: "actor-1",
+        memberId: "member-1",
+        loanId: "loan-1",
+        promisedOn: "2026-07-11",
+        todayIso: "2026-07-04",
+      })).rejects.toThrow("collections_obligation_not_found");
+    });
+
+    expect(tenantDb.selects).toEqual([{ context: "tenant:org-1", tableName: tableNameOf(arAging) }]);
+    expect(insertedRows(tenantDb, promise)).toHaveLength(0);
+    expect(insertedRows(tenantDb, auditLogEntry)).toHaveLength(0);
   });
 });
