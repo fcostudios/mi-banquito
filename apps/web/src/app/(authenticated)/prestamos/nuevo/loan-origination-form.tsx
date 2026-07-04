@@ -30,6 +30,9 @@ type LoanCopy = {
   principalAmount: string;
   termPeriods: string;
   originatedOn: string;
+  disbursementSource: string;
+  disbursementSourceBankTransfer: string;
+  disbursementSourcePettyCash: string;
   purpose: string;
   submit: string;
 };
@@ -148,6 +151,12 @@ export function LoanOriginationForm({
         </FormField>
         <FormField labelKey={copy.originatedOn}>
           <InputText labelKey={copy.originatedOn} name="originatedOn" type="date" defaultValue={today} required />
+        </FormField>
+        <FormField labelKey={copy.disbursementSource}>
+          <Select name="disbursementSource" defaultValue="bank_transfer" required>
+            <option value="bank_transfer">{copy.disbursementSourceBankTransfer}</option>
+            <option value="petty_cash">{copy.disbursementSourcePettyCash}</option>
+          </Select>
         </FormField>
         <FormField labelKey={copy.purpose}>
           <InputText labelKey={copy.purpose} name="purpose" />

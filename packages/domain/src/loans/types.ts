@@ -1,4 +1,5 @@
 export type BorrowerKind = "member" | "non_member";
+export type LoanDisbursementSource = "bank_transfer" | "petty_cash";
 
 export type EligibilityResult =
   | { ok: true }
@@ -42,6 +43,7 @@ export type OriginateLoanInput = {
   principalAmount: string;
   termPeriods: number;
   originatedOn: string;
+  disbursementSource?: LoanDisbursementSource;
   purpose?: string;
 };
 

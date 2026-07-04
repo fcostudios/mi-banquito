@@ -61,6 +61,21 @@ describe("Sprint 2 form validation", () => {
 
     expect(parsed.borrowerKind).toBe("member");
     expect(parsed.termPeriods).toBe(10);
+    expect(parsed.disbursementSource).toBe("bank_transfer");
+  });
+
+  it("accepts petty cash as a loan disbursement source", () => {
+    const parsed = loanOriginationFormSchema.parse({
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      borrowerKind: "member",
+      borrowerMemberId: "22222222-2222-4222-8222-222222222222",
+      principalAmount: "1000.0000",
+      termPeriods: "10",
+      originatedOn: "2026-06-30",
+      disbursementSource: "petty_cash",
+    });
+
+    expect(parsed.disbursementSource).toBe("petty_cash");
   });
 
   it("rejects non-member loan origination without a guarantor", () => {

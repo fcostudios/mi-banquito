@@ -12,6 +12,7 @@ import {
   groupConfig,
   interestAccrual,
   loan,
+  loanDisbursement,
   loanFee,
   loanGuarantor,
   loanReferral,
@@ -25,6 +26,7 @@ import { calculateInterestFirstSplit, calculateNextInstallmentSplit } from "./lo
 import { evaluateLoanEligibility, resolveOriginationRate } from "./loans/eligibility";
 import { calculateDailyInterestAmount, calculatePrincipalBasisOn } from "./loans/accrual";
 import type {
+  LoanDisbursementSource,
   OriginateLoanInput,
   OriginateLoanResult,
   LoanDetailRow,
@@ -38,6 +40,7 @@ import { type AuditWriter, writeWithAudit } from "./audit";
 export type {
   BorrowerKind,
   EligibilityResult,
+  LoanDisbursementSource,
   LoanDetailRow,
   LoanListRow,
   LoanSupportMember,
@@ -470,6 +473,7 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
     }, input.borrowerKind);
     const principalAmount = money4(input.principalAmount);
     const currencyCode = currentConfig.currencyCode || "USD";
+    const disbursementSource: LoanDisbursementSource = input.disbursementSource ?? "bank_transfer";
 
     let borrowerMemberId: string | null = null;
     let borrowerNonMemberId: string | null = null;
@@ -590,6 +594,18 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
             updatedBy: null,
           });
 
+          await tx.insert(loanDisbursement).values({
+            orgId: input.orgId,
+            loanId,
+            disbursementSource,
+            amount: principalAmount,
+            currencyCode,
+            disbursedOn: input.originatedOn,
+            createdAt: now,
+            createdBy: input.actorId,
+            createdByKind: ACTOR_KIND,
+          });
+
           await tx.insert(loanSchedule).values(scheduleRows);
 
           const firstInstallment = schedule.installments[0];
@@ -665,6 +681,7 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
               rateModel: currentConfig.loanRateModel,
               termPeriods: input.termPeriods,
               originatedOn: input.originatedOn,
+              disbursementSource,
               groupConfigVersionAtOrigination: currentConfig.version,
               referrerMemberId: input.referrerMemberId || null,
             },

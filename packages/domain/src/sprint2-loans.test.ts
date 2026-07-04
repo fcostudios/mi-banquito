@@ -6,6 +6,7 @@ import {
   contribution,
   groupConfig,
   loan as loanTable,
+  loanDisbursement,
   loanFee,
   loanGuarantor,
   loanReferral,
@@ -458,6 +459,7 @@ describe("Sprint 2 loan domain rules", () => {
         principalAmount: "1000.0000",
         termPeriods: 2,
         originatedOn: "2026-07-01",
+        disbursementSource: "petty_cash",
         purpose: "Capital de trabajo",
       });
 
@@ -503,6 +505,16 @@ describe("Sprint 2 loan domain rules", () => {
         groupConfigVersion: 7,
         feedsSurplus: true,
       });
+      expect(insertedRows(fakeDb, loanDisbursement)[0]).toMatchObject({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        loanId: result.loanId,
+        disbursementSource: "petty_cash",
+        amount: "1000.0000",
+        currencyCode: "USD",
+        disbursedOn: "2026-07-01",
+        createdBy: "22222222-2222-4222-8222-222222222222",
+        createdByKind: "member",
+      });
 
       expect(insertedRows(fakeDb, loanGuarantor)[0]).toMatchObject({
         loanId: result.loanId,
@@ -519,6 +531,9 @@ describe("Sprint 2 loan domain rules", () => {
         actionKind: "loan.originated",
         subjectKind: "loan",
         subjectId: result.loanId,
+        payloadSnapshot: expect.objectContaining({
+          disbursementSource: "petty_cash",
+        }),
       });
     } finally {
       vi.doUnmock("@mi-banquito/db");
