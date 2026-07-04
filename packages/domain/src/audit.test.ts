@@ -491,6 +491,7 @@ describe("audit narration", () => {
       "contribution.reverse",
       "loan.repayment.create",
       "loan.repayment.payoff",
+      "loan.repayment.data_correction",
       "loan.originated",
       "member.create",
       "member.status_transition",
@@ -537,6 +538,29 @@ describe("audit narration", () => {
       subjectKind: "period_close",
       payloadSnapshot: {},
     })).toBe("Una operadora abrió una ventana de ajuste el 2026-07-02.");
+  });
+
+  it("narrates loan repayment data corrections without exposing the technical event key", () => {
+    const text = narrateAuditRow({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      orgId: "11111111-1111-4111-8111-111111111111",
+      actionKind: "loan.repayment.data_correction",
+      subjectKind: "repayment",
+      subjectId: "22222222-2222-4222-8222-222222222222",
+      payloadSnapshot: {
+        memberName: "Pancho",
+        amount: "16.00",
+        datedOn: "2026-07-02",
+      },
+      at: new Date("2026-07-02T10:00:00.000Z"),
+      actorKind: "system",
+      actorId: "33333333-3333-4333-8333-333333333333",
+      createdAt: new Date("2026-07-02T10:00:00.000Z"),
+      reason: null,
+    });
+
+    expect(text).toBe("Se corrigió el registro de pago de Pancho por $16.00 el 2026-07-02.");
+    expect(text).not.toContain("loan.repayment.data_correction");
   });
 
   it("filters by member, action kind, and date range with AND semantics", () => {
