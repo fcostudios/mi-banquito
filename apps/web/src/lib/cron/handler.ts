@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
+import { createCollectionsService, type DateOnlyString } from "@mi-banquito/domain";
 import {
   alert,
   cronRun,
@@ -24,7 +25,8 @@ export type CronJobName =
   | "accrue-interest"
   | "award-treasurer-compensation"
   | "daily"
-  | "drift-check";
+  | "drift-check"
+  | "promise-reminders";
 
 export type CronRunSummary = {
   job: CronJobName;
@@ -36,14 +38,36 @@ export type CronRunSummary = {
   interestAccrualsPlanned: number;
   moraFeesPlanned: number;
   transitionsToMora: number;
+  promisesScanned?: number;
+  remindersEmitted?: number;
   failures: Array<{ orgId: string; loanId?: string; message: string }>;
 };
 
 const SYSTEM_ACTOR_ID = "00000000-0000-4000-8000-000000000000";
 const ACTIVE_LOAN_STATUSES = new Set(["originated", "activo", "en_mora"]);
 
-function isoToday(): string {
-  return new Date().toISOString().slice(0, 10);
+function isoToday(): DateOnlyString {
+  return new Date().toISOString().slice(0, 10) as DateOnlyString;
+}
+
+function parseDateOnlyParam(value: string): DateOnlyString {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    throw new Error("date must be YYYY-MM-DD");
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year
+    || date.getUTCMonth() + 1 !== month
+    || date.getUTCDate() !== day
+  ) {
+    throw new Error("date must be a valid calendar date");
+  }
+
+  return value as DateOnlyString;
 }
 
 function parseReplayRange(request: Request): { fromDate: string; toDate: string; dates: string[] } {
@@ -331,6 +355,54 @@ export async function runAccrueInterestCron(request: Request): Promise<CronRunSu
   return summary;
 }
 
+async function runPromiseReminderCron(request: Request): Promise<CronRunSummary> {
+  const startedAt = new Date();
+  const endpoint = "/api/cron/promise-reminders";
+  const url = new URL(request.url);
+  const requestedDate = url.searchParams.get("date");
+  const fallbackDate = isoToday();
+  let today = fallbackDate;
+  const summary: CronRunSummary = {
+    job: "promise-reminders",
+    endpoint,
+    fromDate: fallbackDate,
+    toDate: fallbackDate,
+    orgsProcessed: 0,
+    loansProcessed: 0,
+    interestAccrualsPlanned: 0,
+    moraFeesPlanned: 0,
+    transitionsToMora: 0,
+    promisesScanned: 0,
+    remindersEmitted: 0,
+    failures: [],
+  };
+
+  try {
+    today = requestedDate ? parseDateOnlyParam(requestedDate) : fallbackDate;
+    summary.fromDate = today;
+    summary.toDate = today;
+    const result = await createCollectionsService().emitPromiseReminders(today);
+    summary.promisesScanned = result.promisesScanned;
+    summary.remindersEmitted = result.remindersEmitted;
+  } catch (error) {
+    summary.failures.push({
+      orgId: "system",
+      message: error instanceof Error ? error.message : "Promise reminder cron failed",
+    });
+  }
+
+  await recordCronRun({
+    endpoint,
+    startedAt,
+    finishedAt: new Date(),
+    replayFrom: summary.fromDate,
+    replayTo: summary.toDate,
+    summary,
+  });
+
+  return summary;
+}
+
 export function createCronHandler(job: CronJobName) {
   return async function GET(request: Request) {
     const expected = process.env.CRON_SECRET;
@@ -345,6 +417,14 @@ export function createCronHandler(job: CronJobName) {
         return NextResponse.json({ job, ran: true });
       }
       const summary = await runAccrueInterestCron(request);
+      return NextResponse.json({ job, ran: true, summary });
+    }
+
+    if (job === "promise-reminders") {
+      const summary = await runPromiseReminderCron(request);
+      if (summary.failures.length > 0) {
+        return NextResponse.json({ job, ran: false, summary }, { status: 500 });
+      }
       return NextResponse.json({ job, ran: true, summary });
     }
 
