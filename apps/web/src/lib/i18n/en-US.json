@@ -191,6 +191,11 @@
   "verifier": {
     "title": "Verificación de documento"
   },
+  "offline": {
+    "queued": "Guardado. Se sincronizará cuando vuelva la señal",
+    "onePending": "1 guardado pendiente",
+    "manyPendingSuffix": "guardados pendientes"
+  },
   "shell": {
     "header": {
       "appName": "Mi Banquito",
