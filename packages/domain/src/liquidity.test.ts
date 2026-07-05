@@ -21,4 +21,13 @@ describe("liquidity projection", () => {
     expect(shifted.map((row) => row.projectedBalance)).toEqual(["200.0000", "170.0000", "340.0000"]);
     expect(series[0]?.projectedBalance).toBe("300.0000");
   });
+
+  it("models simulated repayments with interest when loan terms are available", () => {
+    const shifted = applyHypotheticalLoan(series, "100.0000", {
+      rateValue: "5.0000",
+      termPeriods: 10,
+    });
+
+    expect(shifted.map((row) => row.projectedBalance)).toEqual(["200.0000", "175.0000", "349.5000"]);
+  });
 });
