@@ -46,6 +46,7 @@ vi.mock("@mi-banquito/db", () => ({
 vi.mock("@mi-banquito/db/schema", () => ({
   organization: {
     id: "organization.id",
+    displayName: "organization.display_name",
     status: "organization.status",
   },
   platformOperator: {
@@ -237,11 +238,13 @@ describe("getShellSession", () => {
     });
     selectResponses.push(
       [{ id: "22222222-2222-4222-8222-222222222222" }],
+      [{ displayName: "Mi Banquito FcoStudios" }],
       [{ role: "TESORERA" }],
     );
 
     await expect(getShellSession()).resolves.toMatchObject({
       roles: ["TESORERA", "PLATFORM_OPERATOR"],
+      orgName: "Mi Banquito FcoStudios",
     });
   });
 });

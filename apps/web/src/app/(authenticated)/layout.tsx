@@ -21,6 +21,7 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
         <Header
           displayName={shell.displayName}
           email={shell.email}
+          activeOrgLabel={shell.orgName ?? shell.orgId}
           alertCount={alerts.length}
           alerts={alerts}
           copy={messages.shell.header}

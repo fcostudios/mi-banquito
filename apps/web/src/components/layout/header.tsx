@@ -10,6 +10,7 @@ import {
 type HeaderProps = {
   displayName: string;
   email?: string;
+  activeOrgLabel?: string;
   alertCount: number;
   alerts: VisibleAlert[];
   copy: {
@@ -21,6 +22,7 @@ type HeaderProps = {
     dismiss: string;
     snooze: string;
     shareWhatsApp: string;
+    orgPrefix: string;
   };
 };
 
@@ -33,7 +35,7 @@ function initials(value: string, fallback: string) {
     .join("");
 }
 
-export function Header({ displayName, email, alertCount, alerts, copy }: HeaderProps) {
+export function Header({ displayName, email, activeOrgLabel, alertCount, alerts, copy }: HeaderProps) {
   const label = displayName || email || copy.fallbackUser;
 
   return (
@@ -41,6 +43,9 @@ export function Header({ displayName, email, alertCount, alerts, copy }: HeaderP
       <div className="min-w-0">
         <p className="truncate text-xs font-semibold uppercase tracking-wide text-text-secondary">{copy.appName}</p>
         <p className="truncate text-sm font-medium text-text-primary">{copy.subtitle}</p>
+        {activeOrgLabel ? (
+          <p className="truncate text-xs font-medium text-text-secondary">{copy.orgPrefix}: {activeOrgLabel}</p>
+        ) : null}
       </div>
       <div className="flex min-w-0 items-center gap-3">
         <details className="relative">
