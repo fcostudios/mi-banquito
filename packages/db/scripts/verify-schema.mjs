@@ -284,6 +284,7 @@ export function evaluateSchemaHealth(actual, expected = EXPECTED_SCHEMA) {
 }
 
 function loadEnv() {
+  const existingEnv = new Map(Object.entries(process.env));
   const paths = [
     new URL("../../../.env", import.meta.url),
     new URL("../../../.env.local", import.meta.url),
@@ -295,6 +296,10 @@ function loadEnv() {
 
   for (const path of paths) {
     config({ path: fileURLToPath(path), override: true });
+  }
+
+  for (const [key, value] of existingEnv) {
+    process.env[key] = value;
   }
 }
 
