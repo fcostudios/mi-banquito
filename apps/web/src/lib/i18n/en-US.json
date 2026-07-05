@@ -247,7 +247,7 @@
     "pdfCanonicalHash": "Hash canónico",
     "pdfOrganization": "Organización",
     "pdfFooter": "Archivo generado automáticamente. El hash canónico permite verificar que el contenido archivado no cambió.",
-    "successReconciled": "Conciliación guardada.",
+    "successReconciled": "Conciliación guardada. Ahora presiona Cerrar mes para generar el reporte archivado.",
     "successAnnotated": "Nota guardada.",
     "successClosed": "Mes cerrado.",
     "error": "No se pudo completar la acción."
