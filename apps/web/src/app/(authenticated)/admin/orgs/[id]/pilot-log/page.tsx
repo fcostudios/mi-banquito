@@ -33,6 +33,12 @@ export default async function ScrAdminPilotLogPage({ params }: { params: Promise
           <li>{checklist.hasWouldNotReturnAffirmation ? copy.ready : copy.pending} - {copy.wouldNotReturn}</li>
           <li>{checklist.readyToExit ? copy.readyToClose : copy.monitoring}</li>
         </ul>
+        <a
+          className="mt-4 inline-flex min-h-11 items-center rounded-md bg-primary px-4 py-2 font-semibold text-primary-foreground"
+          href={`/admin/orgs/${id}/pilot-log/report`}
+        >
+          {copy.reportDownload}
+        </a>
       </section>
 
       <form action={addPilotLogEntryAction} className="grid gap-3 rounded-md border border-border bg-surface p-5">
