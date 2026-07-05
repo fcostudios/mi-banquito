@@ -57,7 +57,7 @@ export default async function ScrMonthlyClosePage({
   const state = await createReconciliationService().getMonthlyCloseState(session.orgId);
   const params = await searchParams;
   const message = resultMessage(params);
-  const canClose = Boolean(state.id) && (state.status === "within_tolerance" || state.status === "annotated");
+  const canClose = Boolean(state.id) && state.closeAllowed;
   const canAnnotate = Boolean(state.id) && state.status === "outside_tolerance";
 
   return (

@@ -40,6 +40,7 @@ const baseState = {
   discrepancyAmount: "0.0000",
   toleranceAmount: "1.0000",
   status: "within_tolerance",
+  closeAllowed: true,
   resolutionKind: "auto_within_tolerance",
   resolutionNote: null,
   periodCloseId: null,
@@ -53,11 +54,24 @@ describe("ScrMonthlyClosePage", () => {
     getMonthlyCloseState.mockResolvedValueOnce({
       ...baseState,
       id: "",
+      closeAllowed: false,
     });
 
     render(await ScrMonthlyClosePage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("heading", { name: "Cierre del mes" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cerrar mes" })).toBeDisabled();
+    expect(screen.getByText("Primero guarda una conciliación dentro de tolerancia o una nota de aceptación.")).toBeInTheDocument();
+  });
+
+  it("keeps close disabled for a reconciliation that is not in a closeable past period", async () => {
+    getMonthlyCloseState.mockResolvedValueOnce({
+      ...baseState,
+      closeAllowed: false,
+    });
+
+    render(await ScrMonthlyClosePage({ searchParams: Promise.resolve({}) }));
+
     expect(screen.getByRole("button", { name: "Cerrar mes" })).toBeDisabled();
     expect(screen.getByText("Primero guarda una conciliación dentro de tolerancia o una nota de aceptación.")).toBeInTheDocument();
   });

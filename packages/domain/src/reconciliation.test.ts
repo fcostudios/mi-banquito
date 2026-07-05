@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   alert,
   auditLogEntry,
+  contributionCycle,
   periodClose,
   reconciliationCycle,
   statementArchive,
@@ -404,6 +405,8 @@ describe("adjustment window reconciliation", () => {
         orgId: "11111111-1111-4111-8111-111111111111",
         cycleLabel: "julio 2026",
         opensOn: "2026-07-01",
+        closesOn: "2026-06-30",
+        status: "open",
       }],
       [],
       [],
@@ -443,6 +446,141 @@ describe("adjustment window reconciliation", () => {
           createdByKind: "system",
         }),
       ]);
+      expect(updatedRows(fakeDb, contributionCycle)).toEqual([
+        expect.objectContaining({
+          id: "44444444-4444-4444-8444-444444444444",
+          status: "closed",
+        }),
+      ]);
+      expect(updatedRows(fakeDb, periodClose)).toEqual([
+        expect.objectContaining({
+          monthlyCloseStatementId: "77777777-7777-4777-8777-777777777777",
+        }),
+      ]);
+    } finally {
+      unmockTenantDb();
+    }
+  });
+
+  it("rejects closing the current contribution cycle", async () => {
+    const closedAt = new Date("2026-07-05T12:00:00.000Z");
+    const reconciliationRow = {
+      id: "55555555-5555-4555-8555-555555555555",
+      orgId: "11111111-1111-4111-8111-111111111111",
+      cycleId: "44444444-4444-4444-8444-444444444444",
+      declaredBankBalance: "125.0000",
+      computedPoolBalance: "125.0000",
+      discrepancyAmount: "0.0000",
+      toleranceAmount: "0.5000",
+      resolutionKind: "auto_within_tolerance",
+      resolutionNote: null,
+      periodCloseId: null,
+    };
+    const fakeDb = new FakeDb([
+      [reconciliationRow],
+      [{
+        id: "44444444-4444-4444-8444-444444444444",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        cycleLabel: "julio 2026",
+        opensOn: "2026-07-01",
+        closesOn: "2026-07-31",
+        status: "open",
+      }],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+    ]);
+    vi.resetModules();
+    mockTenantDb(fakeDb);
+
+    try {
+      const { createReconciliationService } = await import("./reconciliation");
+      await expect(createReconciliationService({
+        now: () => closedAt,
+        monthlyCloseArtifactWriter: async ({ canonicalPayloadHash }) => ({
+          pdfUri: `https://blob.vercel-storage.com/monthly-close/${canonicalPayloadHash}.pdf`,
+          byteSize: 2048,
+        }),
+      }).closePeriod({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        actorId: "33333333-3333-4333-8333-333333333333",
+        reconciliationCycleId: "55555555-5555-4555-8555-555555555555",
+      })).rejects.toThrow("contribution_cycle_not_past");
+
+      expect(insertedRows(fakeDb, periodClose)).toHaveLength(0);
+      expect(insertedRows(fakeDb, statementArchive)).toHaveLength(0);
+    } finally {
+      unmockTenantDb();
+    }
+  });
+
+  it("shows the latest closed monthly close when no past open cycle remains", async () => {
+    const fakeDb = new FakeDb([
+      [],
+      [{
+        id: "55555555-5555-4555-8555-555555555555",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        cycleId: "44444444-4444-4444-8444-444444444444",
+        declaredBankBalance: "125.0000",
+        computedPoolBalance: "125.0000",
+        discrepancyAmount: "0.0000",
+        toleranceAmount: "0.5000",
+        resolutionKind: "auto_within_tolerance",
+        resolutionNote: null,
+        periodCloseId: "22222222-2222-4222-8222-222222222222",
+        closedAt: new Date("2026-07-05T12:00:00.000Z"),
+      }],
+      [{
+        id: "44444444-4444-4444-8444-444444444444",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        cycleLabel: "junio 2026",
+        opensOn: "2026-06-01",
+        closesOn: "2026-06-30",
+        status: "closed",
+      }],
+      [{
+        id: "22222222-2222-4222-8222-222222222222",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        cycleId: "44444444-4444-4444-8444-444444444444",
+        reconciliationCycleId: "55555555-5555-4555-8555-555555555555",
+        closedAt: new Date("2026-07-05T12:00:00.000Z"),
+      }],
+      [{
+        id: "99999999-9999-4999-8999-999999999999",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        kind: "monthly_close",
+        periodCloseId: "22222222-2222-4222-8222-222222222222",
+        pdfUri: "https://blob.vercel-storage.com/monthly-close.pdf",
+        canonicalPayloadHash: "a".repeat(64),
+      }],
+    ]);
+    vi.resetModules();
+    mockTenantDb(fakeDb);
+
+    try {
+      const { createReconciliationService } = await import("./reconciliation");
+      await expect(createReconciliationService({
+        now: () => new Date("2026-07-05T12:00:00.000Z"),
+      }).getMonthlyCloseState("11111111-1111-4111-8111-111111111111")).resolves.toMatchObject({
+        cycleLabel: "junio 2026",
+        status: "closed",
+        periodCloseId: "22222222-2222-4222-8222-222222222222",
+        monthlyCloseStatementId: "99999999-9999-4999-8999-999999999999",
+        monthlyClosePdfUri: "https://blob.vercel-storage.com/monthly-close.pdf",
+      });
     } finally {
       unmockTenantDb();
     }
