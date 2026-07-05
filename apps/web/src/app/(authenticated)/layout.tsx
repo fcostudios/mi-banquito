@@ -3,16 +3,20 @@ import { Header } from "@/components/layout/header";
 import { MobileBar } from "@/components/layout/mobile-bar";
 import { OfflineQueueIndicator } from "@/components/offline/offline-queue-indicator";
 import { getShellSession } from "@/lib/auth/require-session";
-import { createAlertsService } from "@mi-banquito/domain";
 import messages from "@/lib/i18n/en-US.json";
 
 export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const shell = await getShellSession();
-  const alerts = shell.orgId ? await createAlertsService().listVisibleAlerts({
-    orgId: shell.orgId,
-    audience: "treasurer",
-    now: new Date(),
-  }) : [];
+  const orgId = shell.orgId;
+  const alerts = orgId
+    ? await import("@mi-banquito/domain").then(({ createAlertsService }) =>
+        createAlertsService().listVisibleAlerts({
+          orgId,
+          audience: "treasurer",
+          now: new Date(),
+        }),
+      )
+    : [];
 
   return (
     <div className="flex min-h-screen bg-background" data-ui-stabilized="authenticated-shell">
