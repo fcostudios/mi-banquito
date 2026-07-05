@@ -61,6 +61,22 @@ function getDevelopmentBypassSession(): RequiredSession | undefined {
   };
 }
 
+function withPlatformOperatorRole(roles: string[]): string[] {
+  return roles.includes("PLATFORM_OPERATOR") ? roles : [...roles, "PLATFORM_OPERATOR"];
+}
+
+async function getActivePlatformOperator(userId: string) {
+  const [operator] = await db
+    .select({ id: platformOperator.id })
+    .from(platformOperator)
+    .where(and(
+      eq(platformOperator.authSubject, userId),
+      eq(platformOperator.status, "active"),
+    ));
+
+  return operator;
+}
+
 export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
   const bypass = getDevelopmentBypassSession();
   if (bypass && hasMinRole(bypass.roles, minRole)) {
@@ -161,15 +177,7 @@ export async function requirePlatformOperator(): Promise<PlatformSession> {
     redirect(ROUTE_LOGIN);
   }
 
-  if (!hasMinRole(roles, "PLATFORM_OPERATOR")) {
-    logAuthGateDenied("missing_platform_role", { hasUserId: true, roles });
-    redirect(ROUTE_ACCESS_DENIED);
-  }
-
-  const [operator] = await db
-    .select({ id: platformOperator.id })
-    .from(platformOperator)
-    .where(eq(platformOperator.authSubject, userId));
+  const operator = await getActivePlatformOperator(userId);
 
   if (!operator) {
     logAuthGateDenied("missing_platform_operator", { hasUserId: true, roles });
@@ -180,7 +188,7 @@ export async function requirePlatformOperator(): Promise<PlatformSession> {
     userId,
     actorId: operator.id,
     orgId: getDbOrgIdFromUser(session?.user),
-    roles,
+    roles: withPlatformOperatorRole(roles),
   };
 }
 
@@ -211,8 +219,15 @@ export async function getShellSession(): Promise<ShellSession> {
     redirect(ROUTE_LOGIN);
   }
 
+  const platformOperatorRow = userId ? await getActivePlatformOperator(userId) : undefined;
+
   if (!userId || !orgId) {
-    return { displayName, email, orgId, roles: claimRoles };
+    return {
+      displayName,
+      email,
+      orgId,
+      roles: platformOperatorRow ? withPlatformOperatorRole(claimRoles) : claimRoles,
+    };
   }
 
   const [membership] = await db
@@ -226,5 +241,10 @@ export async function getShellSession(): Promise<ShellSession> {
     ));
 
   const roles = claimRoles.length > 0 ? claimRoles : [membership?.role].filter((role): role is string => Boolean(role));
-  return { displayName, email, orgId, roles };
+  return {
+    displayName,
+    email,
+    orgId,
+    roles: platformOperatorRow ? withPlatformOperatorRole(roles) : roles,
+  };
 }

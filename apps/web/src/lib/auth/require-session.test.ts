@@ -11,6 +11,7 @@ const updateWhere = vi.fn();
 const db = {
   select: vi.fn(() => ({
     from: () => ({
+      where: () => Promise.resolve(selectResponses.shift() ?? []),
       innerJoin: () => ({
         where: () => Promise.resolve(selectResponses.shift() ?? []),
       }),
@@ -43,7 +44,11 @@ vi.mock("@mi-banquito/db", () => ({
 }));
 
 vi.mock("@mi-banquito/db/schema", () => ({
-  platformOperator: {},
+  platformOperator: {
+    id: "platform_operator.id",
+    authSubject: "platform_operator.auth_subject",
+    status: "platform_operator.status",
+  },
   userAccount: {
     id: "user_account.id",
     authSubject: "user_account.auth_subject",
@@ -152,11 +157,57 @@ describe("requireRole", () => {
   });
 });
 
+describe("requirePlatformOperator", () => {
+  beforeEach(() => {
+    getSession.mockReset();
+    redirect.mockClear();
+    db.select.mockClear();
+    warn.mockClear();
+    selectResponses.length = 0;
+  });
+
+  it("allows an active DB platform operator even when Auth0 role claims are absent", async () => {
+    const { requirePlatformOperator } = await import("./require-session");
+    getSession.mockResolvedValueOnce({
+      user: {
+        sub: "auth0|operator",
+        email: "pancho@fcostudios.io",
+        "https://mi-banquito.app/org_id": "11111111-1111-4111-8111-111111111111",
+      },
+    });
+    selectResponses.push([{ id: "22222222-2222-4222-8222-222222222222" }]);
+
+    await expect(requirePlatformOperator()).resolves.toMatchObject({
+      userId: "auth0|operator",
+      actorId: "22222222-2222-4222-8222-222222222222",
+      orgId: "11111111-1111-4111-8111-111111111111",
+      roles: ["PLATFORM_OPERATOR"],
+    });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("denies a signed-in user without a DB platform operator row", async () => {
+    const { requirePlatformOperator } = await import("./require-session");
+    getSession.mockResolvedValueOnce({
+      user: {
+        sub: "auth0|member",
+        roles: ["TESORERA"],
+      },
+    });
+    selectResponses.push([]);
+
+    await expect(requirePlatformOperator()).rejects.toThrow("NEXT_REDIRECT:/acceso-denegado");
+    expect(redirect).toHaveBeenCalledWith("/acceso-denegado");
+  });
+});
+
 describe("getShellSession", () => {
   beforeEach(() => {
     getSession.mockReset();
     redirect.mockClear();
     warn.mockClear();
+    db.select.mockClear();
+    selectResponses.length = 0;
   });
 
   it("redirects anonymous authenticated-shell requests before rendering children", async () => {
@@ -165,5 +216,24 @@ describe("getShellSession", () => {
 
     await expect(getShellSession()).rejects.toThrow("NEXT_REDIRECT:/auth/login");
     expect(redirect).toHaveBeenCalledWith("/auth/login");
+  });
+
+  it("adds platform operator role from the DB for shell navigation", async () => {
+    const { getShellSession } = await import("./require-session");
+    getSession.mockResolvedValueOnce({
+      user: {
+        sub: "auth0|operator",
+        email: "pancho@fcostudios.io",
+        "https://mi-banquito.app/org_id": "11111111-1111-4111-8111-111111111111",
+      },
+    });
+    selectResponses.push(
+      [{ id: "22222222-2222-4222-8222-222222222222" }],
+      [{ role: "TESORERA" }],
+    );
+
+    await expect(getShellSession()).resolves.toMatchObject({
+      roles: ["TESORERA", "PLATFORM_OPERATOR"],
+    });
   });
 });
