@@ -146,6 +146,11 @@ const requireReason = (reason: string): string => {
 
 const dateOnly = (date: Date): string => date.toISOString().slice(0, 10);
 const money4 = (value: string | number): string => Number(value).toFixed(4);
+
+const calendarMonthEnd = (label: string): string => {
+  const [year, month] = label.split("-").map(Number);
+  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+};
 const money2 = (value: string | number): string => Number(value).toFixed(2);
 
 export function nextWizardStep(input: { firstRunStep?: number | null; completedAt?: Date | null }): FirstRunStep {
@@ -666,7 +671,7 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
               cycleLabel: label,
               kind: "monthly",
               opensOn: `${label}-01`,
-              closesOn: input.datedOn,
+              closesOn: calendarMonthEnd(label),
               expectedAmountPerMember: money4(currentConfig?.contributionAmount ?? input.amount),
               currencyCode: "USD",
               status: "open",

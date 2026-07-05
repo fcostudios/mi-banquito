@@ -170,10 +170,10 @@ function dateKeyInEcuador(date: Date): string {
 }
 
 function isPastContributionCycle(
-  cycle: Pick<typeof contributionCycle.$inferSelect, "closesOn">,
+  cycle: Pick<typeof contributionCycle.$inferSelect, "opensOn" | "closesOn">,
   referenceDate: Date,
 ): boolean {
-  return cycle.closesOn < dateKeyInEcuador(referenceDate);
+  return cycle.opensOn < cycle.closesOn && cycle.closesOn < dateKeyInEcuador(referenceDate);
 }
 
 export function classifyReconciliation(input: ReconciliationClassificationInput): ReconciliationClassification {
@@ -609,6 +609,7 @@ export const createReconciliationService = (options: ReconciliationServiceOption
           .where(and(
             eq(contributionCycle.orgId, orgId),
             eq(contributionCycle.status, "open"),
+            lt(contributionCycle.opensOn, contributionCycle.closesOn),
             lt(contributionCycle.closesOn, today),
           ))
           .orderBy(desc(contributionCycle.closesOn))
