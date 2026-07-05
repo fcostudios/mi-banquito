@@ -52,7 +52,12 @@ export default async function ScrCashFlowProjectionPage() {
         commitment={projection.commitment}
         copy={{
           amount: copy.sandboxAmount,
+          calculation: copy.sandboxCalculation,
+          parameters: copy.sandboxParameters,
           projection: copy.projection,
+          rate: copy.sandboxRate,
+          term: copy.sandboxTerm,
+          termUnit: copy.sandboxTermUnit,
           title: copy.sandboxTitle,
         }}
         series={projection.series}

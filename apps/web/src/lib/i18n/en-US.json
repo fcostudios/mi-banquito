@@ -185,6 +185,11 @@
     "summary": "Resumen",
     "sandboxTitle": "Considerar un préstamo",
     "sandboxAmount": "Monto del préstamo de prueba",
+    "sandboxParameters": "Parámetros de simulación",
+    "sandboxRate": "Tasa",
+    "sandboxTerm": "Plazo",
+    "sandboxTermUnit": "periodos",
+    "sandboxCalculation": "Resta el capital del préstamo en el mes actual y suma las cuotas esperadas de capital e interés desde el mes siguiente. Usa el calendario de saldo decreciente; no incluye comisión administrativa, mora ni cambios de reglas.",
     "projection": "Proyección",
     "empty": "No hay datos de liquidez proyectada todavía."
   },

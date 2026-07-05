@@ -30,6 +30,10 @@ describe("ScrCashFlowProjectionPage", () => {
       poolBalance: "900.0000",
       baseFundPool: "160.0000",
       commitment: "250.0000",
+      hypotheticalLoanTerms: {
+        rateValue: "5.0000",
+        termPeriods: 10,
+      },
       series: [
         { monthOn: "2026-07-01", projectedBalance: "300.0000" },
         { monthOn: "2026-08-01", projectedBalance: "260.0000" },
@@ -50,6 +54,10 @@ describe("ScrCashFlowProjectionPage", () => {
 
     const sandbox = screen.getByRole("region", { name: "Considerar un préstamo" });
     expect(within(sandbox).getByLabelText("Monto del préstamo de prueba")).toBeInTheDocument();
+    expect(within(sandbox).getByText("Parámetros de simulación")).toBeInTheDocument();
+    expect(within(sandbox).getByText("5,00%")).toBeInTheDocument();
+    expect(within(sandbox).getByText("10 periodos")).toBeInTheDocument();
+    expect(within(sandbox).getByText(/Resta el capital del préstamo/)).toBeInTheDocument();
     expect(within(sandbox).getByText("2026-08-01")).toBeInTheDocument();
     expect(within(sandbox).getByText("$260,00")).toBeInTheDocument();
   });
