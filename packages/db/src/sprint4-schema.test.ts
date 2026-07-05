@@ -137,6 +137,26 @@ describe("Sprint 4 schema substrate", () => {
         ) AS has_projected_liquidity,
         EXISTS (
           SELECT 1
+          FROM pg_matviews
+          WHERE schemaname = 'public'
+            AND matviewname = 'mv_available_capital'
+            AND definition ILIKE '%loan_disbursement%'
+            AND definition ILIKE '%repayment%'
+            AND definition ILIKE '%withdrawal%'
+            AND definition ILIKE '%expense%'
+        ) AS available_capital_models_cash_in_and_out,
+        EXISTS (
+          SELECT 1
+          FROM pg_matviews
+          WHERE schemaname = 'public'
+            AND matviewname = 'mv_liquidez_proyectada'
+            AND definition ILIKE '%loan_schedule%'
+            AND definition ILIKE '%paid_principal_to_date%'
+            AND definition ILIKE '%paid_interest_to_date%'
+            AND definition ILIKE '%date_trunc%'
+        ) AS projected_liquidity_models_scheduled_collections,
+        EXISTS (
+          SELECT 1
           FROM pg_indexes
           WHERE schemaname = 'public'
             AND tablename = 'statement_archive'
@@ -220,6 +240,8 @@ describe("Sprint 4 schema substrate", () => {
       has_ar_aging: true,
       ar_aging_supports_non_member_loans: true,
       has_projected_liquidity: true,
+      available_capital_models_cash_in_and_out: true,
+      projected_liquidity_models_scheduled_collections: true,
       has_statement_hash_index: true,
       has_open_promise_partial_unique_index: true,
       promise_superseded_self_fk_count: 1,

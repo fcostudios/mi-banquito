@@ -25,10 +25,16 @@ function monthName(monthOn: string): string {
 export function applyHypotheticalLoan(series: LiquidityPoint[], amount: string): LiquidityPoint[] {
   const loanAmount = Number(amount || 0);
   const normalizedLoanAmount = Number.isFinite(loanAmount) && loanAmount > 0 ? loanAmount : 0;
+  const termPeriods = 10;
+  const principalCollection = normalizedLoanAmount / termPeriods;
 
-  return series.map((row) => ({
+  return series.map((row, index) => ({
     ...row,
-    projectedBalance: formatMoney4(Number(row.projectedBalance) - normalizedLoanAmount),
+    projectedBalance: formatMoney4(
+      Number(row.projectedBalance)
+        - normalizedLoanAmount
+        + Math.min(index, termPeriods) * principalCollection,
+    ),
   }));
 }
 
