@@ -299,7 +299,8 @@
       "emptyAlerts": "No hay alertas pendientes.",
       "dismiss": "Descartar",
       "snooze": "Recordar en 7 días",
-      "shareWhatsApp": "Enviar por WhatsApp"
+      "shareWhatsApp": "Enviar por WhatsApp",
+      "orgPrefix": "Org"
     }
   },
   "sprint1": {

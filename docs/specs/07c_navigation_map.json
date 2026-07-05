@@ -283,10 +283,10 @@
         },
         {
           "id": "admin-home",
-          "label": "Inicio",
-          "label_en": "Home",
+          "label": "Panel admin",
+          "label_en": "Admin panel",
           "labelKey": "admin.home",
-          "icon": "Home",
+          "icon": "Settings",
           "route": "/admin",
           "screen": "SCR-admin-home",
           "roles": [
@@ -299,7 +299,7 @@
           "label": "Nueva organización",
           "label_en": "New organization",
           "labelKey": "admin.orgsNew",
-          "icon": "PlusCircle",
+          "icon": "Users",
           "route": "/admin/orgs/nueva",
           "screen": "SCR-admin-orgs-new",
           "roles": [

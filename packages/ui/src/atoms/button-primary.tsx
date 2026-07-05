@@ -9,12 +9,12 @@ export interface ButtonPrimaryProps extends ButtonHTMLAttributes<HTMLButtonEleme
   onPress?: () => void;
 }
 
-/** bg-primary text-surface → colors from the data-driven Tailwind token preset. */
+/** bg-primary text-text-on-primary → colors from the data-driven Tailwind token preset. */
 export function ButtonPrimary({ labelKey, children, icon, loading, disabled, onPress, onClick, type = "button", ...rest }: ButtonPrimaryProps) {
   return (
     <button
       type={type}
-      className="bg-primary text-surface rounded-md px-4 min-h-12 inline-flex items-center gap-2"
+      className="inline-flex min-h-12 items-center gap-2 rounded-md bg-primary px-4 font-semibold text-text-on-primary transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
       aria-busy={loading ?? undefined}
       disabled={disabled}
       onClick={onPress ?? onClick}

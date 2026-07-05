@@ -22,6 +22,7 @@ export type ShellSession = {
   displayName: string;
   email?: string;
   orgId?: string;
+  orgName?: string;
   roles: string[];
 };
 
@@ -243,6 +244,11 @@ export async function getShellSession(): Promise<ShellSession> {
     };
   }
 
+  const [org] = await db
+    .select({ displayName: organization.displayName })
+    .from(organization)
+    .where(eq(organization.id, orgId));
+
   const [membership] = await db
     .select({ role: userOrgMembership.role })
     .from(userAccount)
@@ -258,6 +264,7 @@ export async function getShellSession(): Promise<ShellSession> {
     displayName,
     email,
     orgId,
+    orgName: org?.displayName,
     roles: platformOperatorRow ? withPlatformOperatorRole(roles) : roles,
   };
 }
