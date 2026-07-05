@@ -76,6 +76,15 @@ describe("ScrMonthlyClosePage", () => {
     expect(screen.getByText("Primero guarda una conciliación dentro de tolerancia o una nota de aceptación.")).toBeInTheDocument();
   });
 
+  it("explains that closing the month generates the document after reconciliation is saved", async () => {
+    getMonthlyCloseState.mockResolvedValueOnce(baseState);
+
+    render(await ScrMonthlyClosePage({ searchParams: Promise.resolve({ reconciled: "1" }) }));
+
+    expect(screen.getByText("Conciliación guardada. Ahora presiona Cerrar mes para generar el reporte archivado.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cerrar mes" })).toBeEnabled();
+  });
+
   it("shows archived PDF and WhatsApp controls after closing", async () => {
     getMonthlyCloseState.mockResolvedValueOnce({
       ...baseState,
