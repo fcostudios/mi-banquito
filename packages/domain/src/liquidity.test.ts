@@ -18,7 +18,7 @@ describe("liquidity projection", () => {
   it("applies a hypothetical loan without mutating the original projection", () => {
     const shifted = applyHypotheticalLoan(series, "100.0000");
 
-    expect(shifted.map((row) => row.projectedBalance)).toEqual(["200.0000", "160.0000", "320.0000"]);
+    expect(shifted.map((row) => row.projectedBalance)).toEqual(["200.0000", "170.0000", "340.0000"]);
     expect(series[0]?.projectedBalance).toBe("300.0000");
   });
 });

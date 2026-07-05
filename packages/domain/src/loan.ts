@@ -2,7 +2,7 @@ export { evaluateLoanEligibility, resolveOriginationRate } from "./loans/eligibi
 export { calculateInterestFirstSplit } from "./loans/repayment";
 export { generateReferralCommissionCredit } from "./loans/referral";
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
 import {
   alert,
@@ -178,6 +178,19 @@ const memberActiveExposure = async (orgId: string, memberId: string): Promise<st
 );
 
 const openLoanStatuses = new Set(["originated", "activo", "en_mora"]);
+
+const refreshLoanReadModels = async (tx: unknown) => {
+  if (
+    tx
+    && typeof tx === "object"
+    && "execute" in tx
+    && typeof tx.execute === "function"
+  ) {
+    await tx.execute(sql`
+      SELECT refresh_sprint1_read_models()
+    `);
+  }
+};
 
 const scheduledInterestDueOn = (
   rows: Array<typeof loanSchedule.$inferSelect>,
@@ -660,6 +673,7 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
               createdByKind: ACTOR_KIND,
             });
           }
+          await refreshLoanReadModels(tx);
         },
         audit: () => auditWriter({
           tx,
@@ -882,6 +896,7 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
           }
         }
       }
+      await refreshLoanReadModels(tx);
 
         },
         audit: () => auditWriter({
