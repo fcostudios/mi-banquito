@@ -56,6 +56,7 @@ export default async function ScrCashFlowProjectionPage() {
           title: copy.sandboxTitle,
         }}
         series={projection.series}
+        terms={projection.hypotheticalLoanTerms}
       />
     </main>
   );

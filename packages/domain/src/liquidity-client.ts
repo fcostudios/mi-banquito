@@ -1,6 +1,13 @@
+import { generateDecliningBalanceSchedule } from "./rules/loans/declining-balance";
+
 export type LiquidityPoint = {
   monthOn: string;
   projectedBalance: string;
+};
+
+export type HypotheticalLoanTerms = {
+  rateValue?: string;
+  termPeriods?: number;
 };
 
 function formatMoney(value: string | number): string {
@@ -22,18 +29,41 @@ function monthName(monthOn: string): string {
   }).format(date);
 }
 
-export function applyHypotheticalLoan(series: LiquidityPoint[], amount: string): LiquidityPoint[] {
+function cumulativeScheduledCollection(amount: number, terms: Required<HypotheticalLoanTerms>, monthIndex: number): number {
+  if (monthIndex <= 0 || amount <= 0) {
+    return 0;
+  }
+
+  const schedule = generateDecliningBalanceSchedule({
+    principal: amount,
+    ratePerPeriod: Number(terms.rateValue) / 100,
+    termPeriods: terms.termPeriods,
+    adminFeeRate: 0,
+  });
+
+  return schedule.installments
+    .slice(0, monthIndex)
+    .reduce((total, row) => total + Number(row.principalDue) + Number(row.interestDue), 0);
+}
+
+export function applyHypotheticalLoan(
+  series: LiquidityPoint[],
+  amount: string,
+  terms: HypotheticalLoanTerms = {},
+): LiquidityPoint[] {
   const loanAmount = Number(amount || 0);
   const normalizedLoanAmount = Number.isFinite(loanAmount) && loanAmount > 0 ? loanAmount : 0;
-  const termPeriods = 10;
-  const principalCollection = normalizedLoanAmount / termPeriods;
+  const normalizedTerms = {
+    rateValue: terms.rateValue ?? "0.0000",
+    termPeriods: terms.termPeriods ?? 10,
+  };
 
   return series.map((row, index) => ({
     ...row,
     projectedBalance: formatMoney4(
       Number(row.projectedBalance)
         - normalizedLoanAmount
-        + Math.min(index, termPeriods) * principalCollection,
+        + cumulativeScheduledCollection(normalizedLoanAmount, normalizedTerms, index),
     ),
   }));
 }

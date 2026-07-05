@@ -2,7 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { InputNumber } from "@mi-banquito/ui";
-import { applyHypotheticalLoan, liquidityNarrative, type LiquidityPoint } from "@mi-banquito/domain/liquidity-client";
+import {
+  applyHypotheticalLoan,
+  liquidityNarrative,
+  type HypotheticalLoanTerms,
+  type LiquidityPoint,
+} from "@mi-banquito/domain/liquidity-client";
 
 type LiquiditySandboxCopy = {
   amount: string;
@@ -48,13 +53,15 @@ export function LiquiditySandbox({
   commitment,
   copy,
   series,
+  terms,
 }: {
   commitment: string;
   copy: LiquiditySandboxCopy;
   series: LiquidityPoint[];
+  terms?: HypotheticalLoanTerms;
 }) {
   const [amount, setAmount] = useState("");
-  const shifted = useMemo(() => applyHypotheticalLoan(series, amount), [amount, series]);
+  const shifted = useMemo(() => applyHypotheticalLoan(series, amount, terms), [amount, series, terms]);
   const narrative = useMemo(() => liquidityNarrative({ series: shifted, commitment }), [commitment, shifted]);
 
   return (
