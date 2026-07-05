@@ -11,7 +11,12 @@ import {
 
 type LiquiditySandboxCopy = {
   amount: string;
+  calculation: string;
+  parameters: string;
   projection: string;
+  rate: string;
+  term: string;
+  termUnit: string;
   title: string;
 };
 
@@ -20,6 +25,13 @@ function formatMoney(value: string): string {
     style: "currency",
     currency: "USD",
   }).format(Number(value));
+}
+
+function formatPercent(value: string | undefined): string {
+  return `${new Intl.NumberFormat("es-EC", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  }).format(Number(value ?? 0))}%`;
 }
 
 function projectionPath(series: LiquidityPoint[]): string {
@@ -61,6 +73,7 @@ export function LiquiditySandbox({
   terms?: HypotheticalLoanTerms;
 }) {
   const [amount, setAmount] = useState("");
+  const termPeriods = terms?.termPeriods ?? 10;
   const shifted = useMemo(() => applyHypotheticalLoan(series, amount, terms), [amount, series, terms]);
   const narrative = useMemo(() => liquidityNarrative({ series: shifted, commitment }), [commitment, shifted]);
 
@@ -77,6 +90,16 @@ export function LiquiditySandbox({
           onChange={(event) => setAmount(event.target.value)}
         />
       </label>
+      <div className="grid gap-2 rounded-md border border-border bg-surface-muted p-3 text-sm text-text-secondary">
+        <strong className="text-text-primary">{copy.parameters}</strong>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          <dt>{copy.rate}</dt>
+          <dd className="font-medium text-text-primary">{formatPercent(terms?.rateValue)}</dd>
+          <dt>{copy.term}</dt>
+          <dd className="font-medium text-text-primary">{termPeriods} {copy.termUnit}</dd>
+        </dl>
+        <p>{copy.calculation}</p>
+      </div>
       <p className="text-sm text-text-secondary">{narrative}</p>
       <ProjectionChart series={shifted} />
       <div className="grid gap-2" aria-label={copy.projection}>
