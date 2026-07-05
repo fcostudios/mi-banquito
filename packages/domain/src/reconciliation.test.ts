@@ -435,6 +435,7 @@ describe("adjustment window reconciliation", () => {
         status: "closed",
       });
       expect(insertedRows(fakeDb, periodClose)).toHaveLength(1);
+      expect(updatedRows(fakeDb, periodClose)).toEqual([]);
       expect(insertedRows(fakeDb, statementArchive)).toEqual([
         expect.objectContaining({
           orgId: "11111111-1111-4111-8111-111111111111",
@@ -450,11 +451,6 @@ describe("adjustment window reconciliation", () => {
         expect.objectContaining({
           id: "44444444-4444-4444-8444-444444444444",
           status: "closed",
-        }),
-      ]);
-      expect(updatedRows(fakeDb, periodClose)).toEqual([
-        expect.objectContaining({
-          monthlyCloseStatementId: "77777777-7777-4777-8777-777777777777",
         }),
       ]);
     } finally {

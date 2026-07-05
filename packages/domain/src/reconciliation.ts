@@ -1080,11 +1080,6 @@ export const createReconciliationService = (options: ReconciliationServiceOption
             if (!archiveRow) {
               throw new Error("statement_archive_not_found_after_insert");
             }
-            if (closeRow.monthlyCloseStatementId !== archiveRow.id) {
-              await tx.update(periodClose).set({
-                monthlyCloseStatementId: archiveRow.id,
-              }).where(eq(periodClose.id, closeRow.id)).returning();
-            }
 
             auditEntry = {
               orgId: input.orgId,
