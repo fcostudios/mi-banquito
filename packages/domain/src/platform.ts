@@ -6,11 +6,22 @@ import {
   entityVersion,
   groupConfig,
   organization,
+  periodClose,
 } from "@mi-banquito/db/schema";
+import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import type { GroupConfigForm, OrganizationCreateForm } from "@mi-banquito/contracts";
 import { type AuditWriter, writeWithAudit } from "./audit";
+import { closeOverdueAlertState } from "./alerts";
 
 export type CreateOrganizationInput = OrganizationCreateForm;
+export type OrganizationLifecycleStatus = "paused" | "archived";
+
+export type OrganizationLifecycleInput = {
+  orgId: string;
+  actorId: string;
+  status: OrganizationLifecycleStatus;
+  reason: string;
+};
 
 export type DefaultGroupConfigArgs = {
   orgId: string;
@@ -29,6 +40,13 @@ export type BusinessRuleRow = {
   lastChangedAt: string;
   lastChangedBy: string;
   lastChangedByKind: string;
+};
+
+export type OrganizationCloseOverdueSnapshot = {
+  latestClosedAt: Date | null;
+  daysSinceClose: number;
+  thresholdDays: number;
+  overdue: boolean;
 };
 
 export function buildDefaultGroupConfigValues(args: DefaultGroupConfigArgs): typeof groupConfig.$inferInsert {
@@ -128,6 +146,7 @@ type ConfigJson = {
     period?: string;
   };
   opensOnDay?: number;
+  close_overdue_threshold_days?: number | string;
 };
 
 const periodLabels: Record<string, string> = {
@@ -322,9 +341,11 @@ export interface PlatformService {
   createOrganization(input: CreateOrganizationInput, actorId: string, auth0: Auth0OrgProvisioner): Promise<string>;
   listOrganizations(): Promise<Array<typeof organization.$inferSelect>>;
   getOrganization(id: string): Promise<typeof organization.$inferSelect | undefined>;
+  getOrganizationCloseOverdueSnapshot(orgId: string, today?: Date): Promise<OrganizationCloseOverdueSnapshot | undefined>;
   getCurrentGroupConfig(orgId: string): Promise<typeof groupConfig.$inferSelect | undefined>;
   listBusinessRuleRows(orgId: string): Promise<BusinessRuleRow[]>;
   recordBusinessRulesView(orgId: string, actorId: string): Promise<void>;
+  updateOrganizationLifecycle(input: OrganizationLifecycleInput): Promise<typeof organization.$inferSelect>;
   saveGroupConfig(orgId: string, input: GroupConfigForm, actorId: string, actorKind: GroupConfigActorKind): Promise<typeof groupConfig.$inferSelect>;
 }
 
@@ -473,6 +494,40 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
       const [row] = await db.select().from(organization).where(eq(organization.id, id));
       return row;
     },
+    async getOrganizationCloseOverdueSnapshot(orgId, today = new Date()) {
+      const org = await this.getOrganization(orgId);
+      if (!org) {
+        return undefined;
+      }
+
+      return withTenantTransaction(orgId, async (tx) => {
+        const [config] = await tx.select({ config: groupConfig.config })
+          .from(groupConfig)
+          .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)))
+          .orderBy(desc(groupConfig.version))
+          .limit(1);
+        const [latestClose] = await tx.select({ closedAt: periodClose.closedAt })
+          .from(periodClose)
+          .where(eq(periodClose.orgId, orgId))
+          .orderBy(desc(periodClose.closedAt))
+          .limit(1);
+        const json = asConfigJson(config?.config);
+        const threshold = Number(json.close_overdue_threshold_days);
+        const state = closeOverdueAlertState({
+          today,
+          latestClosedAt: latestClose?.closedAt ?? null,
+          fallbackStartedAt: org.createdAt,
+          thresholdDays: Number.isInteger(threshold) && threshold > 0 ? threshold : undefined,
+        });
+
+        return {
+          latestClosedAt: latestClose?.closedAt ?? null,
+          daysSinceClose: state.daysSinceClose,
+          thresholdDays: state.thresholdDays,
+          overdue: state.overdue,
+        };
+      });
+    },
     async getCurrentGroupConfig(orgId) {
       const [row] = await db.select().from(groupConfig)
         .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)))
@@ -536,8 +591,66 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
         },
       });
     },
-    async saveGroupConfig(orgId, input, actorId, actorKind) {
+    async updateOrganizationLifecycle(input) {
+      const reason = input.reason.trim();
+      if (!reason) {
+        throw new Error("organization_lifecycle_reason_required");
+      }
+      if (input.status !== "paused" && input.status !== "archived") {
+        throw new Error("organization_lifecycle_status_invalid");
+      }
+
       return db.transaction(async (tx) => {
+        const now = new Date();
+        let updated: typeof organization.$inferSelect | undefined;
+        let priorStatus: string | undefined;
+        return writeWithAudit({
+          write: async () => {
+            const [current] = await tx.select().from(organization).where(eq(organization.id, input.orgId));
+            if (!current) {
+              throw new Error("organization_not_found");
+            }
+            priorStatus = current.status;
+            const [row] = await tx.update(organization)
+              .set({
+                status: input.status,
+                updatedAt: now,
+                updatedBy: input.actorId,
+              })
+              .where(eq(organization.id, input.orgId))
+              .returning();
+            updated = row;
+            return row;
+          },
+          audit: async () => {
+            if (!updated || !priorStatus) {
+              throw new Error("organization lifecycle audit subject is missing");
+            }
+            await auditWriter({
+              tx,
+              entry: {
+                orgId: input.orgId,
+                actorKind: "platform_operator",
+                actorId: input.actorId,
+                actionKind: "organization.lifecycle",
+                subjectKind: "organization",
+                subjectId: input.orgId,
+                payloadSnapshot: {
+                  orgId: input.orgId,
+                  priorStatus,
+                  newStatus: input.status,
+                },
+                reason,
+                at: now,
+                createdAt: now,
+              },
+            });
+          },
+        });
+      });
+    },
+    async saveGroupConfig(orgId, input, actorId, actorKind) {
+      return withWritableTenantTransaction(orgId, async (tx) => {
         const now = new Date();
         let auditEntry: PlatformAuditEntry | undefined;
         return writeWithAudit({

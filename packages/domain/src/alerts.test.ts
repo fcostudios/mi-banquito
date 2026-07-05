@@ -25,6 +25,10 @@ class FakeSelectBuilder {
     return this;
   }
 
+  limit() {
+    return this;
+  }
+
   then<TResult1 = unknown[], TResult2 = never>(
     onfulfilled?: ((value: unknown[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
@@ -42,6 +46,11 @@ class FakeInsertBuilder {
   values(values: Record<string, unknown> | Array<Record<string, unknown>>) {
     this.inserts.push({ tableName: tableNameOf(this.table), values });
     return this;
+  }
+
+  returning() {
+    const rows = insertedRows({ inserts: this.inserts } as FakeDb, this.table);
+    return Promise.resolve([rows[rows.length - 1] ?? {}]);
   }
 }
 
@@ -84,6 +93,58 @@ async function withMockedDb<T>(fakeDb: FakeDb, callback: () => Promise<T>): Prom
 }
 
 describe("alerts", () => {
+  it("classifies close overdue alerts by latest close and configured threshold", async () => {
+    await withMockedDb(new FakeDb(), async () => {
+      const { closeOverdueAlertState } = await import("./alerts");
+
+      expect(closeOverdueAlertState({
+        today: new Date("2026-07-20T12:00:00.000Z"),
+        latestClosedAt: new Date("2026-07-05T10:00:00.000Z"),
+        thresholdDays: 14,
+      })).toEqual({ overdue: true, daysSinceClose: 15, thresholdDays: 14 });
+      expect(closeOverdueAlertState({
+        today: new Date("2026-07-19T12:00:00.000Z"),
+        latestClosedAt: new Date("2026-07-05T10:00:00.000Z"),
+        thresholdDays: 14,
+      })).toEqual({ overdue: false, daysSinceClose: 14, thresholdDays: 14 });
+    });
+  });
+
+  it("emits one A8 close overdue alert per org when the 24 hour dedup window is clear", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const fakeDb = new FakeDb([
+      [{ id: orgId, displayName: "Mi Banquito", createdAt: new Date("2026-07-01T00:00:00.000Z") }],
+      [{ config: { close_overdue_threshold_days: 3 } }],
+      [{ closedAt: new Date("2026-07-01T00:00:00.000Z") }],
+      [],
+    ]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitCloseOverdueAlerts({
+        today: new Date("2026-07-05T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        orgsScanned: 1,
+        alertsEmitted: 1,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toEqual([
+      expect.objectContaining({
+        alertKind: "A8",
+        severity: "medium",
+        audience: "both",
+        subjectKind: "organization",
+        subjectId: orgId,
+        payload: expect.objectContaining({ daysSinceClose: 4, thresholdDays: 3 }),
+      }),
+    ]);
+    expect(insertedRows(fakeDb, auditLogEntry)).toEqual([
+      expect.objectContaining({ actionKind: "alert.close_overdue.emit" }),
+    ]);
+  });
+
   it("uses append-only actions to compute dismissed and snoozed state", async () => {
     let state: ReturnType<(typeof import("./alerts"))["effectiveAlertState"]> | undefined;
     await withMockedDb(new FakeDb(), async () => {

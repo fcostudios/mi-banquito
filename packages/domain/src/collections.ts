@@ -3,7 +3,7 @@ import { and, desc, eq, isNull, lte } from "drizzle-orm";
 
 import { db } from "@mi-banquito/db";
 import { alert, arAging, auditLogEntry, organization, promise, promiseReminder } from "@mi-banquito/db/schema";
-import { withTenantTransaction } from "@mi-banquito/db/tenant";
+import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 
 export type AgingRow = {
   daysLate: number;
@@ -310,7 +310,7 @@ export function createCollectionsService(): CollectionsService {
       const now = new Date();
       const note = trimmedNote(input.note);
 
-      await withTenantTransaction(input.orgId, async (tx) => {
+      await withWritableTenantTransaction(input.orgId, async (tx) => {
         await assertSourceObligationExists(tx, input, source, input.periodLabel);
 
         const openRows = await tx.select().from(promise)
@@ -403,7 +403,7 @@ export function createCollectionsService(): CollectionsService {
       const source = normalizePromiseSourceRef(input);
       const now = new Date();
 
-      await withTenantTransaction(input.orgId, async (tx) => {
+      await withWritableTenantTransaction(input.orgId, async (tx) => {
         await assertSourceObligationExists(tx, input, source, input.periodLabel);
 
         await tx.insert(auditLogEntry).values({

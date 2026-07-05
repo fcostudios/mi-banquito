@@ -35,6 +35,13 @@ type UpdateRecord = {
 
 const tableNameOf = (table: unknown): string => getTableName(table as Parameters<typeof getTableName>[0]);
 
+let tenantFakeDb: FakeDb;
+
+vi.mock("@mi-banquito/db/tenant", () => ({
+  withTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => run(tenantFakeDb),
+  withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => run(tenantFakeDb),
+}));
+
 class FakeSelectBuilder {
   constructor(private readonly nextResult: () => unknown[]) {}
 
@@ -92,6 +99,7 @@ class FakeDb {
   private readonly selectResults: unknown[][];
 
   constructor(selectResults: unknown[][]) {
+    tenantFakeDb = this;
     this.selectResults = [...selectResults];
   }
 

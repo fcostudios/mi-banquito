@@ -4,6 +4,7 @@ export { generateReferralCommissionCredit } from "./loans/referral";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
+import { withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import {
   alert,
   auditLogEntry,
@@ -564,7 +565,7 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
       createdByKind: ACTOR_KIND,
     }));
 
-    await db.transaction(async (tx) => {
+    await withWritableTenantTransaction(input.orgId, async (tx) => {
       await writeWithAudit({
         write: async () => {
           if (input.borrowerKind === "non_member" && borrowerNonMemberId) {
@@ -780,7 +781,7 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
     const scheduleUpdates = allocateRepaymentToSchedule(scheduleRows, feeRows, money4(paidFee), split);
     const borrowerDisplayName = await resolveBorrowerName(input.orgId, currentLoan);
 
-    await db.transaction(async (tx) => {
+    await withWritableTenantTransaction(input.orgId, async (tx) => {
       await writeWithAudit({
         write: async () => {
           await tx.insert(repayment).values({

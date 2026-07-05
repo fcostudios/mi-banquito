@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  createAlertsService: vi.fn(),
+  emitCloseOverdueAlerts: vi.fn(),
   createCompensationService: vi.fn(),
   awardDueTreasurerCompensation: vi.fn(),
   insert: vi.fn(),
@@ -9,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@mi-banquito/domain", () => ({
   createCollectionsService: vi.fn(),
+  createAlertsService: mocks.createAlertsService,
   createCompensationService: mocks.createCompensationService,
 }));
 
@@ -44,6 +47,16 @@ beforeEach(() => {
     skippedExistingDisbursements: 0,
     configsAdvanced: 0,
     failures: [],
+  });
+  mocks.emitCloseOverdueAlerts.mockResolvedValue({
+    orgsScanned: 1,
+    alertsEmitted: 1,
+    alertsSkippedExisting: 0,
+    alertsCleared: 0,
+    failures: [],
+  });
+  mocks.createAlertsService.mockReturnValue({
+    emitCloseOverdueAlerts: mocks.emitCloseOverdueAlerts,
   });
   mocks.createCompensationService.mockReturnValue({
     awardDueTreasurerCompensation: mocks.awardDueTreasurerCompensation,
@@ -101,8 +114,15 @@ describe("daily cron route", () => {
           compensationDisbursementsAwarded: 0,
           compensationSkippedExistingDisbursements: 0,
           compensationConfigsAdvanced: 0,
+          closeOverdueOrgsScanned: 1,
+          closeOverdueAlertsEmitted: 1,
+          closeOverdueAlertsSkippedExisting: 0,
+          closeOverdueAlertsCleared: 0,
           failures: [],
         },
+      });
+      expect(mocks.emitCloseOverdueAlerts).toHaveBeenCalledWith({
+        today: expect.any(Date),
       });
     } else {
       expect(await response.json()).toEqual({ job, ran: true });

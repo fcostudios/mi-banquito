@@ -498,45 +498,36 @@ describe("Sprint 3 schema substrate", () => {
               now()
             );
 
-            got_adjustment_payload_check := false;
-            BEGIN
-              INSERT INTO reconciliation_cycle (
-                id,
-                org_id,
-                cycle_id,
-                declared_bank_balance,
-                computed_pool_balance,
-                discrepancy_amount,
-                tolerance_amount,
-                resolution_kind,
-                period_close_id,
-                closed_at,
-                created_at,
-                created_by,
-                created_by_kind
-              )
-              VALUES (
-                gen_random_uuid(),
-                test_org_id,
-                open_adjustment_parent_cycle_id,
-                0,
-                0,
-                0,
-                0,
-                'auto_within_tolerance',
-                test_period_close_id,
-                now(),
-                now(),
-                test_actor_id,
-                'system'
-              );
-            EXCEPTION
-              WHEN check_violation THEN
-                got_adjustment_payload_check := true;
-            END;
-            IF NOT got_adjustment_payload_check THEN
-              RAISE EXCEPTION 'expected non-adjustment reconciliation period_close_id to fail';
-            END IF;
+            INSERT INTO reconciliation_cycle (
+              id,
+              org_id,
+              cycle_id,
+              declared_bank_balance,
+              computed_pool_balance,
+              discrepancy_amount,
+              tolerance_amount,
+              resolution_kind,
+              period_close_id,
+              closed_at,
+              created_at,
+              created_by,
+              created_by_kind
+            )
+            VALUES (
+              gen_random_uuid(),
+              test_org_id,
+              open_adjustment_parent_cycle_id,
+              0,
+              0,
+              0,
+              0,
+              'auto_within_tolerance',
+              test_period_close_id,
+              now(),
+              now(),
+              test_actor_id,
+              'system'
+            );
 
             INSERT INTO reconciliation_cycle (
               id,

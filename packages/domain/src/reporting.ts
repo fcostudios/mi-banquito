@@ -1,7 +1,9 @@
-import { eq } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { desc, eq } from "drizzle-orm";
 
 import { db } from "@mi-banquito/db";
 import { organization, statementArchive } from "@mi-banquito/db/schema";
+import { withTenantTransaction } from "@mi-banquito/db/tenant";
 
 export type VerifyResult =
   | { matched: true; groupName: string; generatedAt: string }
@@ -9,6 +11,7 @@ export type VerifyResult =
 
 export interface ReportingService {
   readonly context: "reporting";
+  listStatementArchive(orgId: string): Promise<Array<typeof statementArchive.$inferSelect>>;
   verifyStatementHash(hash: string): Promise<VerifyResult>;
 }
 
@@ -23,9 +26,33 @@ export function verifierResultText(result: VerifyResult): string {
   return `Este documento coincide con el registro del grupo ${result.groupName} al ${result.generatedAt.slice(0, 10)}.`;
 }
 
+type JsonValue = undefined | null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
+
+export function canonicalJson(value: JsonValue): string {
+  if (value === undefined) {
+    return "null";
+  }
+  if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => canonicalJson(entry)).join(",")}]`;
+  }
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+}
+
+export function sha256Hex(input: string): string {
+  return createHash("sha256").update(input).digest("hex");
+}
+
 export function createReportingService(): ReportingService {
   return {
     context: "reporting",
+    async listStatementArchive(orgId) {
+      return withTenantTransaction(orgId, async (tx) => tx.select().from(statementArchive)
+        .where(eq(statementArchive.orgId, orgId))
+        .orderBy(desc(statementArchive.generatedAt)));
+    },
     async verifyStatementHash(hash) {
       const [row] = await db.select({
         generatedAt: statementArchive.generatedAt,

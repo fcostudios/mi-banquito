@@ -1,6 +1,6 @@
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
-import { alert, alertAction, auditLogEntry } from "@mi-banquito/db/schema";
+import { alert, alertAction, auditLogEntry, groupConfig, organization, periodClose } from "@mi-banquito/db/schema";
 import { withTenantTransaction } from "@mi-banquito/db/tenant";
 import { writeWithAudit } from "./audit";
 
@@ -30,12 +30,34 @@ export type VisibleAlert = {
   whatsAppText: string;
 };
 
+export type CloseOverdueAlertInput = {
+  today: Date | string;
+  latestClosedAt: Date | string | null;
+  thresholdDays?: number | null;
+  fallbackStartedAt?: Date | string | null;
+};
+
+export type CloseOverdueAlertState = {
+  overdue: boolean;
+  daysSinceClose: number;
+  thresholdDays: number;
+};
+
+export type CloseOverdueAlertRunSummary = {
+  orgsScanned: number;
+  alertsEmitted: number;
+  alertsSkippedExisting: number;
+  alertsCleared: number;
+  failures: Array<{ orgId: string; message: string }>;
+};
+
 export interface AlertsService {
   readonly context: "alerts";
   listVisibleAlerts(input: { orgId: string; audience: AlertAudience; now?: Date }): Promise<VisibleAlert[]>;
   countVisibleAlerts(input: { orgId: string; audience: AlertAudience; now?: Date }): Promise<number>;
   dismissAlert(input: { orgId: string; alertId: string; actorId: string; audience: AlertAudience; reason?: string }): Promise<void>;
   snoozeAlert(input: { orgId: string; alertId: string; actorId: string; audience: AlertAudience; snoozedUntil: Date; reason?: string }): Promise<void>;
+  emitCloseOverdueAlerts(input: { today: Date }): Promise<CloseOverdueAlertRunSummary>;
 }
 
 type AlertPayload = {
@@ -52,8 +74,17 @@ type AlertReadTx = {
   };
 };
 
+const SYSTEM_ACTOR_ID = "00000000-0000-4000-8000-000000000000";
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const DEFAULT_CLOSE_OVERDUE_THRESHOLD_DAYS = 14;
+
 function dateValue(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value);
+}
+
+function dayStartUtc(value: Date | string): Date {
+  const date = dateValue(value);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
 function payloadObject(value: unknown): AlertPayload {
@@ -62,6 +93,32 @@ function payloadObject(value: unknown): AlertPayload {
 
 function payloadText(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function closeOverdueThreshold(config: unknown): number {
+  const value = config && typeof config === "object" && !Array.isArray(config)
+    ? (config as Record<string, unknown>).close_overdue_threshold_days
+    : undefined;
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_CLOSE_OVERDUE_THRESHOLD_DAYS;
+}
+
+export function closeOverdueAlertState(input: CloseOverdueAlertInput): CloseOverdueAlertState {
+  const thresholdDays = Number.isInteger(input.thresholdDays) && Number(input.thresholdDays) > 0
+    ? Number(input.thresholdDays)
+    : DEFAULT_CLOSE_OVERDUE_THRESHOLD_DAYS;
+  const today = dayStartUtc(input.today);
+  const reference = input.latestClosedAt ?? input.fallbackStartedAt;
+  if (!reference) {
+    return { overdue: false, daysSinceClose: 0, thresholdDays };
+  }
+
+  const daysSinceClose = Math.max(0, Math.floor((today.getTime() - dayStartUtc(reference).getTime()) / MS_PER_DAY));
+  return {
+    overdue: daysSinceClose > thresholdDays,
+    daysSinceClose,
+    thresholdDays,
+  };
 }
 
 export function effectiveAlertState(input: EffectiveAlertStateInput): EffectiveAlertState {
@@ -233,5 +290,141 @@ export const createAlertsService = (): AlertsService => ({
         });
       },
     }));
+  },
+  async emitCloseOverdueAlerts(input) {
+    const summary: CloseOverdueAlertRunSummary = {
+      orgsScanned: 0,
+      alertsEmitted: 0,
+      alertsSkippedExisting: 0,
+      alertsCleared: 0,
+      failures: [],
+    };
+    const today = dayStartUtc(input.today);
+    const dedupWindowEnd = new Date(today.getTime() + MS_PER_DAY);
+    const orgs = await db.select({
+      id: organization.id,
+      displayName: organization.displayName,
+      createdAt: organization.createdAt,
+    }).from(organization)
+      .where(eq(organization.status, "active"));
+
+    for (const org of orgs) {
+      summary.orgsScanned += 1;
+      try {
+        await withTenantTransaction(org.id, async (tx) => {
+          const [config] = await tx.select({ config: groupConfig.config })
+            .from(groupConfig)
+            .where(and(eq(groupConfig.orgId, org.id), isNull(groupConfig.validTo)))
+            .orderBy(desc(groupConfig.version))
+            .limit(1);
+          const [latestClose] = await tx.select({ closedAt: periodClose.closedAt })
+            .from(periodClose)
+            .where(eq(periodClose.orgId, org.id))
+            .orderBy(desc(periodClose.closedAt))
+            .limit(1);
+          const existingAlerts = await tx.select().from(alert)
+            .where(and(
+              eq(alert.orgId, org.id),
+              eq(alert.alertKind, "A8"),
+              eq(alert.subjectKind, "organization"),
+              eq(alert.subjectId, org.id),
+            ))
+            .orderBy(desc(alert.createdAt));
+          const [existing] = existingAlerts;
+
+          const state = closeOverdueAlertState({
+            today,
+            latestClosedAt: latestClose?.closedAt ?? null,
+            fallbackStartedAt: org.createdAt,
+            thresholdDays: closeOverdueThreshold(config?.config),
+          });
+
+          if (!state.overdue) {
+            for (const staleAlert of existingAlerts) {
+              await tx.insert(alertAction).values({
+                orgId: org.id,
+                alertId: staleAlert.id,
+                actionKind: "dismiss",
+                snoozedUntil: null,
+                actorId: SYSTEM_ACTOR_ID,
+                actorKind: "system",
+                reason: "Período cerrado o dentro del umbral",
+                createdAt: today,
+              });
+              await tx.insert(auditLogEntry).values({
+                orgId: org.id,
+                actorKind: "system",
+                actorId: SYSTEM_ACTOR_ID,
+                actionKind: "alert.close_overdue.clear",
+                subjectKind: "alert",
+                subjectId: staleAlert.id,
+                payloadSnapshot: {
+                  orgId: org.id,
+                  daysSinceClose: state.daysSinceClose,
+                  thresholdDays: state.thresholdDays,
+                },
+                reason: "Período cerrado o dentro del umbral",
+                at: today,
+                createdAt: today,
+              });
+              summary.alertsCleared += 1;
+            }
+            return;
+          }
+
+          if (existing && dateValue(existing.dedupWindowEnd) > today) {
+            summary.alertsSkippedExisting += 1;
+            return;
+          }
+
+          const [row] = await tx.insert(alert).values({
+            orgId: org.id,
+            alertKind: "A8",
+            severity: "medium",
+            audience: "both",
+            subjectKind: "organization",
+            subjectId: org.id,
+            payload: {
+              title: "Cierre pendiente",
+              body: `No has cerrado el mes en los últimos ${state.daysSinceClose} días.`,
+              orgId: org.id,
+              orgName: org.displayName,
+              daysSinceClose: state.daysSinceClose,
+              thresholdDays: state.thresholdDays,
+            },
+            dedupWindowEnd,
+            dismissedAt: null,
+            dismissedBy: null,
+            snoozedUntil: null,
+            createdAt: today,
+          }).returning();
+
+          await tx.insert(auditLogEntry).values({
+            orgId: org.id,
+            actorKind: "system",
+            actorId: SYSTEM_ACTOR_ID,
+            actionKind: "alert.close_overdue.emit",
+            subjectKind: "alert",
+            subjectId: row.id,
+            payloadSnapshot: {
+              orgId: org.id,
+              daysSinceClose: state.daysSinceClose,
+              thresholdDays: state.thresholdDays,
+            },
+            reason: null,
+            at: today,
+            createdAt: today,
+          });
+          summary.alertsEmitted += 1;
+        });
+      } catch (error) {
+        summary.failures.push({
+          orgId: org.id,
+          message: error instanceof Error ? error.message : "Unknown close overdue alert failure",
+        });
+      }
+    }
+
+    return summary;
   },
 });

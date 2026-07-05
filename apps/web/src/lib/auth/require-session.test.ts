@@ -44,6 +44,10 @@ vi.mock("@mi-banquito/db", () => ({
 }));
 
 vi.mock("@mi-banquito/db/schema", () => ({
+  organization: {
+    id: "organization.id",
+    status: "organization.status",
+  },
   platformOperator: {
     id: "platform_operator.id",
     authSubject: "platform_operator.auth_subject",
@@ -110,6 +114,7 @@ describe("requireRole", () => {
       },
     });
     selectResponses.push(
+      [{ status: "active" }],
       [],
       [{ memberId: "33333333-3333-4333-8333-333333333333", userAccountId: "44444444-4444-4444-8444-444444444444" }],
     );
@@ -139,13 +144,16 @@ describe("requireRole", () => {
         org_id: "org_Chul6oWgE2ZzCNvE",
       },
     });
-    selectResponses.push([
-      {
-        memberId: "33333333-3333-4333-8333-333333333333",
-        userAccountId: "44444444-4444-4444-8444-444444444444",
-        role: "TESORERA",
-      },
-    ]);
+    selectResponses.push(
+      [{ status: "active" }],
+      [
+        {
+          memberId: "33333333-3333-4333-8333-333333333333",
+          userAccountId: "44444444-4444-4444-8444-444444444444",
+          role: "TESORERA",
+        },
+      ],
+    );
 
     await expect(requireTreasurer()).resolves.toMatchObject({
       userId: "auth0|real-user",

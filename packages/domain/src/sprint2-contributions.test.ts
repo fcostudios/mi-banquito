@@ -148,6 +148,10 @@ describe("Sprint 2 contribution source and partial state", () => {
     ]);
     vi.resetModules();
     vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+    vi.doMock("@mi-banquito/db/tenant", () => ({
+      withTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => fakeDb.transaction(() => run(fakeDb)),
+      withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => fakeDb.transaction(() => run(fakeDb)),
+    }));
 
     try {
       const { createLedgerService } = await import("./ledger");
@@ -176,6 +180,7 @@ describe("Sprint 2 contribution source and partial state", () => {
       expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(1);
     } finally {
       vi.doUnmock("@mi-banquito/db");
+      vi.doUnmock("@mi-banquito/db/tenant");
       vi.resetModules();
     }
   });
@@ -184,6 +189,10 @@ describe("Sprint 2 contribution source and partial state", () => {
     const fakeDb = new FakeDb([]);
     vi.resetModules();
     vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+    vi.doMock("@mi-banquito/db/tenant", () => ({
+      withTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => fakeDb.transaction(() => run(fakeDb)),
+      withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => fakeDb.transaction(() => run(fakeDb)),
+    }));
 
     try {
       const { createLedgerService } = await import("./ledger");
@@ -206,6 +215,7 @@ describe("Sprint 2 contribution source and partial state", () => {
       expect(fakeDb.executedSql).toHaveLength(1);
     } finally {
       vi.doUnmock("@mi-banquito/db");
+      vi.doUnmock("@mi-banquito/db/tenant");
       vi.resetModules();
     }
   });

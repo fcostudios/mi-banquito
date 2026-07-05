@@ -1,63 +1,165 @@
-import { createLedgerService } from "@mi-banquito/domain";
-import { FormField, InputNumber } from "@mi-banquito/ui";
+import Link from "next/link";
+import { createReconciliationService, type ReconciliationSnapshot } from "@mi-banquito/domain";
+import { ButtonPrimary, ButtonSecondary, FormField, InputNumber } from "@mi-banquito/ui";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import { ecCurrency } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
+import {
+  annotateReconciliationAction,
+  closePeriodAction,
+  executeReconciliationAction,
+  shareMonthlyCloseAction,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
-const copy = messages.sprint2.close;
+const copy = messages.monthlyClose;
 
-export default async function ScrMonthlyClosePage() {
+function money(value: string) {
+  return ecCurrency.format(Number(value));
+}
+
+function statusLabel(status: ReconciliationSnapshot["status"]) {
+  if (status === "closed") {
+    return copy.statusClosed;
+  }
+  if (status === "annotated") {
+    return copy.statusAnnotated;
+  }
+  if (status === "outside_tolerance") {
+    return copy.statusOutside;
+  }
+  return copy.statusWithin;
+}
+
+function resultMessage(params?: { reconciled?: string; annotated?: string; closed?: string; error?: string }) {
+  if (params?.error) {
+    return decodeURIComponent(params.error) || copy.error;
+  }
+  if (params?.closed) {
+    return copy.successClosed;
+  }
+  if (params?.annotated) {
+    return copy.successAnnotated;
+  }
+  if (params?.reconciled) {
+    return copy.successReconciled;
+  }
+  return null;
+}
+
+export default async function ScrMonthlyClosePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ reconciled?: string; annotated?: string; closed?: string; error?: string }>;
+}) {
   const session = await requireTreasurer();
-  const balances = await createLedgerService().getCashBalances(session.orgId);
-  const rows = [
-    {
-      id: "bank",
-      label: copy.bankBalance,
-      value: balances.bankBalance,
-      hint: copy.bankHint,
-    },
-    {
-      id: "petty-cash",
-      label: copy.pettyCashBalance,
-      value: balances.pettyCashBalance,
-      hint: copy.pettyCashHint,
-    },
-  ];
+  const state = await createReconciliationService().getMonthlyCloseState(session.orgId);
+  const params = await searchParams;
+  const message = resultMessage(params);
+  const canClose = Boolean(state.id) && (state.status === "within_tolerance" || state.status === "annotated");
+  const canAnnotate = Boolean(state.id) && state.status === "outside_tolerance";
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6" data-screen="SCR-monthly-close">
+    <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6" data-screen="SCR-monthly-close">
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold text-text-primary">{copy.title}</h1>
         <p className="text-text-secondary">{copy.description}</p>
       </div>
 
-      <section className="grid gap-3 rounded-md border border-border bg-surface p-5" aria-label={copy.reconciliationRows}>
-        {rows.map((row) => (
-          <div
-            key={row.id}
-            className="grid gap-4 border-b border-border py-3 last:border-b-0 md:grid-cols-[1fr_auto] md:items-center"
-          >
-            <div>
-              <h2 className="font-semibold text-text-primary">{row.label}</h2>
-              <p className="text-sm text-text-secondary">{row.hint}</p>
-            </div>
-            <div className="grid gap-3 md:min-w-56">
-              <p className="text-xl font-bold text-text-primary">{ecCurrency.format(Number(row.value))}</p>
-              <FormField labelKey={copy.declaredBalance}>
-                <InputNumber
-                  name={`declared-${row.id}`}
-                  min="0"
-                  step="0.01"
-                  defaultValue={Number(row.value)}
-                  aria-label={`${copy.declaredBalance}: ${row.label}`}
-                />
-              </FormField>
-            </div>
+      {message ? (
+        <p className="rounded-md border border-border bg-surface p-4 text-sm font-semibold text-text-primary">{message}</p>
+      ) : null}
+
+      <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.title}>
+        <div className="grid gap-3 md:grid-cols-4">
+          <div>
+            <p className="text-sm text-text-secondary">{copy.cycle}</p>
+            <p className="font-semibold text-text-primary">{state.cycleLabel}</p>
           </div>
-        ))}
+          <div>
+            <p className="text-sm text-text-secondary">{copy.computedPool}</p>
+            <p className="font-semibold text-text-primary">{money(state.computedPoolBalance)}</p>
+          </div>
+          <div>
+            <p className="text-sm text-text-secondary">{copy.discrepancy}</p>
+            <p className="font-semibold text-text-primary">{money(state.discrepancyAmount)}</p>
+          </div>
+          <div>
+            <p className="text-sm text-text-secondary">{copy.tolerance}</p>
+            <p className="font-semibold text-text-primary">{money(state.toleranceAmount)}</p>
+          </div>
+        </div>
+
+        <div className="rounded-md border border-border bg-background p-4">
+          <p className="text-sm text-text-secondary">{statusLabel(state.status)}</p>
+          {state.resolutionNote ? (
+            <p className="mt-2 text-sm text-text-primary">{state.resolutionNote}</p>
+          ) : null}
+        </div>
+
+        <form action={executeReconciliationAction} className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+          <input type="hidden" name="cycleId" value={state.cycleId} />
+          <FormField labelKey={copy.declaredBalance}>
+            <InputNumber
+              name="declaredBankBalance"
+              min="0"
+              step="0.01"
+              defaultValue={Number(state.declaredBankBalance)}
+              aria-label={copy.declaredBalance}
+              required
+            />
+          </FormField>
+          <ButtonPrimary type="submit">{copy.reconcile}</ButtonPrimary>
+        </form>
       </section>
+
+      <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.annotationTitle}>
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary">{copy.annotationTitle}</h2>
+          <p className="text-sm text-text-secondary">{copy.annotationHelp}</p>
+        </div>
+        <form action={annotateReconciliationAction} className="grid gap-3">
+          <input type="hidden" name="reconciliationCycleId" value={state.id} />
+          <FormField labelKey={copy.reason}>
+            <textarea
+              name="reason"
+              className="min-h-24 w-full rounded-md border border-border bg-surface px-4 py-3 text-text-primary focus:border-primary"
+              defaultValue={state.resolutionNote ?? ""}
+              disabled={!canAnnotate}
+              required
+            />
+          </FormField>
+          <ButtonSecondary type="submit" disabled={!canAnnotate}>{copy.annotate}</ButtonSecondary>
+        </form>
+        <form action={closePeriodAction} className="flex flex-wrap gap-3">
+          <input type="hidden" name="reconciliationCycleId" value={state.id} />
+          <ButtonPrimary type="submit" disabled={!canClose}>{copy.close}</ButtonPrimary>
+          {!canClose && state.status !== "closed" ? (
+            <p className="text-sm text-text-secondary">{copy.closeDisabled}</p>
+          ) : null}
+        </form>
+      </section>
+
+      {state.monthlyCloseStatementId && state.monthlyClosePdfUri ? (
+        <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.archiveTitle}>
+          <div>
+            <h2 className="text-lg font-semibold text-text-primary">{copy.archiveTitle}</h2>
+            {state.canonicalPayloadHash ? (
+              <p className="break-all text-sm text-text-secondary">{copy.hash}: {state.canonicalPayloadHash}</p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link href={state.monthlyClosePdfUri} className="inline-flex min-h-12 items-center rounded-md border border-primary bg-surface px-4 text-primary">
+              {copy.previewPdf}
+            </Link>
+            <form action={shareMonthlyCloseAction}>
+              <input type="hidden" name="statementArchiveId" value={state.monthlyCloseStatementId} />
+              <ButtonPrimary type="submit">{copy.shareWhatsApp}</ButtonPrimary>
+            </form>
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

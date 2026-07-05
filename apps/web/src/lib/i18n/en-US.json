@@ -24,6 +24,19 @@
     "empty": "No cron runs have been recorded yet."
   },
   "adminOrgs": {
+    "home": {
+      "title": "Admin Inicio",
+      "description": "Organizaciones disponibles en la plataforma.",
+      "activeOrganizations": "Organizaciones activas",
+      "totalOrganizations": "Organizaciones totales",
+      "newOrganization": "Nueva organización",
+      "organization": "Organización",
+      "status": "Estado",
+      "createdAt": "Creada",
+      "orgId": "Org ID",
+      "open": "Abrir",
+      "empty": "Todavía no hay organizaciones registradas."
+    },
     "new": {
       "title": "Nueva organización",
       "description": "Crea el banquito y deja lista su configuración inicial.",
@@ -40,7 +53,19 @@
       "timezone": "Zona horaria",
       "language": "Idioma",
       "configLink": "Configurar reglas",
-      "createdAt": "Creada"
+      "createdAt": "Creada",
+      "closeHealthTitle": "Cierre mensual",
+      "lastClose": "Último cierre",
+      "daysSinceClose": "Días desde cierre",
+      "closeThreshold": "Umbral",
+      "closeHealthOk": "Al día",
+      "closeHealthOverdue": "Cierre pendiente",
+      "neverClosed": "Sin cierre registrado",
+      "lifecycleTitle": "Estado de la organización",
+      "lifecycleDescription": "Congela o archiva el banquito sin borrar sus datos.",
+      "reason": "Razón",
+      "freeze": "Congelar",
+      "archive": "Archivar"
     },
     "businessRules": {
       "title": "Reglas del grupo",
@@ -192,6 +217,49 @@
     "sandboxCalculation": "Resta el capital del préstamo en el mes actual y suma las cuotas esperadas de capital e interés desde el mes siguiente. Usa el calendario de saldo decreciente; no incluye comisión administrativa, mora ni cambios de reglas.",
     "projection": "Proyección",
     "empty": "No hay datos de liquidez proyectada todavía."
+  },
+  "monthlyClose": {
+    "title": "Cierre del mes",
+    "description": "Declara el saldo real, revisa la diferencia y cierra el período cuando esté listo.",
+    "cycle": "Período",
+    "computedPool": "Saldo en libros",
+    "declaredBalance": "Saldo declarado",
+    "discrepancy": "Diferencia",
+    "tolerance": "Tolerancia",
+    "reconcile": "Guardar conciliación",
+    "statusWithin": "Dentro de tolerancia",
+    "statusOutside": "Fuera de tolerancia",
+    "statusAnnotated": "Diferencia aceptada con nota",
+    "statusClosed": "Mes cerrado",
+    "annotationTitle": "Aceptar diferencia con nota",
+    "annotationHelp": "Usa esta opción solo cuando la diferencia fue revisada y seguirá visible en auditoría.",
+    "reason": "Nota de conciliación",
+    "annotate": "Guardar nota",
+    "close": "Cerrar mes",
+    "closeDisabled": "Primero guarda una conciliación dentro de tolerancia o una nota de aceptación.",
+    "archiveTitle": "Reporte archivado",
+    "previewPdf": "Abrir PDF",
+    "shareWhatsApp": "Compartir por WhatsApp",
+    "hash": "Hash",
+    "pdfTitle": "Cierre mensual",
+    "pdfSummary": "Resumen de conciliación",
+    "pdfEvidence": "Evidencia de archivo",
+    "pdfCanonicalHash": "Hash canónico",
+    "pdfOrganization": "Organización",
+    "pdfFooter": "Archivo generado automáticamente. El hash canónico permite verificar que el contenido archivado no cambió.",
+    "successReconciled": "Conciliación guardada.",
+    "successAnnotated": "Nota guardada.",
+    "successClosed": "Mes cerrado.",
+    "error": "No se pudo completar la acción."
+  },
+  "statementArchive": {
+    "description": "Documentos generados y archivados por el sistema.",
+    "empty": "Todavía no hay documentos archivados.",
+    "kind": "Tipo",
+    "period": "Período",
+    "generatedAt": "Generado",
+    "hash": "Hash",
+    "openPdf": "Abrir PDF"
   },
   "verifier": {
     "title": "Verificación de documento"

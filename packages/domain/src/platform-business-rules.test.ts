@@ -95,18 +95,32 @@ class FakeInsertBuilder {
 }
 
 class FakeUpdateBuilder {
+  private values?: Record<string, unknown>;
+
   constructor(
     private readonly table: unknown,
     private readonly updates: UpdateRecord[],
   ) {}
 
   set(values: Record<string, unknown>) {
+    this.values = values;
     this.updates.push({ tableName: tableNameOf(this.table), values });
     return this;
   }
 
   where() {
-    return Promise.resolve([]);
+    return this;
+  }
+
+  returning() {
+    return Promise.resolve([{ id: "11111111-1111-4111-8111-111111111111", ...this.values }]);
+  }
+
+  then<TResult1 = unknown[], TResult2 = never>(
+    onfulfilled?: ((value: unknown[]) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2> {
+    return Promise.resolve([]).then(onfulfilled, onrejected);
   }
 }
 
@@ -405,6 +419,12 @@ describe("US-024 business-rules projection", () => {
     const fakeDb = new FakeWriteDb([[previousConfig]]);
     vi.resetModules();
     vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+    vi.doMock("@mi-banquito/db/tenant", () => ({
+      withTenantTransaction: async (_orgId: string, run: (tx: FakeWriteDb) => Promise<unknown>) =>
+        fakeDb.transaction(run),
+      withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeWriteDb) => Promise<unknown>) =>
+        fakeDb.transaction(run),
+    }));
 
     try {
       const { createPlatformService } = await import("./platform");
@@ -452,6 +472,44 @@ describe("US-024 business-rules projection", () => {
           changeKind: "update",
           createdBy: "33333333-3333-4333-8333-333333333333",
           createdByKind: "member",
+        }),
+      ]);
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.doUnmock("@mi-banquito/db/tenant");
+      vi.resetModules();
+    }
+  });
+
+  it("pauses or archives an organization with a required audit reason", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const fakeDb = new FakeWriteDb([[
+      {
+        id: orgId,
+        displayName: "Mi Banquito",
+        status: "active",
+      },
+    ]]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+
+    try {
+      const { createPlatformService } = await import("./platform");
+      await expect(createPlatformService().updateOrganizationLifecycle({
+        orgId,
+        actorId: "33333333-3333-4333-8333-333333333333",
+        status: "paused",
+        reason: "La organización pausó operaciones por decisión de la asamblea.",
+      })).resolves.toEqual(expect.objectContaining({ status: "paused" }));
+
+      expect(updatedRows(fakeDb, organization)).toEqual([
+        expect.objectContaining({ status: "paused", updatedBy: "33333333-3333-4333-8333-333333333333" }),
+      ]);
+      expect(insertedRows(fakeDb, auditLogEntry)).toEqual([
+        expect.objectContaining({
+          actionKind: "organization.lifecycle",
+          reason: "La organización pausó operaciones por decisión de la asamblea.",
+          payloadSnapshot: expect.objectContaining({ priorStatus: "active", newStatus: "paused" }),
         }),
       ]);
     } finally {

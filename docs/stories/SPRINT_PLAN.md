@@ -142,20 +142,24 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 **Stories:** 10 | **Points:** 0 SP
 
+> **Status:** Closed / shipped. Two accepted downstream evidence items remain:
+> US-050 monthly-close PDF visibility waits for the monthly close PDF story, and
+> US-085 QR/footer embedding waits for statement PDF generation.
+
 ### Execution Order
 
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |
 |---|-------|-------|------|------|---------------|-----|------------|--------|----------|------|
-| 1 | full-stack | **US-040** ⬜ | Treasurer views the A/R aging primary tab sorted by days-late descending | ? ?SP | `See story file` | — | US-008, US-029, US-036 | →5 | — | [r1_collections_us_040.md](sprint-4/r1_collections_us_040.md) |
-| 2 | full-stack | **US-050** ⬜ | System awards treasurer compensation per cron with idempotency | ? ?SP | `See story file` | — | US-012, US-017, US-047 | — | — | [r1_reporting_us_050.md](sprint-4/r1_reporting_us_050.md) |
-| 3 | full-stack | **US-054** ⬜ | Treasurer views Liquidez Proyectada single screen with sandbox | ? ?SP | `See story file` | — | US-008, US-064, US-062 | →2 | — | [r1_liquidity_us_054.md](sprint-4/r1_liquidity_us_054.md) |
-| 4 | full-stack | **US-076** ⬜ | Treasurer declares loan disbursement source (bank vs cash) at origination | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_076.md](sprint-4/r1_chg_us_076.md) |
-| 5 | full-stack | **US-077** ⬜ | PWA visibly shows "guardado, esperando señal" when a write is queued offline | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_077.md](sprint-4/r1_chg_us_077.md) |
-| 6 | full-stack | **US-085** ⬜ | Public statement-verifier endpoint accepts hash + returns "matches / does not match" | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_085.md](sprint-4/r1_chg_us_085.md) |
-| 7 | full-stack | **US-087** ⬜ | Operator runs the design-partner onboarding ceremony with parity-check log | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_087.md](sprint-4/r1_chg_us_087.md) |
-| 8 | full-stack | **US-041** ⬜ | Treasurer marks a promise on a late row with a date | ? ?SP | `See story file` | — | US-040, US-064 | →2 | — | [r1_collections_us_041.md](sprint-4/r1_collections_us_041.md) |
-| 9 | full-stack | **US-043** ⬜ | System surfaces promise on the promised date as a reminder | ? ?SP | `See story file` | — | US-041 | — | — | [r1_alerts_us_043.md](sprint-4/r1_alerts_us_043.md) |
-| 10 | full-stack | **US-042** ⬜ | Treasurer shares a chase message via WhatsApp from a late row | ? ?SP | `See story file` | — | US-040, US-005, US-041 | — | — | [r1_collections_us_042.md](sprint-4/r1_collections_us_042.md) |
+| 1 | full-stack | **US-040** ✅ | Treasurer views the A/R aging primary tab sorted by days-late descending | ? ?SP | `See story file` | — | US-008, US-029, US-036 | →5 | — | [r1_collections_us_040.md](sprint-4/r1_collections_us_040.md) |
+| 2 | full-stack | **US-050** ✅ | System awards treasurer compensation per cron with idempotency | ? ?SP | `See story file` | — | US-012, US-017, US-047 | — | — | [r1_reporting_us_050.md](sprint-4/r1_reporting_us_050.md) |
+| 3 | full-stack | **US-054** ✅ | Treasurer views Liquidez Proyectada single screen with sandbox | ? ?SP | `See story file` | — | US-008, US-064, US-062 | →2 | — | [r1_liquidity_us_054.md](sprint-4/r1_liquidity_us_054.md) |
+| 4 | full-stack | **US-076** ✅ | Treasurer declares loan disbursement source (bank vs cash) at origination | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_076.md](sprint-4/r1_chg_us_076.md) |
+| 5 | full-stack | **US-077** ✅ | PWA visibly shows "guardado, esperando señal" when a write is queued offline | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_077.md](sprint-4/r1_chg_us_077.md) |
+| 6 | full-stack | **US-085** ✅ | Public statement-verifier endpoint accepts hash + returns "matches / does not match" | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_085.md](sprint-4/r1_chg_us_085.md) |
+| 7 | full-stack | **US-087** ✅ | Operator runs the design-partner onboarding ceremony with parity-check log | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_087.md](sprint-4/r1_chg_us_087.md) |
+| 8 | full-stack | **US-041** ✅ | Treasurer marks a promise on a late row with a date | ? ?SP | `See story file` | — | US-040, US-064 | →2 | — | [r1_collections_us_041.md](sprint-4/r1_collections_us_041.md) |
+| 9 | full-stack | **US-043** ✅ | System surfaces promise on the promised date as a reminder | ? ?SP | `See story file` | — | US-041 | — | — | [r1_alerts_us_043.md](sprint-4/r1_alerts_us_043.md) |
+| 10 | full-stack | **US-042** ✅ | Treasurer shares a chase message via WhatsApp from a late row | ? ?SP | `See story file` | — | US-040, US-005, US-041 | — | — | [r1_collections_us_042.md](sprint-4/r1_collections_us_042.md) |
 
 ### References
 
@@ -168,6 +172,12 @@ See `docs/specs/09_architecture.md` for bounded context details.
 ## Sprint 5: Sprint 5
 
 **Stories:** 10 | **Points:** 0 SP
+
+> **Status:** Implemented and verified for the monthly-close Sprint 5 path. The
+> `/cierre` workflow, A7/A8 alerting, lifecycle guardrails, migrations, Vercel Blob
+> monthly-close PDF artifact, WhatsApp share URL, and archive listing are in place.
+> Full US-086 per-member and year-end PDF generation remains outside this monthly-close
+> implementation slice unless Sprint 5 is scoped to monthly close only.
 
 ### Execution Order
 

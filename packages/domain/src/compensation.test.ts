@@ -162,6 +162,10 @@ async function withMockedCompensationDb<T>(
       input.tenantCalls?.push(orgId);
       return run(input.tenantDbs?.[orgId] ?? input.systemDb);
     },
+    withWritableTenantTransaction: async <R>(orgId: string, run: (tx: FakeDb) => Promise<R>): Promise<R> => {
+      input.tenantCalls?.push(orgId);
+      return run(input.tenantDbs?.[orgId] ?? input.systemDb);
+    },
   }));
   try {
     return await callback();

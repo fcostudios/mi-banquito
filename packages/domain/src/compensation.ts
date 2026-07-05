@@ -12,7 +12,7 @@ import {
   treasurerCompensationDisbursement,
   withdrawal,
 } from "@mi-banquito/db/schema";
-import { withTenantTransaction } from "@mi-banquito/db/tenant";
+import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import type { DateOnlyString } from "./collections";
 
 export type CompensationPeriod = "monthly" | "yearly";
@@ -397,7 +397,7 @@ export function createCompensationService(options: CompensationServiceOptions = 
       for (const orgId of orgIds) {
         result.orgsProcessed += 1;
         try {
-          const awardResult = await withTenantTransaction(orgId, async (tx) => {
+          const awardResult = await withWritableTenantTransaction(orgId, async (tx) => {
             const configs = await tx.select().from(groupConfig)
               .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)));
             let configsScanned = 0;

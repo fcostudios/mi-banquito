@@ -166,10 +166,15 @@ const expectAuditFailure = async (operation: Promise<unknown>, AuditFailure: typ
 const withMockedDb = async <T>(fakeDb: FakeDb, callback: () => Promise<T>): Promise<T> => {
   vi.resetModules();
   vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+  vi.doMock("@mi-banquito/db/tenant", () => ({
+    withTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<T>) => fakeDb.transaction(() => run(fakeDb)),
+    withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<T>) => fakeDb.transaction(() => run(fakeDb)),
+  }));
   try {
     return await callback();
   } finally {
     vi.doUnmock("@mi-banquito/db");
+    vi.doUnmock("@mi-banquito/db/tenant");
     vi.resetModules();
   }
 };

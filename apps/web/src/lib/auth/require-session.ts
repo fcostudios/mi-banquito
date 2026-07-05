@@ -5,7 +5,7 @@ import { getDbOrgIdFromUser, getRolesFromUser } from "@/lib/auth/session-claims"
 import { hasMinRole, type AppRole } from "@/lib/auth/roles";
 import { ROUTE_ACCESS_DENIED, ROUTE_LOGIN } from "@/lib/routes";
 import { db } from "@mi-banquito/db";
-import { platformOperator, userAccount, userOrgMembership } from "@mi-banquito/db/schema";
+import { organization, platformOperator, userAccount, userOrgMembership } from "@mi-banquito/db/schema";
 
 export type RequiredSession = {
   userId: string;
@@ -101,6 +101,19 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
       hasOrgId: false,
       nativeOrgId: typeof session?.user?.org_id === "string" ? session.user.org_id : undefined,
       roles: claimRoles,
+    });
+    redirect(ROUTE_ACCESS_DENIED);
+  }
+
+  const [org] = await db
+    .select({ status: organization.status })
+    .from(organization)
+    .where(eq(organization.id, orgId));
+  if (org?.status === "archived") {
+    logAuthGateDenied("missing_membership", {
+      hasUserId: true,
+      orgId,
+      reason: "organization_archived",
     });
     redirect(ROUTE_ACCESS_DENIED);
   }

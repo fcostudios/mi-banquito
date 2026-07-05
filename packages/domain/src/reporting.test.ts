@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { publicVerifyUrl, verifierResultText } from "./reporting";
+import { canonicalJson, publicVerifyUrl, sha256Hex, verifierResultText } from "./reporting";
 
 describe("public statement verification", () => {
+  it("orders object keys deterministically before hashing", () => {
+    const left = canonicalJson({ b: 2, a: { d: 4, c: 3 } });
+    const right = canonicalJson({ a: { c: 3, d: 4 }, b: 2 });
+
+    expect(left).toBe('{"a":{"c":3,"d":4},"b":2}');
+    expect(right).toBe(left);
+    expect(sha256Hex(left)).toBe("c461c47a913352f1a21e3f2ea49e1fd34754c0dc12cb7366e4636d5e186c6c6e");
+  });
+
   it("builds the verifier URL from a canonical hash", () => {
     expect(publicVerifyUrl("https://mi-banquito.vercel.app", "a".repeat(64))).toBe(
       "https://mi-banquito.vercel.app/verify/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
