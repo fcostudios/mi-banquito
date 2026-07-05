@@ -24,6 +24,19 @@
     "empty": "No cron runs have been recorded yet."
   },
   "adminOrgs": {
+    "home": {
+      "title": "Admin Inicio",
+      "description": "Organizaciones disponibles en la plataforma.",
+      "activeOrganizations": "Organizaciones activas",
+      "totalOrganizations": "Organizaciones totales",
+      "newOrganization": "Nueva organización",
+      "organization": "Organización",
+      "status": "Estado",
+      "createdAt": "Creada",
+      "orgId": "Org ID",
+      "open": "Abrir",
+      "empty": "Todavía no hay organizaciones registradas."
+    },
     "new": {
       "title": "Nueva organización",
       "description": "Crea el banquito y deja lista su configuración inicial.",

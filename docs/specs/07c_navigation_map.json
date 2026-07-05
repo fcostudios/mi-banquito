@@ -300,7 +300,7 @@
           "label_en": "New organization",
           "labelKey": "admin.orgsNew",
           "icon": "PlusCircle",
-          "route": "/admin/orgs/new",
+          "route": "/admin/orgs/nueva",
           "screen": "SCR-admin-orgs-new",
           "roles": [
             "platform_operator"

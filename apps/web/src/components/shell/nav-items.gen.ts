@@ -179,7 +179,7 @@ export const navItems: readonly NavItem[] = [
     label: "Nueva organización",
     labelKey: "nav.admin_orgs_new",
     icon: Circle,
-    href: "/admin/orgs/new",
+    href: "/admin/orgs/nueva",
     screenId: "SCR-admin-orgs-new",
     roles: ["PLATFORM_OPERATOR"],
     position: "top",
