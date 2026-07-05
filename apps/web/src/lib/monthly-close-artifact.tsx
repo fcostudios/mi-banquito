@@ -116,15 +116,15 @@ function MonthlyCloseDocument({ input }: { input: MonthlyCloseArtifactInput }) {
 export async function uploadMonthlyCloseArtifact(input: MonthlyCloseArtifactInput): Promise<MonthlyCloseArtifactResult> {
   const blob = await pdf(<MonthlyCloseDocument input={input} />).toBlob();
   const pathname = `monthly-close/${input.orgId}/${input.canonicalPayloadHash}.pdf`;
-  const uploaded = await put(pathname, blob, {
-    access: "public",
+  await put(pathname, blob, {
+    access: "private",
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: "application/pdf",
   });
 
   return {
-    pdfUri: uploaded.url,
+    pdfUri: `/statement-archive/monthly-close/${input.canonicalPayloadHash}.pdf`,
     byteSize: blob.size,
   };
 }

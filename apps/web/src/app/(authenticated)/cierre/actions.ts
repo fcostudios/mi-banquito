@@ -55,15 +55,23 @@ export async function annotateReconciliationAction(formData: FormData) {
 
 export async function closePeriodAction(formData: FormData) {
   const session = await requireTreasurer();
+  const reconciliationCycleId = requiredString(formData, "reconciliationCycleId");
   try {
     await createReconciliationService({
       monthlyCloseArtifactWriter: uploadMonthlyCloseArtifact,
     }).closePeriod({
       orgId: session.orgId,
       actorId: session.actorId,
-      reconciliationCycleId: requiredString(formData, "reconciliationCycleId"),
+      reconciliationCycleId,
     });
-  } catch {
+  } catch (error) {
+    console.error("monthly_close.close_failed", {
+      orgId: session.orgId,
+      reconciliationCycleId,
+      errorName: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined,
+    });
     redirectWithError("No se pudo cerrar el mes todavía.");
   }
 

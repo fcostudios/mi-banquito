@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { get } from "@vercel/blob";
 import { and, eq } from "drizzle-orm";
 import { withTenantTransaction } from "@mi-banquito/db/tenant";
 import { statementArchive } from "@mi-banquito/db/schema";
@@ -94,6 +95,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ has
 
   if (!archive) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const pathname = `monthly-close/${archive.orgId}/${archive.canonicalPayloadHash}.pdf`;
+  const blob = await get(pathname, { access: "private" });
+  if (blob?.statusCode === 200) {
+    return new NextResponse(blob.stream, {
+      headers: {
+        "content-type": blob.blob.contentType || "application/pdf",
+        "content-disposition": `inline; filename="cierre-${archive.periodLabel}.pdf"`,
+      },
+    });
   }
 
   const body = buildMonthlyClosePdf([
