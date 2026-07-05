@@ -1876,3 +1876,31 @@ Placeholder scan:
 Type consistency:
 - Service method names are `executeReconciliation`, `annotateReconciliation`, `closePeriod`, `recordMonthlyCloseShareAttempt`, and `getMonthlyCloseState`.
 - UI action names are `executeReconciliationAction`, `annotateReconciliationAction`, `closePeriodAction`, and `shareMonthlyCloseAction`.
+
+## Execution Status — 2026-07-05
+
+Implemented and verified:
+- `US-044`, `US-045`, `US-046`, `US-047`, `US-060`, `US-067`, `US-088` backend/UI path is implemented for the monthly-close workflow.
+- `US-079` has a confirmed/idempotent platform bootstrap seed script.
+- `US-080` has audited lifecycle actions plus server-side writable tenant transaction gating across normal tenant write services.
+- Monthly-close `US-086` content now includes canonical payload sections for branding, ledger entries, member balance summary, open loans, effective active alerts, annotated discrepancy, and interest accrual evidence.
+- Sprint 5 migrations were applied to the configured database:
+  - `V20260705170000__sprint_5_monthly_close_guards.sql`
+  - `V20260705173000__allow_closed_regular_reconciliation_link.sql`
+
+Verification passed:
+
+```bash
+rtk pnpm type-check
+rtk pnpm lint
+rtk pnpm build
+rtk pnpm test
+rtk pnpm audit:sprint5
+cd packages/db && rtk pnpm verify
+```
+
+Adversarial review result:
+- Fixed after review: DB check constraint conflict for regular closed reconciliation; RLS bypass in monthly-close PDF route; stale A8 clearing across all historical A8 rows; repeated A7 alert insertion; weak period-lock preflight; broader paused/archived write gating including config writes; close idempotency race for `period_close`; end-of-period reconciliation balance; monthly-close PDF generation with `@react-pdf/renderer` and Vercel Blob upload; archive listing on `/estados`; active-alert snapshot filtering through alert actions before hashing.
+
+Sprint status:
+- Sprint 5 monthly-close path is **implemented and verified**. Full US-086 per-member and year-end PDF generation remains a separate scope gap if Sprint 5 is interpreted as the entire US-086 story rather than the monthly-close extension.

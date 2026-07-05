@@ -173,6 +173,12 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 **Stories:** 10 | **Points:** 0 SP
 
+> **Status:** Implemented and verified for the monthly-close Sprint 5 path. The
+> `/cierre` workflow, A7/A8 alerting, lifecycle guardrails, migrations, Vercel Blob
+> monthly-close PDF artifact, WhatsApp share URL, and archive listing are in place.
+> Full US-086 per-member and year-end PDF generation remains outside this monthly-close
+> implementation slice unless Sprint 5 is scoped to monthly close only.
+
 ### Execution Order
 
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |

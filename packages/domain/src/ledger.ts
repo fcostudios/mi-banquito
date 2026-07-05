@@ -7,6 +7,7 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
+import { withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import {
   auditLogEntry,
   baseFundQuotaConfig,
@@ -461,7 +462,7 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
   },
   async saveFirstRunName(orgId, actorId, input) {
     const now = new Date();
-    await db.transaction(async (tx) => {
+    await withWritableTenantTransaction(orgId, async (tx) => {
       await writeWithAudit({
         write: async () => {
           await tx.update(organization)
@@ -494,7 +495,7 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
   },
   async completeFirstRun(orgId, actorId) {
     const now = new Date();
-    await db.transaction(async (tx) => {
+    await withWritableTenantTransaction(orgId, async (tx) => {
       await writeWithAudit({
         write: async () => {
           await tx.update(organization)
@@ -573,7 +574,7 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
       initialSavingsBalance: money4(input.initialSavingsBalance ?? "0"),
       notes: input.notes,
     });
-    return db.transaction(async (tx) => {
+    return withWritableTenantTransaction(orgId, async (tx) => {
       return writeWithAudit({
         write: async () => {
           const [row] = await tx.insert(member).values(plan.member).returning();
@@ -608,7 +609,7 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
       reason: input.reason,
       refundAmount: input.refundAmount,
     });
-    await db.transaction(async (tx) => {
+    await withWritableTenantTransaction(orgId, async (tx) => {
       await writeWithAudit({
         write: async () => {
           await tx.update(member).set(plan.memberUpdate)
@@ -650,7 +651,7 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
       .where(and(eq(contributionCycle.orgId, orgId), eq(contributionCycle.status, "open")))
       .orderBy(desc(contributionCycle.opensOn));
 
-    return db.transaction(async (tx) => {
+    return withWritableTenantTransaction(orgId, async (tx) => {
       let auditEntry: AuditLogEntryInsert | undefined;
       const row = await writeWithAudit({
         write: async () => {
@@ -736,7 +737,7 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
     const [existingReversal] = await db.select().from(contribution)
       .where(and(eq(contribution.orgId, orgId), eq(contribution.reversesId, original.id)));
     if (existingReversal) throw new Error("Contribution already reversed");
-    await db.transaction(async (tx) => {
+    await withWritableTenantTransaction(orgId, async (tx) => {
       let auditEntry: AuditLogEntryInsert | undefined;
       await writeWithAudit({
         write: async () => {
@@ -791,7 +792,7 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
   },
   async recordBaseFundQuotaPayment(orgId, actorId, input) {
     const now = new Date();
-    return db.transaction(async (tx) => {
+    return withWritableTenantTransaction(orgId, async (tx) => {
       let auditEntry: AuditLogEntryInsert | undefined;
       const row = await writeWithAudit({
         write: async () => {

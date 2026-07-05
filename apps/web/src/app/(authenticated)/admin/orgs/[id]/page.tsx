@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createPlatformService } from "@mi-banquito/domain";
-import { ButtonSecondary, StatusPill } from "@mi-banquito/ui";
+import { ButtonPrimary, ButtonSecondary, FormField, StatusPill } from "@mi-banquito/ui";
 import { requirePlatformOperator } from "@/lib/auth/require-session";
 import { ecDate } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
+import { updateOrganizationLifecycleAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,11 @@ export default async function ScrAdminOrgDetailPage({
 }) {
   await requirePlatformOperator();
   const { id } = await params;
-  const org = await createPlatformService().getOrganization(id);
+  const platform = createPlatformService();
+  const [org, closeSnapshot] = await Promise.all([
+    platform.getOrganization(id),
+    platform.getOrganizationCloseOverdueSnapshot(id),
+  ]);
 
   if (!org) {
     notFound();
@@ -63,6 +68,67 @@ export default async function ScrAdminOrgDetailPage({
           <dd className="mt-2 font-medium text-text-primary">{ecDate.format(org.createdAt)}</dd>
         </div>
       </dl>
+
+      {closeSnapshot ? (
+        <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.closeHealthTitle}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-text-primary">{copy.closeHealthTitle}</h2>
+            <StatusPill
+              tone={closeSnapshot.overdue ? "warning" : "success"}
+              label={closeSnapshot.overdue ? copy.closeHealthOverdue : copy.closeHealthOk}
+            />
+          </div>
+          <dl className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <dt className="text-sm text-text-secondary">{copy.lastClose}</dt>
+              <dd className="mt-1 font-medium text-text-primary">
+                {closeSnapshot.latestClosedAt ? ecDate.format(closeSnapshot.latestClosedAt) : copy.neverClosed}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm text-text-secondary">{copy.daysSinceClose}</dt>
+              <dd className="mt-1 font-medium text-text-primary">{closeSnapshot.daysSinceClose}</dd>
+            </div>
+            <div>
+              <dt className="text-sm text-text-secondary">{copy.closeThreshold}</dt>
+              <dd className="mt-1 font-medium text-text-primary">{closeSnapshot.thresholdDays}</dd>
+            </div>
+          </dl>
+        </section>
+      ) : null}
+
+      <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.lifecycleTitle}>
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary">{copy.lifecycleTitle}</h2>
+          <p className="text-sm text-text-secondary">{copy.lifecycleDescription}</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <form action={updateOrganizationLifecycleAction} className="grid gap-3">
+            <input type="hidden" name="orgId" value={org.id} />
+            <input type="hidden" name="status" value="paused" />
+            <FormField labelKey={copy.reason}>
+              <textarea
+                name="reason"
+                className="min-h-20 w-full rounded-md border border-border bg-surface px-4 py-3 text-text-primary focus:border-primary"
+                required
+              />
+            </FormField>
+            <ButtonSecondary type="submit">{copy.freeze}</ButtonSecondary>
+          </form>
+          <form action={updateOrganizationLifecycleAction} className="grid gap-3">
+            <input type="hidden" name="orgId" value={org.id} />
+            <input type="hidden" name="status" value="archived" />
+            <FormField labelKey={copy.reason}>
+              <textarea
+                name="reason"
+                className="min-h-20 w-full rounded-md border border-border bg-surface px-4 py-3 text-text-primary focus:border-primary"
+                required
+              />
+            </FormField>
+            <ButtonPrimary type="submit">{copy.archive}</ButtonPrimary>
+          </form>
+        </div>
+      </section>
     </main>
   );
 }

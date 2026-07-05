@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
-import { createCollectionsService, createCompensationService, type DateOnlyString } from "@mi-banquito/domain";
+import { createAlertsService, createCollectionsService, createCompensationService, type DateOnlyString } from "@mi-banquito/domain";
 import {
   alert,
   cronRun,
@@ -45,6 +45,10 @@ export type CronRunSummary = {
   compensationDisbursementsAwarded?: number;
   compensationSkippedExistingDisbursements?: number;
   compensationConfigsAdvanced?: number;
+  closeOverdueOrgsScanned?: number;
+  closeOverdueAlertsEmitted?: number;
+  closeOverdueAlertsSkippedExisting?: number;
+  closeOverdueAlertsCleared?: number;
   failures: Array<{ orgId: string; loanId?: string; message: string }>;
 };
 
@@ -433,6 +437,10 @@ async function runTreasurerCompensationCron(
     compensationDisbursementsAwarded: 0,
     compensationSkippedExistingDisbursements: 0,
     compensationConfigsAdvanced: 0,
+    closeOverdueOrgsScanned: 0,
+    closeOverdueAlertsEmitted: 0,
+    closeOverdueAlertsSkippedExisting: 0,
+    closeOverdueAlertsCleared: 0,
     failures: [],
   };
 
@@ -448,6 +456,17 @@ async function runTreasurerCompensationCron(
     summary.compensationSkippedExistingDisbursements = result.skippedExistingDisbursements;
     summary.compensationConfigsAdvanced = result.configsAdvanced;
     summary.failures.push(...result.failures);
+    if (summary.job === "daily") {
+      const closeOverdue = await createAlertsService().emitCloseOverdueAlerts({
+        today: new Date(`${today}T00:00:00.000Z`),
+      });
+      summary.orgsProcessed = Math.max(summary.orgsProcessed, closeOverdue.orgsScanned);
+      summary.closeOverdueOrgsScanned = closeOverdue.orgsScanned;
+      summary.closeOverdueAlertsEmitted = closeOverdue.alertsEmitted;
+      summary.closeOverdueAlertsSkippedExisting = closeOverdue.alertsSkippedExisting;
+      summary.closeOverdueAlertsCleared = closeOverdue.alertsCleared;
+      summary.failures.push(...closeOverdue.failures);
+    }
   } catch (error) {
     summary.failures.push({
       orgId: "system",
