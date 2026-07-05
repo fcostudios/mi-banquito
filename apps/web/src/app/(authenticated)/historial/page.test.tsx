@@ -43,6 +43,7 @@ describe("ScrHistoryPage", () => {
 
     expect(card).not.toBeNull();
     expect(within(card!).getByText("Pago registrado")).toBeInTheDocument();
+    expect(within(card!).getByText("02/07/2026, 05:00")).toBeInTheDocument();
     expect(container).not.toHaveTextContent("loan.repayment.create");
   });
 });

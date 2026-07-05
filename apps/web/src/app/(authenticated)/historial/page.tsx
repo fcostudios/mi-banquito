@@ -6,6 +6,7 @@ import {
   Select,
 } from "@mi-banquito/ui";
 import { requireTreasurer } from "@/lib/auth/require-session";
+import { ecDateTime } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ function searchValue(value: SearchValue): string {
 }
 
 function entryDate(value: Date) {
-  return value.toISOString().slice(0, 10);
+  return ecDateTime.format(value);
 }
 
 const actionLabels: Record<(typeof narratedAuditActionKinds)[number], string> = {
