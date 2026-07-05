@@ -214,7 +214,8 @@
     "cleanMonth": "Mes limpio",
     "wouldNotReturnCheckbox": "No volvería al papel",
     "note": "Nota",
-    "save": "Guardar observación"
+    "save": "Guardar observación",
+    "reportDownload": "Generar reporte de salida del piloto"
   },
   "shell": {
     "header": {
