@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull, lt, lte } from "drizzle-orm";
 import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import {
   alert,
@@ -63,6 +63,7 @@ export type ReconciliationSnapshot = {
   discrepancyAmount: string;
   toleranceAmount: string;
   status: ReconciliationStatus;
+  closeAllowed: boolean;
   resolutionKind: string;
   resolutionNote: string | null;
   periodCloseId: string | null;
@@ -155,6 +156,24 @@ function cycleLabelOf(row: Pick<typeof contributionCycle.$inferSelect, "cycleLab
     return row.cycleLabel;
   }
   return periodLabelFromDate(new Date(`${row.opensOn}T00:00:00.000Z`));
+}
+
+function dateKeyInEcuador(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "America/Guayaquil",
+    year: "numeric",
+  }).formatToParts(date);
+  const byType = new Map(parts.map((part) => [part.type, part.value]));
+  return `${byType.get("year")}-${byType.get("month")}-${byType.get("day")}`;
+}
+
+function isPastContributionCycle(
+  cycle: Pick<typeof contributionCycle.$inferSelect, "closesOn">,
+  referenceDate: Date,
+): boolean {
+  return cycle.closesOn < dateKeyInEcuador(referenceDate);
 }
 
 export function classifyReconciliation(input: ReconciliationClassificationInput): ReconciliationClassification {
@@ -423,6 +442,7 @@ function snapshotFromRows(input: {
   reconciliation: typeof reconciliationCycle.$inferSelect;
   periodCloseId?: string | null;
   statement?: typeof statementArchive.$inferSelect | null;
+  closeAllowed?: boolean;
 }): ReconciliationSnapshot {
   const classification = classifyReconciliation({
     declaredBankBalance: String(input.reconciliation.declaredBankBalance),
@@ -441,6 +461,7 @@ function snapshotFromRows(input: {
     discrepancyAmount: classification.discrepancyAmount,
     toleranceAmount: money4(String(input.reconciliation.toleranceAmount)),
     status: classification.status,
+    closeAllowed: classification.closeAllowed && Boolean(input.closeAllowed),
     resolutionKind: input.reconciliation.resolutionKind,
     resolutionNote: input.reconciliation.resolutionNote,
     periodCloseId: input.periodCloseId ?? input.reconciliation.periodCloseId,
@@ -455,6 +476,7 @@ function emptySnapshot(input: {
   cycle: typeof contributionCycle.$inferSelect;
   computedPoolBalance: string;
   toleranceAmount: string;
+  closeAllowed: boolean;
 }): ReconciliationSnapshot {
   const classification = classifyReconciliation({
     declaredBankBalance: input.computedPoolBalance,
@@ -473,6 +495,7 @@ function emptySnapshot(input: {
     discrepancyAmount: classification.discrepancyAmount,
     toleranceAmount: money4(input.toleranceAmount),
     status: classification.status,
+    closeAllowed: classification.closeAllowed && input.closeAllowed,
     resolutionKind: "auto_within_tolerance",
     resolutionNote: null,
     periodCloseId: null,
@@ -525,6 +548,53 @@ export function monthlyCloseShareUrl(pdfUri: string): string {
   return `https://wa.me/?text=${encodeURIComponent(`Revisa el cierre del mes: ${pdfUri}`)}`;
 }
 
+async function latestClosedMonthlyCloseSnapshot(
+  tx: { select(): any },
+  orgId: string,
+): Promise<ReconciliationSnapshot | null> {
+  const [reconciliation] = await tx.select().from(reconciliationCycle)
+    .where(and(
+      eq(reconciliationCycle.orgId, orgId),
+      isNotNull(reconciliationCycle.periodCloseId),
+    ))
+    .orderBy(desc(reconciliationCycle.closedAt))
+    .limit(1);
+  if (!reconciliation?.periodCloseId) {
+    return null;
+  }
+
+  const [cycle] = await tx.select().from(contributionCycle)
+    .where(and(eq(contributionCycle.orgId, orgId), eq(contributionCycle.id, reconciliation.cycleId)))
+    .limit(1);
+  if (!cycle) {
+    throw new Error("contribution_cycle_not_found");
+  }
+
+  const [closeRow] = await tx.select().from(periodClose)
+    .where(and(eq(periodClose.orgId, orgId), eq(periodClose.id, reconciliation.periodCloseId)))
+    .limit(1);
+  if (!closeRow) {
+    throw new Error("period_close_not_found");
+  }
+
+  const [archive] = await tx.select().from(statementArchive)
+    .where(and(
+      eq(statementArchive.orgId, orgId),
+      eq(statementArchive.periodCloseId, closeRow.id),
+      eq(statementArchive.kind, "monthly_close"),
+    ))
+    .limit(1);
+
+  return snapshotFromRows({
+    orgId,
+    cycle,
+    reconciliation,
+    periodCloseId: closeRow.id,
+    statement: archive ?? null,
+    closeAllowed: false,
+  });
+}
+
 export const createReconciliationService = (options: ReconciliationServiceOptions = {}): ReconciliationService => {
   const auditWriter = options.auditWriter ?? defaultAuditWriter;
   const monthlyCloseArtifactWriter = options.monthlyCloseArtifactWriter;
@@ -534,13 +604,30 @@ export const createReconciliationService = (options: ReconciliationServiceOption
     context: "reconciliation",
     async getMonthlyCloseState(orgId) {
       return withTenantTransaction(orgId, async (tx) => {
-        const [cycle] = await tx.select().from(contributionCycle)
-          .where(and(eq(contributionCycle.orgId, orgId), eq(contributionCycle.status, "open")))
-          .orderBy(desc(contributionCycle.opensOn))
+        const today = dateKeyInEcuador(now());
+        let [cycle] = await tx.select().from(contributionCycle)
+          .where(and(
+            eq(contributionCycle.orgId, orgId),
+            eq(contributionCycle.status, "open"),
+            lt(contributionCycle.closesOn, today),
+          ))
+          .orderBy(desc(contributionCycle.closesOn))
           .limit(1);
         if (!cycle) {
-          throw new Error("open_contribution_cycle_not_found");
+          const closedSnapshot = await latestClosedMonthlyCloseSnapshot(tx, orgId);
+          if (closedSnapshot) {
+            return closedSnapshot;
+          }
+
+          [cycle] = await tx.select().from(contributionCycle)
+            .where(and(eq(contributionCycle.orgId, orgId), eq(contributionCycle.status, "open")))
+            .orderBy(desc(contributionCycle.opensOn))
+            .limit(1);
         }
+        if (!cycle) {
+          throw new Error("contribution_cycle_not_found");
+        }
+        const closeAllowedForCycle = isPastContributionCycle(cycle, now());
 
         const [config] = await tx.select({
           reconciliationToleranceAmount: groupConfig.reconciliationToleranceAmount,
@@ -567,6 +654,7 @@ export const createReconciliationService = (options: ReconciliationServiceOption
             cycle,
             computedPoolBalance,
             toleranceAmount: String(config.reconciliationToleranceAmount),
+            closeAllowed: false,
           });
         }
 
@@ -591,6 +679,7 @@ export const createReconciliationService = (options: ReconciliationServiceOption
           reconciliation,
           periodCloseId: closeRow?.id ?? reconciliation.periodCloseId,
           statement: archive ?? null,
+          closeAllowed: closeAllowedForCycle,
         });
       });
     },
@@ -608,6 +697,7 @@ export const createReconciliationService = (options: ReconciliationServiceOption
             if (!cycle) {
               throw new Error("contribution_cycle_not_found");
             }
+            const closeAllowedForCycle = isPastContributionCycle(cycle, writtenAt);
             const [lockedClose] = await tx.select().from(periodClose)
               .where(and(eq(periodClose.orgId, input.orgId), eq(periodClose.cycleId, input.cycleId)))
               .limit(1);
@@ -710,6 +800,7 @@ export const createReconciliationService = (options: ReconciliationServiceOption
               reconciliation: row,
               periodCloseId: null,
               statement: null,
+              closeAllowed: closeAllowedForCycle,
             });
 
             auditEntry = {
@@ -782,6 +873,7 @@ export const createReconciliationService = (options: ReconciliationServiceOption
               reconciliation: row,
               periodCloseId: null,
               statement: null,
+              closeAllowed: isPastContributionCycle(cycle, writtenAt),
             });
 
             auditEntry = {
@@ -834,6 +926,9 @@ export const createReconciliationService = (options: ReconciliationServiceOption
               .limit(1);
             if (!cycle) {
               throw new Error("contribution_cycle_not_found");
+            }
+            if (!isPastContributionCycle(cycle, closedAt)) {
+              throw new Error("contribution_cycle_not_past");
             }
 
             const classification = classifyReconciliation({
@@ -889,6 +984,11 @@ export const createReconciliationService = (options: ReconciliationServiceOption
                 closedAt: closeRow.closedAt,
                 periodCloseId: closeRow.id,
               }).where(eq(reconciliationCycle.id, reconciliation.id)).returning();
+            if (cycle.status !== "closed") {
+              await tx.update(contributionCycle).set({
+                status: "closed",
+              }).where(eq(contributionCycle.id, cycle.id)).returning();
+            }
 
             const [a7] = await tx.select().from(alert)
               .where(and(
@@ -979,6 +1079,11 @@ export const createReconciliationService = (options: ReconciliationServiceOption
             if (!archiveRow) {
               throw new Error("statement_archive_not_found_after_insert");
             }
+            if (closeRow.monthlyCloseStatementId !== archiveRow.id) {
+              await tx.update(periodClose).set({
+                monthlyCloseStatementId: archiveRow.id,
+              }).where(eq(periodClose.id, closeRow.id)).returning();
+            }
 
             auditEntry = {
               orgId: input.orgId,
@@ -1004,6 +1109,7 @@ export const createReconciliationService = (options: ReconciliationServiceOption
               reconciliation: closedReconciliation,
               periodCloseId: closeRow.id,
               statement: archiveRow,
+              closeAllowed: false,
             });
           },
           audit: async () => {
