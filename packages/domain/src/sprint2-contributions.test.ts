@@ -170,6 +170,8 @@ describe("Sprint 2 contribution source and partial state", () => {
       );
 
       expect(insertedRows(fakeDb, contributionCycle)[0]).toMatchObject({
+        opensOn: "2026-07-01",
+        closesOn: "2026-07-31",
         expectedAmountPerMember: "25.0000",
       });
       expect(insertedRows(fakeDb, contribution)[0]).toMatchObject({
