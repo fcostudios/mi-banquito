@@ -44,8 +44,8 @@ describe("Sprint 7 alert builders", () => {
     expect(alert.subjectId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(alert.subjectId).not.toBe("11111111-1111-4111-8111-111111111111");
     expect(alert.payload.title).toBe("Compromiso de reparto excede proyección");
-    expect(alert.payload.body).toBe("El compromiso de reparto 2026 excede la proyección disponible por $200,00.");
-    expect(alert.payload.copy).toBe("El compromiso de reparto 2026 excede la proyección disponible por $200,00.");
+    expect(alert.payload.body).toBe("El compromiso de reparto 2026 es $500,00; la proyección disponible es $300,00; faltan $200,00.");
+    expect(alert.payload.copy).toBe("El compromiso de reparto 2026 es $500,00; la proyección disponible es $300,00; faltan $200,00.");
   });
 
   it("builds stable natural subject IDs for A4 by org and month", () => {
@@ -87,7 +87,7 @@ describe("Sprint 7 alert builders", () => {
       now: new Date("2026-07-06T10:00:00.000Z"),
     });
 
-    expect(alert.payload.copy).toBe("El compromiso de reparto 2026 excede la proyección disponible por $1.234,56.");
+    expect(alert.payload.copy).toBe("El compromiso de reparto 2026 es $1.500,00; la proyección disponible es $265,44; faltan $1.234,56.");
   });
 
   it("rounds four-decimal DB money values to cents", () => {
@@ -99,7 +99,7 @@ describe("Sprint 7 alert builders", () => {
       now: new Date("2026-07-06T10:00:00.000Z"),
     });
 
-    expect(alert.payload.copy).toBe("El compromiso de reparto 2026 excede la proyección disponible por $1,24.");
+    expect(alert.payload.copy).toBe("El compromiso de reparto 2026 es $1,24; la proyección disponible es $0,00; faltan $1,24.");
   });
 
   it("builds A6 for member and non-member loans", () => {
