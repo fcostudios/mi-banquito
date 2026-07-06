@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
 import {
   alert,
@@ -9,9 +9,14 @@ import {
   memberComplianceState,
   organization,
   periodClose,
+  projectedLiquidity,
 } from "@mi-banquito/db/schema";
 import { withTenantTransaction } from "@mi-banquito/db/tenant";
 import { writeWithAudit } from "./audit";
+import {
+  buildA4LiquidityLowMarginAlert,
+  buildA5ShareOutCommitmentAlert,
+} from "./sprint7-alerts";
 
 export type AlertAudience = "treasurer" | "platform_operator";
 export type AlertActionKind = "dismiss" | "snooze";
@@ -68,6 +73,19 @@ export type Sprint6AlertRunSummary = {
   failures: Array<{ orgId: string; message: string }>;
 };
 
+export type Sprint7AlertRunSummary = {
+  a4OrgsScanned: number;
+  a4MonthsScanned: number;
+  a4AlertsEmitted: number;
+  a4AlertsSkippedExisting: number;
+  a4Failures: number;
+  a5CommitmentsScanned: number;
+  a5AlertsEmitted: number;
+  a5AlertsSkippedExisting: number;
+  a5Failures: number;
+  failures: Array<{ orgId: string; message: string }>;
+};
+
 export interface AlertsService {
   readonly context: "alerts";
   listVisibleAlerts(input: { orgId: string; audience: AlertAudience; now?: Date }): Promise<VisibleAlert[]>;
@@ -76,9 +94,10 @@ export interface AlertsService {
   snoozeAlert(input: { orgId: string; alertId: string; actorId: string; audience: AlertAudience; snoozedUntil: Date; reason?: string }): Promise<void>;
   emitCloseOverdueAlerts(input: { today: Date }): Promise<CloseOverdueAlertRunSummary>;
   emitSprint6DailyAlerts(input: { today: Date }): Promise<Sprint6AlertRunSummary>;
+  emitSprint7DailyAlerts(input: { today: Date }): Promise<Sprint7AlertRunSummary>;
 }
 
-type AlertPayload = {
+type AlertPayload = Record<string, unknown> & {
   title?: string;
   body?: string;
   message?: string;
@@ -98,6 +117,12 @@ type Sprint6LateContributionRow = {
   member_id: string;
   display_name: string;
   closes_on: string;
+};
+
+type Sprint7ShareOutCommitmentRow = {
+  year: number | string;
+  commitment: string | number;
+  projected_available: string | number | null;
 };
 
 const SYSTEM_ACTOR_ID = "00000000-0000-4000-8000-000000000000";
@@ -255,6 +280,37 @@ function dateOnly(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
+function monthOnly(value: Date | string): string {
+  return (value instanceof Date ? value.toISOString() : value).slice(0, 7);
+}
+
+function money4(value: unknown): bigint {
+  const trimmed = String(value ?? "0").trim();
+  const negative = trimmed.startsWith("-");
+  const unsigned = negative || trimmed.startsWith("+") ? trimmed.slice(1) : trimmed;
+  const [whole = "0", fraction = ""] = unsigned.split(".");
+  const fractional = Number.parseInt(fraction.padEnd(4, "0").slice(0, 4), 10) || 0;
+  const amount = BigInt(Number.parseInt(whole, 10) || 0) * BigInt(10000) + BigInt(fractional);
+  return negative ? -amount : amount;
+}
+
+function currentSafetyMarginAmount(row: unknown): string {
+  const record = row && typeof row === "object" && !Array.isArray(row)
+    ? row as Record<string, unknown>
+    : {};
+  if (record.safetyMarginAmount !== undefined && record.safetyMarginAmount !== null) {
+    return String(record.safetyMarginAmount);
+  }
+  const config = record.config && typeof record.config === "object" && !Array.isArray(record.config)
+    ? record.config as Record<string, unknown>
+    : {};
+  return String(config.safety_margin_amount ?? config.safetyMarginAmount ?? "0.0000");
+}
+
+function executeRows<T>(result: { rows?: T[] } | T[]): T[] {
+  return Array.isArray(result) ? result : result.rows ?? [];
+}
+
 async function hasActiveDedupedAlert(input: {
   tx: AlertReadTx;
   orgId: string;
@@ -273,6 +329,89 @@ async function hasActiveDedupedAlert(input: {
     .orderBy(desc(alert.createdAt));
 
   return Boolean(existing && dateValue(existing.dedupWindowEnd) > input.today);
+}
+
+async function hasActiveDedupedAlertForPayload(input: {
+  tx: AlertReadTx;
+  orgId: string;
+  alertKind: string;
+  subjectKind: string;
+  subjectId: string;
+  payloadKey: string;
+  payloadValue: string | number;
+  today: Date;
+}): Promise<boolean> {
+  const rows = await input.tx.select().from(alert)
+    .where(and(
+      eq(alert.orgId, input.orgId),
+      eq(alert.alertKind, input.alertKind),
+      eq(alert.subjectKind, input.subjectKind),
+      eq(alert.subjectId, input.subjectId),
+    ))
+    .orderBy(desc(alert.createdAt));
+
+  return rows.some((row: typeof alert.$inferSelect) => {
+    const payload = payloadObject(row.payload);
+    return dateValue(row.dedupWindowEnd) > input.today
+      && String(payload[input.payloadKey]) === String(input.payloadValue);
+  });
+}
+
+async function latestShareOutCommitmentRows(input: {
+  tx: AlertReadTx & { execute(query: unknown): Promise<{ rows?: Sprint7ShareOutCommitmentRow[] } | Sprint7ShareOutCommitmentRow[]> };
+  orgId: string;
+}): Promise<Sprint7ShareOutCommitmentRow[]> {
+  const result = await input.tx.execute(sql`
+    WITH latest_share_out AS (
+      SELECT DISTINCT ON (year)
+        year,
+        COALESCE(total_approved, total_commitment, reparto_total) AS commitment,
+        created_at
+      FROM year_end_share_out
+      WHERE org_id = ${input.orgId}
+        AND status IN ('draft', 'approved', 'distributed')
+      ORDER BY year, created_at DESC
+    ),
+    latest_decision AS (
+      SELECT DISTINCT ON (year)
+        year,
+        reparto_total AS commitment,
+        created_at
+      FROM surplus_governance_decision
+      WHERE org_id = ${input.orgId}
+        AND status = 'approved'
+      ORDER BY year, version DESC, created_at DESC
+    ),
+    commitments AS (
+      SELECT year, commitment, 1 AS source_priority FROM latest_share_out
+      UNION ALL
+      SELECT year, commitment, 2 AS source_priority FROM latest_decision
+    ),
+    latest_commitments AS (
+      SELECT DISTINCT ON (year)
+        year,
+        commitment
+      FROM commitments
+      ORDER BY year, source_priority
+    )
+    SELECT
+      lc.year,
+      lc.commitment::numeric(18, 4)::text AS commitment,
+      COALESCE(projected.projected_balance, capital.available_capital, 0)::numeric(18, 4)::text AS projected_available
+    FROM latest_commitments lc
+    LEFT JOIN LATERAL (
+      SELECT pl.projected_balance
+      FROM mv_liquidez_proyectada pl
+      WHERE pl.org_id = ${input.orgId}
+        AND EXTRACT(YEAR FROM pl.month_on)::integer = lc.year
+      ORDER BY pl.month_on DESC
+      LIMIT 1
+    ) projected ON TRUE
+    LEFT JOIN mv_available_capital capital
+      ON capital.org_id = ${input.orgId}
+    ORDER BY lc.year
+  `);
+  return executeRows(result);
 }
 
 export const createAlertsService = (): AlertsService => ({
@@ -563,6 +702,175 @@ export const createAlertsService = (): AlertsService => ({
         summary.failures.push({
           orgId: org.id,
           message: error instanceof Error ? error.message : "Unknown Sprint 6 alert failure",
+        });
+      }
+    }
+
+    return summary;
+  },
+  async emitSprint7DailyAlerts(input) {
+    const today = dayStartUtc(input.today);
+    const horizonStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    const summary: Sprint7AlertRunSummary = {
+      a4OrgsScanned: 0,
+      a4MonthsScanned: 0,
+      a4AlertsEmitted: 0,
+      a4AlertsSkippedExisting: 0,
+      a4Failures: 0,
+      a5CommitmentsScanned: 0,
+      a5AlertsEmitted: 0,
+      a5AlertsSkippedExisting: 0,
+      a5Failures: 0,
+      failures: [],
+    };
+
+    const orgs = await db.select({ id: organization.id }).from(organization)
+      .where(eq(organization.status, "active"));
+
+    for (const org of orgs) {
+      summary.a4OrgsScanned += 1;
+      try {
+        await withTenantTransaction(org.id, async (tx) => {
+          const [config] = await tx.select({
+            safetyMarginAmount: groupConfig.safetyMarginAmount,
+            config: groupConfig.config,
+          })
+            .from(groupConfig)
+            .where(and(eq(groupConfig.orgId, org.id), isNull(groupConfig.validTo)))
+            .orderBy(desc(groupConfig.version))
+            .limit(1);
+          const safetyMarginAmount = currentSafetyMarginAmount(config);
+          const projections = await tx.select({
+            monthOn: projectedLiquidity.monthOn,
+            projectedBalance: projectedLiquidity.projectedBalance,
+          })
+            .from(projectedLiquidity)
+            .where(and(
+              eq(projectedLiquidity.orgId, org.id),
+              sql`${projectedLiquidity.monthOn} >= ${dateOnly(horizonStart)}`,
+            ))
+            .orderBy(asc(projectedLiquidity.monthOn))
+            .limit(12);
+
+          for (const row of projections) {
+            summary.a4MonthsScanned += 1;
+            const projectedBalance = String(row.projectedBalance);
+            if (money4(projectedBalance) >= money4(safetyMarginAmount)) {
+              continue;
+            }
+
+            const month = monthOnly(row.monthOn);
+            const existing = await hasActiveDedupedAlertForPayload({
+              tx,
+              orgId: org.id,
+              alertKind: "A4",
+              subjectKind: "liquidity_projection",
+              subjectId: org.id,
+              payloadKey: "month",
+              payloadValue: month,
+              today,
+            });
+            if (existing) {
+              summary.a4AlertsSkippedExisting += 1;
+              continue;
+            }
+
+            const alertRow = buildA4LiquidityLowMarginAlert({
+              orgId: org.id,
+              month,
+              projectedBalance,
+              safetyMarginAmount,
+              now: today,
+            });
+            await tx.insert(alert).values(alertRow);
+            await tx.insert(auditLogEntry).values({
+              orgId: org.id,
+              actorKind: "system",
+              actorId: SYSTEM_ACTOR_ID,
+              actionKind: "alert.liquidity_low_margin.emit",
+              subjectKind: "alert",
+              subjectId: alertRow.id,
+              payloadSnapshot: {
+                orgId: org.id,
+                month,
+                projectedBalance,
+                safetyMarginAmount,
+              },
+              reason: null,
+              at: today,
+              createdAt: today,
+            });
+            summary.a4AlertsEmitted += 1;
+          }
+        });
+      } catch (error) {
+        summary.a4Failures += 1;
+        summary.failures.push({
+          orgId: org.id,
+          message: error instanceof Error ? error.message : "Unknown A4 liquidity alert failure",
+        });
+      }
+
+      try {
+        await withTenantTransaction(org.id, async (tx) => {
+          const commitmentRows = await latestShareOutCommitmentRows({ tx, orgId: org.id });
+          for (const row of commitmentRows) {
+            summary.a5CommitmentsScanned += 1;
+            const year = Number(row.year);
+            const commitment = String(row.commitment);
+            const projectedAvailable = String(row.projected_available ?? "0.0000");
+            if (!Number.isInteger(year) || money4(commitment) <= money4(projectedAvailable)) {
+              continue;
+            }
+
+            const existing = await hasActiveDedupedAlertForPayload({
+              tx,
+              orgId: org.id,
+              alertKind: "A5",
+              subjectKind: "year_end_share_out",
+              subjectId: org.id,
+              payloadKey: "year",
+              payloadValue: year,
+              today,
+            });
+            if (existing) {
+              summary.a5AlertsSkippedExisting += 1;
+              continue;
+            }
+
+            const alertRow = buildA5ShareOutCommitmentAlert({
+              orgId: org.id,
+              year,
+              commitment,
+              projectedAvailable,
+              now: today,
+            });
+            await tx.insert(alert).values(alertRow);
+            await tx.insert(auditLogEntry).values({
+              orgId: org.id,
+              actorKind: "system",
+              actorId: SYSTEM_ACTOR_ID,
+              actionKind: "alert.shareout_commitment.emit",
+              subjectKind: "alert",
+              subjectId: alertRow.id,
+              payloadSnapshot: {
+                orgId: org.id,
+                year,
+                commitment,
+                projectedAvailable,
+              },
+              reason: null,
+              at: today,
+              createdAt: today,
+            });
+            summary.a5AlertsEmitted += 1;
+          }
+        });
+      } catch (error) {
+        summary.a5Failures += 1;
+        summary.failures.push({
+          orgId: org.id,
+          message: error instanceof Error ? error.message : "Unknown A5 share-out alert failure",
         });
       }
     }
