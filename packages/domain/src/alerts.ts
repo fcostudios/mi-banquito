@@ -123,6 +123,10 @@ type Sprint7ShareOutCommitmentRow = {
   year: number | string;
   commitment: string | number;
   projected_available: string | number | null;
+  source_kind?: "share_out" | "governance_decision" | string;
+  status?: string | null;
+  version?: number | string | null;
+  committed_at?: Date | string | null;
 };
 
 const SYSTEM_ACTOR_ID = "00000000-0000-4000-8000-000000000000";
@@ -311,6 +315,68 @@ function executeRows<T>(result: { rows?: T[] } | T[]): T[] {
   return Array.isArray(result) ? result : result.rows ?? [];
 }
 
+function commitmentStatusRank(row: Sprint7ShareOutCommitmentRow): number {
+  if (row.status === "distributed") return 4;
+  if (row.status === "approved") return 3;
+  if (row.status === "draft") return 2;
+  if (row.status === "locked") return 1;
+  return 0;
+}
+
+function commitmentSourceRank(row: Sprint7ShareOutCommitmentRow): number {
+  return row.source_kind === "share_out" ? 2 : 1;
+}
+
+function commitmentVersion(row: Sprint7ShareOutCommitmentRow): number {
+  const version = row.version === null || row.version === undefined ? 0 : Number(row.version);
+  return Number.isFinite(version) ? version : 0;
+}
+
+function commitmentAt(row: Sprint7ShareOutCommitmentRow): number {
+  const at = row.committed_at ? dateValue(row.committed_at).getTime() : 0;
+  return Number.isFinite(at) ? at : 0;
+}
+
+function compareCommitmentRows(a: Sprint7ShareOutCommitmentRow, b: Sprint7ShareOutCommitmentRow): number {
+  const aSort = [
+    commitmentAt(a),
+    commitmentStatusRank(a),
+    commitmentVersion(a),
+    commitmentSourceRank(a),
+  ];
+  const bSort = [
+    commitmentAt(b),
+    commitmentStatusRank(b),
+    commitmentVersion(b),
+    commitmentSourceRank(b),
+  ];
+
+  for (let index = 0; index < aSort.length; index += 1) {
+    const difference = aSort[index] - bSort[index];
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+function latestCommitmentByYear(rows: Sprint7ShareOutCommitmentRow[]): Sprint7ShareOutCommitmentRow[] {
+  const latest = new Map<number, Sprint7ShareOutCommitmentRow>();
+  for (const row of rows) {
+    const year = Number(row.year);
+    if (!Number.isInteger(year)) continue;
+    const current = latest.get(year);
+    if (!current) {
+      latest.set(year, row);
+      continue;
+    }
+
+    if (compareCommitmentRows(row, current) > 0) {
+      latest.set(year, row);
+    }
+  }
+
+  return [...latest.values()].sort((a, b) => Number(a.year) - Number(b.year));
+}
+
 async function hasActiveDedupedAlert(input: {
   tx: AlertReadTx;
   orgId: string;
@@ -362,56 +428,53 @@ async function latestShareOutCommitmentRows(input: {
   orgId: string;
 }): Promise<Sprint7ShareOutCommitmentRow[]> {
   const result = await input.tx.execute(sql`
-    WITH latest_share_out AS (
-      SELECT DISTINCT ON (year)
+    WITH commitment_candidates AS (
+      SELECT
         year,
         COALESCE(total_approved, total_commitment, reparto_total) AS commitment,
-        created_at
+        status::text AS status,
+        0 AS version,
+        COALESCE(approved_at, created_at) AS committed_at,
+        'share_out' AS source_kind
       FROM year_end_share_out
       WHERE org_id = ${input.orgId}
         AND status IN ('draft', 'approved', 'distributed')
-      ORDER BY year, created_at DESC
-    ),
-    latest_decision AS (
-      SELECT DISTINCT ON (year)
+
+      UNION ALL
+
+      SELECT
         year,
         reparto_total AS commitment,
-        created_at
+        status::text AS status,
+        version,
+        COALESCE(decided_at, valid_from, created_at) AS committed_at,
+        'governance_decision' AS source_kind
       FROM surplus_governance_decision
       WHERE org_id = ${input.orgId}
         AND status = 'approved'
-      ORDER BY year, version DESC, created_at DESC
-    ),
-    commitments AS (
-      SELECT year, commitment, 1 AS source_priority FROM latest_share_out
-      UNION ALL
-      SELECT year, commitment, 2 AS source_priority FROM latest_decision
-    ),
-    latest_commitments AS (
-      SELECT DISTINCT ON (year)
-        year,
-        commitment
-      FROM commitments
-      ORDER BY year, source_priority
     )
     SELECT
-      lc.year,
-      lc.commitment::numeric(18, 4)::text AS commitment,
-      COALESCE(projected.projected_balance, capital.available_capital, 0)::numeric(18, 4)::text AS projected_available
-    FROM latest_commitments lc
+      cc.year,
+      cc.commitment::numeric(18, 4)::text AS commitment,
+      COALESCE(projected.projected_balance, capital.available_capital, 0)::numeric(18, 4)::text AS projected_available,
+      cc.source_kind,
+      cc.status,
+      cc.version,
+      cc.committed_at
+    FROM commitment_candidates cc
     LEFT JOIN LATERAL (
       SELECT pl.projected_balance
       FROM mv_liquidez_proyectada pl
       WHERE pl.org_id = ${input.orgId}
-        AND EXTRACT(YEAR FROM pl.month_on)::integer = lc.year
+        AND EXTRACT(YEAR FROM pl.month_on)::integer = cc.year
       ORDER BY pl.month_on DESC
       LIMIT 1
     ) projected ON TRUE
     LEFT JOIN mv_available_capital capital
       ON capital.org_id = ${input.orgId}
-    ORDER BY lc.year
+    ORDER BY cc.year, cc.committed_at DESC, cc.version DESC
   `);
-  return executeRows(result);
+  return latestCommitmentByYear(executeRows(result));
 }
 
 export const createAlertsService = (): AlertsService => ({
