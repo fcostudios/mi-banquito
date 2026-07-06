@@ -376,6 +376,7 @@ describe("alerts", () => {
       }],
       [],
       [],
+      [],
     ], [[]]);
 
     await withMockedDb(fakeDb, async () => {
@@ -473,6 +474,7 @@ describe("alerts", () => {
         createdAt: new Date("2026-07-01T00:00:00.000Z"),
       }],
       [],
+      [],
     ], [[]]);
 
     await withMockedDb(fakeDb, async () => {
@@ -496,6 +498,138 @@ describe("alerts", () => {
     expect(insertedRows(fakeDb, auditLogEntry)).toEqual([
       expect.objectContaining({ actionKind: "alert.liquidity_low_margin.clear" }),
     ]);
+  });
+
+  it("does not let a dismissed A4 alert suppress a re-breached month", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const subjectId = buildA4LiquidityLowMarginAlert({
+      orgId,
+      month: "2026-08",
+      projectedBalance: "80.0000",
+      safetyMarginAmount: "100.0000",
+      now: new Date("2026-07-01T00:00:00.000Z"),
+    }).subjectId;
+    const alertId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [{ safetyMarginAmount: "100.0000", config: { safety_margin_amount: "100.0000" } }],
+      [{ monthOn: "2026-08-01", projectedBalance: "80.0000" }],
+      [{
+        id: alertId,
+        orgId,
+        alertKind: "A4",
+        severity: "high",
+        audience: "treasurer",
+        subjectKind: "liquidity_projection",
+        subjectId,
+        payload: { month: "2026-08" },
+        dedupWindowEnd: new Date("2026-07-13T00:00:00.000Z"),
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+      }],
+      [{
+        alertId,
+        actionKind: "dismiss",
+        snoozedUntil: null,
+        createdAt: new Date("2026-07-03T00:00:00.000Z"),
+      }],
+      [],
+      [],
+    ], [[]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a4AlertsEmitted: 1,
+        a4AlertsSkippedExisting: 0,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toEqual([
+      expect.objectContaining({
+        alertKind: "A4",
+        subjectId,
+        payload: expect.objectContaining({ month: "2026-08" }),
+      }),
+    ]);
+    expect(insertedRows(fakeDb, alertAction)).toHaveLength(0);
+  });
+
+  it("does not clear already dismissed A4 and A5 alerts again", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const a4Id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const a5Id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const a4SubjectId = buildA4LiquidityLowMarginAlert({
+      orgId,
+      month: "2026-08",
+      projectedBalance: "80.0000",
+      safetyMarginAmount: "100.0000",
+      now: new Date("2026-07-01T00:00:00.000Z"),
+    }).subjectId;
+    const a5SubjectId = buildA5ShareOutCommitmentAlert({
+      orgId,
+      year: 2026,
+      commitment: "500.0000",
+      projectedAvailable: "300.0000",
+      now: new Date("2026-07-01T00:00:00.000Z"),
+    }).subjectId;
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [{ safetyMarginAmount: "100.0000", config: { safety_margin_amount: "100.0000" } }],
+      [{ monthOn: "2026-08-01", projectedBalance: "120.0000" }],
+      [{
+        id: a4Id,
+        orgId,
+        alertKind: "A4",
+        severity: "high",
+        audience: "treasurer",
+        subjectKind: "liquidity_projection",
+        subjectId: a4SubjectId,
+        payload: { month: "2026-08" },
+        dedupWindowEnd: new Date("2026-07-13T00:00:00.000Z"),
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+      }],
+      [{
+        alertId: a4Id,
+        actionKind: "dismiss",
+        snoozedUntil: null,
+        createdAt: new Date("2026-07-03T00:00:00.000Z"),
+      }],
+      [{
+        id: a5Id,
+        orgId,
+        alertKind: "A5",
+        severity: "high",
+        audience: "treasurer",
+        subjectKind: "year_end_share_out",
+        subjectId: a5SubjectId,
+        payload: { year: 2026 },
+        dedupWindowEnd: new Date("2026-07-13T00:00:00.000Z"),
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+      }],
+      [{
+        alertId: a5Id,
+        actionKind: "dismiss",
+        snoozedUntil: null,
+        createdAt: new Date("2026-07-03T00:00:00.000Z"),
+      }],
+    ], [[]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a4AlertsEmitted: 0,
+        a5AlertsEmitted: 0,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alertAction)).toHaveLength(0);
+    expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(0);
   });
 
   it("emits A5 for share-out commitments above projected cash and dedupes by org year", async () => {
@@ -523,6 +657,7 @@ describe("alerts", () => {
         dedupWindowEnd: new Date("2026-07-13T00:00:00.000Z"),
         createdAt: new Date("2026-07-06T00:00:00.000Z"),
       }],
+      [],
       [],
     ], [[
       { year: 2026, commitment: "500.0000", projected_available: "300.0000" },

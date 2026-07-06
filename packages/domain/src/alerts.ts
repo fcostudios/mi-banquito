@@ -410,6 +410,25 @@ async function hasActiveDedupedAlert(input: {
   return Boolean(existing && dateValue(existing.dedupWindowEnd) > input.today);
 }
 
+async function alertActionsForRows(input: {
+  tx: AlertReadTx;
+  orgId: string;
+  rows: Array<typeof alert.$inferSelect>;
+}): Promise<Map<string, Array<typeof alertAction.$inferSelect>>> {
+  if (input.rows.length === 0) {
+    return new Map();
+  }
+
+  const actions = await input.tx.select().from(alertAction)
+    .where(and(
+      eq(alertAction.orgId, input.orgId),
+      inArray(alertAction.alertId, input.rows.map((row) => row.id)),
+    ))
+    .orderBy(desc(alertAction.createdAt));
+
+  return actionsByAlert(actions);
+}
+
 async function hasActiveDedupedAlertForPayload(input: {
   tx: AlertReadTx;
   orgId: string;
@@ -428,11 +447,17 @@ async function hasActiveDedupedAlertForPayload(input: {
       eq(alert.subjectId, input.subjectId),
     ))
     .orderBy(desc(alert.createdAt));
+  const actions = await alertActionsForRows({ tx: input.tx, orgId: input.orgId, rows });
 
   return rows.some((row: typeof alert.$inferSelect) => {
     const payload = payloadObject(row.payload);
     return dateValue(row.dedupWindowEnd) > input.today
-      && String(payload[input.payloadKey]) === String(input.payloadValue);
+      && String(payload[input.payloadKey]) === String(input.payloadValue)
+      && effectiveAlertState({
+        alert: row,
+        actions: actions.get(row.id) ?? [],
+        now: input.today,
+      }).visible;
   });
 }
 
@@ -509,6 +534,7 @@ async function clearResolvedSprint7Alerts(input: {
       eq(alert.subjectKind, input.subjectKind),
     ))
     .orderBy(desc(alert.createdAt));
+  const actions = await alertActionsForRows({ tx: input.tx, orgId: input.orgId, rows: existingAlerts });
 
   for (const row of existingAlerts) {
     const payload = payloadObject(row.payload);
@@ -526,6 +552,14 @@ async function clearResolvedSprint7Alerts(input: {
     const expired = dateValue(row.dedupWindowEnd) <= input.today;
     const superseded = Boolean(naturalSubjectId && row.subjectId !== naturalSubjectId);
     if (!resolved && !expired && !superseded) {
+      continue;
+    }
+    const state = effectiveAlertState({
+      alert: row,
+      actions: actions.get(row.id) ?? [],
+      now: input.today,
+    });
+    if (state.dismissed) {
       continue;
     }
 
