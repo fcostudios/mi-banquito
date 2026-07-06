@@ -41,6 +41,18 @@ describe("Sprint 7 alert builders", () => {
     expect(alert.payload.copy).toBe("El compromiso de reparto 2026 excede la proyección disponible por $200,00.");
   });
 
+  it("formats A5 shortfalls with es-EC thousands separators", () => {
+    const alert = buildA5ShareOutCommitmentAlert({
+      orgId: "11111111-1111-4111-8111-111111111111",
+      year: 2026,
+      commitment: "1500.0000",
+      projectedAvailable: "265.4400",
+      now: new Date("2026-07-06T10:00:00.000Z"),
+    });
+
+    expect(alert.payload.copy).toBe("El compromiso de reparto 2026 excede la proyección disponible por $1.234,56.");
+  });
+
   it("builds A6 for member and non-member loans", () => {
     const memberAlert = buildA6LoanPastDueAlert({
       orgId: "11111111-1111-4111-8111-111111111111",

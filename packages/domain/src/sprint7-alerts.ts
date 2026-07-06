@@ -128,9 +128,11 @@ function cents(value: string): number {
 function money(valueInCents: number): string {
   const sign = valueInCents < 0 ? "-" : "";
   const absolute = Math.abs(valueInCents);
-  const whole = Math.floor(absolute / 100).toString();
-  const fraction = (absolute % 100).toString().padStart(2, "0");
-  return `${sign}$${whole},${fraction}`;
+  const amount = (absolute / 100).toLocaleString("es-EC", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `${sign}$${amount}`;
 }
 
 function monthLabel(month: string): string {
