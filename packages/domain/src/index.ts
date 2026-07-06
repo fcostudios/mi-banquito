@@ -10,6 +10,7 @@ export * from "./pilot";
 export * from "./platform";
 export * from "./reconciliation";
 export * from "./reporting";
+export * from "./sprint7-alerts";
 export * from "./rules/loans/declining-balance";
 export {
   applyShareOutOverride,
