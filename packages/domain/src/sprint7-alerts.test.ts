@@ -22,6 +22,7 @@ describe("Sprint 7 alert builders", () => {
     expect(alert.severity).toBe("high");
     expect(alert.audience).toBe("treasurer");
     expect(alert.subjectKind).toBe("liquidity_projection");
+    expect(alert.subjectId).toBe("11111111-1111-4111-8111-111111111111");
     expect(alert.payload.copy).toBe("La liquidez proyectada de septiembre 2026 queda $25,00 por debajo del margen de seguridad.");
     expect(alert.payload.month).toBe("2026-09");
     expect(alert.dedupWindowEnd?.toISOString()).toBe("2026-07-13T10:00:00.000Z");
@@ -38,6 +39,8 @@ describe("Sprint 7 alert builders", () => {
 
     expect(alert.alertKind).toBe("A5");
     expect(alert.severity).toBe("high");
+    expect(alert.subjectKind).toBe("year_end_share_out");
+    expect(alert.subjectId).toBe("11111111-1111-4111-8111-111111111111");
     expect(alert.payload.title).toBe("Compromiso de reparto excede proyección");
     expect(alert.payload.body).toBe("El compromiso de reparto 2026 excede la proyección disponible por $200,00.");
     expect(alert.payload.copy).toBe("El compromiso de reparto 2026 excede la proyección disponible por $200,00.");

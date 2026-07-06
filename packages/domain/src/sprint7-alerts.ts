@@ -156,7 +156,7 @@ export function buildA4LiquidityLowMarginAlert(input: BuildA4LiquidityLowMarginA
     severity: "high",
     audience: "treasurer",
     subjectKind: "liquidity_projection",
-    subjectId: null,
+    subjectId: input.orgId,
     payload: {
       title: "Liquidez bajo margen",
       body: copy,
@@ -179,8 +179,8 @@ export function buildA5ShareOutCommitmentAlert(input: BuildA5ShareOutCommitmentA
     alertKind: "A5",
     severity: "high",
     audience: "treasurer",
-    subjectKind: "share_out_commitment",
-    subjectId: null,
+    subjectKind: "year_end_share_out",
+    subjectId: input.orgId,
     payload: {
       title: "Compromiso de reparto excede proyección",
       body: copy,
