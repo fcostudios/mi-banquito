@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 export type Sprint7AlertSeverity = "low" | "medium" | "high" | "critical";
 export type Sprint7AlertAudience = "treasurer" | "platform_operator" | "both";
@@ -87,6 +87,21 @@ function dedupWindowEnd(now: Date, days: number): Date {
   return new Date(now.getTime() + days * MS_PER_DAY);
 }
 
+export function deterministicAlertSubjectId(input: {
+  orgId: string;
+  alertKind: "A4" | "A5";
+  naturalKey: string | number;
+}): string {
+  const bytes = createHash("sha256")
+    .update(`${input.orgId}:${input.alertKind}:${input.naturalKey}`)
+    .digest()
+    .subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 function baseAlert(input: {
   orgId: string;
   alertKind: Sprint7AlertInsert["alertKind"];
@@ -156,7 +171,7 @@ export function buildA4LiquidityLowMarginAlert(input: BuildA4LiquidityLowMarginA
     severity: "high",
     audience: "treasurer",
     subjectKind: "liquidity_projection",
-    subjectId: input.orgId,
+    subjectId: deterministicAlertSubjectId({ orgId: input.orgId, alertKind: "A4", naturalKey: input.month }),
     payload: {
       title: "Liquidez bajo margen",
       body: copy,
@@ -180,7 +195,7 @@ export function buildA5ShareOutCommitmentAlert(input: BuildA5ShareOutCommitmentA
     severity: "high",
     audience: "treasurer",
     subjectKind: "year_end_share_out",
-    subjectId: input.orgId,
+    subjectId: deterministicAlertSubjectId({ orgId: input.orgId, alertKind: "A5", naturalKey: input.year }),
     payload: {
       title: "Compromiso de reparto excede proyección",
       body: copy,

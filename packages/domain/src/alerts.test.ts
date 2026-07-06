@@ -2,6 +2,10 @@ import { getTableName } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
 import { alert, alertAction, auditLogEntry } from "@mi-banquito/db/schema";
+import {
+  buildA4LiquidityLowMarginAlert,
+  buildA5ShareOutCommitmentAlert,
+} from "./sprint7-alerts";
 
 type InsertRecord = {
   tableName: string;
@@ -345,6 +349,13 @@ describe("alerts", () => {
 
   it("emits A4 for projected liquidity below margin and dedupes by org month", async () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
+    const septemberSubjectId = buildA4LiquidityLowMarginAlert({
+      orgId,
+      month: "2026-09",
+      projectedBalance: "75.0000",
+      safetyMarginAmount: "100.0000",
+      now: new Date("2026-07-06T00:00:00.000Z"),
+    }).subjectId;
     const fakeDb = new FakeDb([
       [{ id: orgId }],
       [{ safetyMarginAmount: "100.0000", config: { safety_margin_amount: "100.0000" } }],
@@ -358,11 +369,13 @@ describe("alerts", () => {
         orgId,
         alertKind: "A4",
         subjectKind: "liquidity_projection",
-        subjectId: orgId,
+        subjectId: septemberSubjectId,
         payload: { month: "2026-09" },
         dedupWindowEnd: new Date("2026-07-13T00:00:00.000Z"),
         createdAt: new Date("2026-07-06T00:00:00.000Z"),
       }],
+      [],
+      [],
     ], [[]]);
 
     await withMockedDb(fakeDb, async () => {
@@ -389,7 +402,7 @@ describe("alerts", () => {
         severity: "high",
         audience: "treasurer",
         subjectKind: "liquidity_projection",
-        subjectId: orgId,
+        subjectId: expect.not.stringMatching(orgId),
         payload: expect.objectContaining({ month: "2026-08" }),
       }),
     ]);
@@ -398,10 +411,105 @@ describe("alerts", () => {
     ]);
   });
 
-  it("emits A5 for share-out commitments above projected cash and dedupes by org year", async () => {
+  it("emits separate A4 rows for separate breached months", async () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
     const fakeDb = new FakeDb([
       [{ id: orgId }],
+      [{ safetyMarginAmount: "100.0000", config: { safety_margin_amount: "100.0000" } }],
+      [
+        { monthOn: "2026-08-01", projectedBalance: "80.0000" },
+        { monthOn: "2026-09-01", projectedBalance: "75.0000" },
+      ],
+      [],
+      [],
+      [],
+      [],
+    ], [[]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a4AlertsEmitted: 2,
+        a4AlertsSkippedExisting: 0,
+        failures: [],
+      });
+    });
+
+    const rows = insertedRows(fakeDb, alert);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.payload)).toEqual([
+      expect.objectContaining({ month: "2026-08" }),
+      expect.objectContaining({ month: "2026-09" }),
+    ]);
+    expect(new Set(rows.map((row) => row.subjectId))).toHaveProperty("size", 2);
+    expect(rows.every((row) => row.subjectId !== orgId)).toBe(true);
+  });
+
+  it("clears an existing A4 alert when its month is no longer breached", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const subjectId = buildA4LiquidityLowMarginAlert({
+      orgId,
+      month: "2026-08",
+      projectedBalance: "80.0000",
+      safetyMarginAmount: "100.0000",
+      now: new Date("2026-07-01T00:00:00.000Z"),
+    }).subjectId;
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [{ safetyMarginAmount: "100.0000", config: { safety_margin_amount: "100.0000" } }],
+      [{ monthOn: "2026-08-01", projectedBalance: "120.0000" }],
+      [{
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        orgId,
+        alertKind: "A4",
+        severity: "high",
+        audience: "treasurer",
+        subjectKind: "liquidity_projection",
+        subjectId,
+        payload: { month: "2026-08" },
+        dedupWindowEnd: new Date("2026-07-13T00:00:00.000Z"),
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+      }],
+      [],
+    ], [[]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a4AlertsEmitted: 0,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toHaveLength(0);
+    expect(insertedRows(fakeDb, alertAction)).toEqual([
+      expect.objectContaining({
+        alertId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        actionKind: "dismiss",
+        actorKind: "system",
+      }),
+    ]);
+    expect(insertedRows(fakeDb, auditLogEntry)).toEqual([
+      expect.objectContaining({ actionKind: "alert.liquidity_low_margin.clear" }),
+    ]);
+  });
+
+  it("emits A5 for share-out commitments above projected cash and dedupes by org year", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const year2027SubjectId = buildA5ShareOutCommitmentAlert({
+      orgId,
+      year: 2027,
+      commitment: "600.0000",
+      projectedAvailable: "100.0000",
+      now: new Date("2026-07-06T00:00:00.000Z"),
+    }).subjectId;
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [],
       [],
       [],
       [],
@@ -410,11 +518,12 @@ describe("alerts", () => {
         orgId,
         alertKind: "A5",
         subjectKind: "year_end_share_out",
-        subjectId: orgId,
+        subjectId: year2027SubjectId,
         payload: { year: 2027 },
         dedupWindowEnd: new Date("2026-07-13T00:00:00.000Z"),
         createdAt: new Date("2026-07-06T00:00:00.000Z"),
       }],
+      [],
     ], [[
       { year: 2026, commitment: "500.0000", projected_available: "300.0000" },
       { year: 2027, commitment: "600.0000", projected_available: "100.0000" },
@@ -444,7 +553,7 @@ describe("alerts", () => {
         severity: "high",
         audience: "treasurer",
         subjectKind: "year_end_share_out",
-        subjectId: orgId,
+        subjectId: expect.not.stringMatching(orgId),
         payload: expect.objectContaining({ year: 2026, commitment: "500.0000", projectedAvailable: "300.0000" }),
       }),
     ]);
@@ -457,6 +566,8 @@ describe("alerts", () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
     const fakeDb = new FakeDb([
       [{ id: orgId }],
+      [],
+      [],
       [],
       [],
       [],
@@ -497,11 +608,126 @@ describe("alerts", () => {
     expect(insertedRows(fakeDb, alert)).toEqual([
       expect.objectContaining({
         alertKind: "A5",
-        subjectId: orgId,
+        subjectId: expect.not.stringMatching(orgId),
         payload: expect.objectContaining({
           year: 2026,
           commitment: "700.0000",
           projectedAvailable: "300.0000",
+        }),
+      }),
+    ]);
+  });
+
+  it("emits separate A5 rows for separate active breached years", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+    ], [[
+      { year: 2026, commitment: "500.0000", projected_available: "300.0000", status: "approved", version: 1, committed_at: new Date("2026-07-01T00:00:00.000Z") },
+      { year: 2027, commitment: "600.0000", projected_available: "200.0000", status: "approved", version: 1, committed_at: new Date("2026-07-02T00:00:00.000Z") },
+    ]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a5CommitmentsScanned: 2,
+        a5AlertsEmitted: 2,
+        a5AlertsSkippedExisting: 0,
+        failures: [],
+      });
+    });
+
+    const rows = insertedRows(fakeDb, alert);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.payload)).toEqual([
+      expect.objectContaining({ year: 2026, projectedAvailable: "300.0000" }),
+      expect.objectContaining({ year: 2027, projectedAvailable: "200.0000" }),
+    ]);
+    expect(new Set(rows.map((row) => row.subjectId))).toHaveProperty("size", 2);
+    expect(rows.every((row) => row.subjectId !== orgId)).toBe(true);
+  });
+
+  it("does not re-alert for stale distributed or past A5 commitments", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [],
+      [],
+      [],
+      [],
+    ], [[
+      {
+        year: 2025,
+        commitment: "700.0000",
+        projected_available: "100.0000",
+        source_kind: "share_out",
+        status: "distributed",
+        version: 1,
+        committed_at: new Date("2025-12-31T00:00:00.000Z"),
+      },
+    ]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a5CommitmentsScanned: 0,
+        a5AlertsEmitted: 0,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toHaveLength(0);
+    expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(0);
+  });
+
+  it("uses projected available capital, not total projected balance, for A5", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [],
+      [],
+      [],
+      [],
+      [],
+    ], [[
+      {
+        year: 2026,
+        commitment: "500.0000",
+        projected_available: "300.0000",
+        projected_balance: "900.0000",
+        status: "approved",
+        version: 1,
+        committed_at: new Date("2026-07-01T00:00:00.000Z"),
+      },
+    ]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a5CommitmentsScanned: 1,
+        a5AlertsEmitted: 1,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toEqual([
+      expect.objectContaining({
+        alertKind: "A5",
+        payload: expect.objectContaining({
+          projectedAvailable: "300.0000",
+          shortfall: "$200,00",
         }),
       }),
     ]);

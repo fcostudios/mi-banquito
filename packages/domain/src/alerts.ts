@@ -16,6 +16,7 @@ import { writeWithAudit } from "./audit";
 import {
   buildA4LiquidityLowMarginAlert,
   buildA5ShareOutCommitmentAlert,
+  deterministicAlertSubjectId,
 } from "./sprint7-alerts";
 
 export type AlertAudience = "treasurer" | "platform_operator";
@@ -316,7 +317,6 @@ function executeRows<T>(result: { rows?: T[] } | T[]): T[] {
 }
 
 function commitmentStatusRank(row: Sprint7ShareOutCommitmentRow): number {
-  if (row.status === "distributed") return 4;
   if (row.status === "approved") return 3;
   if (row.status === "draft") return 2;
   if (row.status === "locked") return 1;
@@ -358,9 +358,22 @@ function compareCommitmentRows(a: Sprint7ShareOutCommitmentRow, b: Sprint7ShareO
   return 0;
 }
 
-function latestCommitmentByYear(rows: Sprint7ShareOutCommitmentRow[]): Sprint7ShareOutCommitmentRow[] {
+function isActiveShareOutCommitment(row: Sprint7ShareOutCommitmentRow, currentYear: number): boolean {
+  const year = Number(row.year);
+  if (!Number.isInteger(year) || year < currentYear) return false;
+  if (row.source_kind === "share_out") {
+    return row.status === "draft" || row.status === "approved";
+  }
+  if (row.source_kind === "governance_decision") {
+    return row.status === "approved";
+  }
+  return row.status === undefined || row.status === null || row.status === "approved" || row.status === "draft";
+}
+
+function latestCommitmentByYear(rows: Sprint7ShareOutCommitmentRow[], currentYear: number): Sprint7ShareOutCommitmentRow[] {
   const latest = new Map<number, Sprint7ShareOutCommitmentRow>();
   for (const row of rows) {
+    if (!isActiveShareOutCommitment(row, currentYear)) continue;
     const year = Number(row.year);
     if (!Number.isInteger(year)) continue;
     const current = latest.get(year);
@@ -426,6 +439,7 @@ async function hasActiveDedupedAlertForPayload(input: {
 async function latestShareOutCommitmentRows(input: {
   tx: AlertReadTx & { execute(query: unknown): Promise<{ rows?: Sprint7ShareOutCommitmentRow[] } | Sprint7ShareOutCommitmentRow[]> };
   orgId: string;
+  currentYear: number;
 }): Promise<Sprint7ShareOutCommitmentRow[]> {
   const result = await input.tx.execute(sql`
     WITH commitment_candidates AS (
@@ -438,7 +452,8 @@ async function latestShareOutCommitmentRows(input: {
         'share_out' AS source_kind
       FROM year_end_share_out
       WHERE org_id = ${input.orgId}
-        AND status IN ('draft', 'approved', 'distributed')
+        AND year >= ${input.currentYear}
+        AND status IN ('draft', 'approved')
 
       UNION ALL
 
@@ -451,19 +466,20 @@ async function latestShareOutCommitmentRows(input: {
         'governance_decision' AS source_kind
       FROM surplus_governance_decision
       WHERE org_id = ${input.orgId}
+        AND year >= ${input.currentYear}
         AND status = 'approved'
     )
     SELECT
       cc.year,
       cc.commitment::numeric(18, 4)::text AS commitment,
-      COALESCE(projected.projected_balance, capital.available_capital, 0)::numeric(18, 4)::text AS projected_available,
+      COALESCE(projected.available_capital, capital.available_capital, 0)::numeric(18, 4)::text AS projected_available,
       cc.source_kind,
       cc.status,
       cc.version,
       cc.committed_at
     FROM commitment_candidates cc
     LEFT JOIN LATERAL (
-      SELECT pl.projected_balance
+      SELECT pl.available_capital
       FROM mv_liquidez_proyectada pl
       WHERE pl.org_id = ${input.orgId}
         AND EXTRACT(YEAR FROM pl.month_on)::integer = cc.year
@@ -474,7 +490,79 @@ async function latestShareOutCommitmentRows(input: {
       ON capital.org_id = ${input.orgId}
     ORDER BY cc.year, cc.committed_at DESC, cc.version DESC
   `);
-  return latestCommitmentByYear(executeRows(result));
+  return latestCommitmentByYear(executeRows(result), input.currentYear);
+}
+
+async function clearResolvedSprint7Alerts(input: {
+  tx: AlertReadTx & { insert(table: unknown): any };
+  orgId: string;
+  alertKind: "A4" | "A5";
+  subjectKind: string;
+  payloadKey: "month" | "year";
+  activeKeys: Set<string>;
+  today: Date;
+}): Promise<void> {
+  const existingAlerts = await input.tx.select().from(alert)
+    .where(and(
+      eq(alert.orgId, input.orgId),
+      eq(alert.alertKind, input.alertKind),
+      eq(alert.subjectKind, input.subjectKind),
+    ))
+    .orderBy(desc(alert.createdAt));
+
+  for (const row of existingAlerts) {
+    const payload = payloadObject(row.payload);
+    const key = payload[input.payloadKey] === undefined || payload[input.payloadKey] === null
+      ? ""
+      : String(payload[input.payloadKey]);
+    const naturalSubjectId = key
+      ? deterministicAlertSubjectId({
+        orgId: input.orgId,
+        alertKind: input.alertKind,
+        naturalKey: key,
+      })
+      : null;
+    const resolved = !input.activeKeys.has(key);
+    const expired = dateValue(row.dedupWindowEnd) <= input.today;
+    const superseded = Boolean(naturalSubjectId && row.subjectId !== naturalSubjectId);
+    if (!resolved && !expired && !superseded) {
+      continue;
+    }
+
+    await input.tx.insert(alertAction).values({
+      orgId: input.orgId,
+      alertId: row.id,
+      actionKind: "dismiss",
+      snoozedUntil: null,
+      actorId: SYSTEM_ACTOR_ID,
+      actorKind: "system",
+      reason: "Condición resuelta o ventana de deduplicación vencida",
+      createdAt: input.today,
+    });
+    await input.tx.insert(auditLogEntry).values({
+      orgId: input.orgId,
+      actorKind: "system",
+      actorId: SYSTEM_ACTOR_ID,
+      actionKind: input.alertKind === "A4"
+        ? "alert.liquidity_low_margin.clear"
+        : "alert.shareout_commitment.clear",
+      subjectKind: "alert",
+      subjectId: row.id,
+      payloadSnapshot: {
+        orgId: input.orgId,
+        alertKind: input.alertKind,
+        alertId: row.id,
+        [input.payloadKey]: key || null,
+        dedupWindowEnd: dateValue(row.dedupWindowEnd).toISOString(),
+        resolved,
+        expired,
+        superseded,
+      },
+      reason: null,
+      at: input.today,
+      createdAt: input.today,
+    });
+  }
 }
 
 export const createAlertsService = (): AlertsService => ({
@@ -794,6 +882,7 @@ export const createAlertsService = (): AlertsService => ({
       summary.a4OrgsScanned += 1;
       try {
         await withTenantTransaction(org.id, async (tx) => {
+          const activeA4Months = new Set<string>();
           const [config] = await tx.select({
             safetyMarginAmount: groupConfig.safetyMarginAmount,
             config: groupConfig.config,
@@ -823,12 +912,18 @@ export const createAlertsService = (): AlertsService => ({
             }
 
             const month = monthOnly(row.monthOn);
+            activeA4Months.add(month);
+            const subjectId = deterministicAlertSubjectId({
+              orgId: org.id,
+              alertKind: "A4",
+              naturalKey: month,
+            });
             const existing = await hasActiveDedupedAlertForPayload({
               tx,
               orgId: org.id,
               alertKind: "A4",
               subjectKind: "liquidity_projection",
-              subjectId: org.id,
+              subjectId,
               payloadKey: "month",
               payloadValue: month,
               today,
@@ -865,6 +960,16 @@ export const createAlertsService = (): AlertsService => ({
             });
             summary.a4AlertsEmitted += 1;
           }
+
+          await clearResolvedSprint7Alerts({
+            tx,
+            orgId: org.id,
+            alertKind: "A4",
+            subjectKind: "liquidity_projection",
+            payloadKey: "month",
+            activeKeys: activeA4Months,
+            today,
+          });
         });
       } catch (error) {
         summary.a4Failures += 1;
@@ -876,7 +981,12 @@ export const createAlertsService = (): AlertsService => ({
 
       try {
         await withTenantTransaction(org.id, async (tx) => {
-          const commitmentRows = await latestShareOutCommitmentRows({ tx, orgId: org.id });
+          const activeA5Years = new Set<string>();
+          const commitmentRows = await latestShareOutCommitmentRows({
+            tx,
+            orgId: org.id,
+            currentYear: today.getUTCFullYear(),
+          });
           for (const row of commitmentRows) {
             summary.a5CommitmentsScanned += 1;
             const year = Number(row.year);
@@ -886,12 +996,18 @@ export const createAlertsService = (): AlertsService => ({
               continue;
             }
 
+            activeA5Years.add(String(year));
+            const subjectId = deterministicAlertSubjectId({
+              orgId: org.id,
+              alertKind: "A5",
+              naturalKey: year,
+            });
             const existing = await hasActiveDedupedAlertForPayload({
               tx,
               orgId: org.id,
               alertKind: "A5",
               subjectKind: "year_end_share_out",
-              subjectId: org.id,
+              subjectId,
               payloadKey: "year",
               payloadValue: year,
               today,
@@ -928,6 +1044,16 @@ export const createAlertsService = (): AlertsService => ({
             });
             summary.a5AlertsEmitted += 1;
           }
+
+          await clearResolvedSprint7Alerts({
+            tx,
+            orgId: org.id,
+            alertKind: "A5",
+            subjectKind: "year_end_share_out",
+            payloadKey: "year",
+            activeKeys: activeA5Years,
+            today,
+          });
         });
       } catch (error) {
         summary.a5Failures += 1;
