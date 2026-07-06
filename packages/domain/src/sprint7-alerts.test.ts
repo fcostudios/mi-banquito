@@ -22,7 +22,8 @@ describe("Sprint 7 alert builders", () => {
     expect(alert.severity).toBe("high");
     expect(alert.audience).toBe("treasurer");
     expect(alert.subjectKind).toBe("liquidity_projection");
-    expect(alert.subjectId).toBe("11111111-1111-4111-8111-111111111111");
+    expect(alert.subjectId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(alert.subjectId).not.toBe("11111111-1111-4111-8111-111111111111");
     expect(alert.payload.copy).toBe("La liquidez proyectada de septiembre 2026 queda $25,00 por debajo del margen de seguridad.");
     expect(alert.payload.month).toBe("2026-09");
     expect(alert.dedupWindowEnd?.toISOString()).toBe("2026-07-13T10:00:00.000Z");
@@ -40,10 +41,41 @@ describe("Sprint 7 alert builders", () => {
     expect(alert.alertKind).toBe("A5");
     expect(alert.severity).toBe("high");
     expect(alert.subjectKind).toBe("year_end_share_out");
-    expect(alert.subjectId).toBe("11111111-1111-4111-8111-111111111111");
+    expect(alert.subjectId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(alert.subjectId).not.toBe("11111111-1111-4111-8111-111111111111");
     expect(alert.payload.title).toBe("Compromiso de reparto excede proyección");
     expect(alert.payload.body).toBe("El compromiso de reparto 2026 excede la proyección disponible por $200,00.");
     expect(alert.payload.copy).toBe("El compromiso de reparto 2026 excede la proyección disponible por $200,00.");
+  });
+
+  it("builds stable natural subject IDs for A4 by org and month", () => {
+    const base = {
+      orgId: "11111111-1111-4111-8111-111111111111",
+      projectedBalance: "75.0000",
+      safetyMarginAmount: "100.0000",
+      now: new Date("2026-07-06T10:00:00.000Z"),
+    };
+    const september = buildA4LiquidityLowMarginAlert({ ...base, month: "2026-09" });
+    const septemberAgain = buildA4LiquidityLowMarginAlert({ ...base, month: "2026-09" });
+    const october = buildA4LiquidityLowMarginAlert({ ...base, month: "2026-10" });
+
+    expect(september.subjectId).toBe(septemberAgain.subjectId);
+    expect(september.subjectId).not.toBe(october.subjectId);
+  });
+
+  it("builds stable natural subject IDs for A5 by org and year", () => {
+    const base = {
+      orgId: "11111111-1111-4111-8111-111111111111",
+      commitment: "500.0000",
+      projectedAvailable: "300.0000",
+      now: new Date("2026-07-06T10:00:00.000Z"),
+    };
+    const currentYear = buildA5ShareOutCommitmentAlert({ ...base, year: 2026 });
+    const currentYearAgain = buildA5ShareOutCommitmentAlert({ ...base, year: 2026 });
+    const nextYear = buildA5ShareOutCommitmentAlert({ ...base, year: 2027 });
+
+    expect(currentYear.subjectId).toBe(currentYearAgain.subjectId);
+    expect(currentYear.subjectId).not.toBe(nextYear.subjectId);
   });
 
   it("formats A5 shortfalls with es-EC thousands separators", () => {
