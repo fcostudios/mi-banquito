@@ -38,6 +38,8 @@ describe("Sprint 7 alert builders", () => {
 
     expect(alert.alertKind).toBe("A5");
     expect(alert.severity).toBe("high");
+    expect(alert.payload.title).toBe("Compromiso de reparto excede proyección");
+    expect(alert.payload.body).toBe("El compromiso de reparto 2026 excede la proyección disponible por $200,00.");
     expect(alert.payload.copy).toBe("El compromiso de reparto 2026 excede la proyección disponible por $200,00.");
   });
 
@@ -51,6 +53,18 @@ describe("Sprint 7 alert builders", () => {
     });
 
     expect(alert.payload.copy).toBe("El compromiso de reparto 2026 excede la proyección disponible por $1.234,56.");
+  });
+
+  it("rounds four-decimal DB money values to cents", () => {
+    const alert = buildA5ShareOutCommitmentAlert({
+      orgId: "11111111-1111-4111-8111-111111111111",
+      year: 2026,
+      commitment: "1.2399",
+      projectedAvailable: "0.0000",
+      now: new Date("2026-07-06T10:00:00.000Z"),
+    });
+
+    expect(alert.payload.copy).toBe("El compromiso de reparto 2026 excede la proyección disponible por $1,24.");
   });
 
   it("builds A6 for member and non-member loans", () => {
@@ -91,6 +105,7 @@ describe("Sprint 7 alert builders", () => {
 
     expect(alert.alertKind).toBe("A9");
     expect(alert.severity).toBe("low");
+    expect(alert.dedupWindowEnd.toISOString()).toBe("2026-07-06T10:00:00.000Z");
     expect(alert.payload.copy).toBe("Pancho cambió la configuración del grupo: cuota base, tasa de interés.");
   });
 
@@ -123,7 +138,72 @@ describe("Sprint 7 alert builders", () => {
     expect(alert.alertKind).toBe("A14");
     expect(alert.severity).toBe("critical");
     expect(alert.audience).toBe("both");
-    expect(alert.dedupWindowEnd).toBeNull();
+    expect(alert.dedupWindowEnd.toISOString()).toBe("2026-07-06T10:00:00.000Z");
     expect(alert.payload.copy).toBe("Pancho tiene saldo negativo de -$12,50.");
+  });
+
+  it("builds DB/display-compatible alert inserts", () => {
+    const now = new Date("2026-07-06T10:00:00.000Z");
+    const alerts = [
+      buildA4LiquidityLowMarginAlert({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        month: "2026-09",
+        projectedBalance: "75.0000",
+        safetyMarginAmount: "100.0000",
+        now,
+      }),
+      buildA5ShareOutCommitmentAlert({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        year: 2026,
+        commitment: "500.0000",
+        projectedAvailable: "300.0000",
+        now,
+      }),
+      buildA6LoanPastDueAlert({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        loanId: "22222222-2222-4222-8222-222222222222",
+        borrowerName: "Pancho",
+        borrowerKind: "member",
+        daysLate: 3,
+        now,
+      }),
+      buildA9GroupConfigChangedAlert({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        configId: "44444444-4444-4444-8444-444444444444",
+        changedKeys: ["base_quota_amount"],
+        actorLabel: "Pancho",
+        now,
+      }),
+      buildA11ContributionMissingPhotoAlert({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        memberId: "55555555-5555-4555-8555-555555555555",
+        memberName: "Pancho",
+        threshold: 3,
+        consecutiveCount: 3,
+        now,
+      }),
+      buildA14NegativeMemberBalanceAlert({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        memberId: "55555555-5555-4555-8555-555555555555",
+        memberName: "Pancho",
+        balance: "-12.5000",
+        sourceEventId: "event-1",
+        now,
+      }),
+    ];
+
+    expect(alerts.map((alert) => alert.payload.title)).toEqual([
+      "Liquidez bajo margen",
+      "Compromiso de reparto excede proyección",
+      "Préstamo en mora",
+      "Cambio de configuración del grupo",
+      "Aporte sin foto de comprobante",
+      "Saldo de miembro negativo",
+    ]);
+    for (const alert of alerts) {
+      expect(alert.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      expect(alert.dedupWindowEnd).toBeInstanceOf(Date);
+      expect(alert.payload.body).toBe(alert.payload.copy);
+    }
   });
 });
