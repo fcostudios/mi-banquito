@@ -48,7 +48,7 @@ describe("ScrYearEndShareOutPage", () => {
       }],
     });
 
-    render(await ScrYearEndShareOutPage());
+    render(await ScrYearEndShareOutPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("heading", { name: "Reparto fin de año" })).toBeInTheDocument();
     expect(screen.getByText("Decisión de gobernanza requerida")).toBeInTheDocument();
@@ -56,5 +56,16 @@ describe("ScrYearEndShareOutPage", () => {
     expect(screen.getByLabelText("Monto final Ana Mora")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Guardar override" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Aprobar reparto" })).toBeInTheDocument();
+  });
+
+  it("renders a recoverable message when draft generation is missing prerequisites", async () => {
+    getLatestDraft.mockResolvedValueOnce(null);
+
+    render(await ScrYearEndShareOutPage({
+      searchParams: Promise.resolve({ error: "governance-required" }),
+    }));
+
+    expect(screen.getByText("Antes de generar el reparto, registra y aprueba la decisión de gobernanza del año.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generar reparto 2026" })).toBeInTheDocument();
   });
 });

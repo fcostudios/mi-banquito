@@ -62,7 +62,10 @@ describe("ScrMemberDetailPage", () => {
       periodLabel: "2026-06",
     }]);
 
-    render(await ScrMemberDetailPage({ params: Promise.resolve({ id: "22222222-2222-4222-8222-222222222222" }) }));
+    render(await ScrMemberDetailPage({
+      params: Promise.resolve({ id: "22222222-2222-4222-8222-222222222222" }),
+      searchParams: Promise.resolve({}),
+    }));
 
     expect(screen.getByRole("heading", { name: "Ana Mora" })).toBeInTheDocument();
     expect(screen.getByText("Saldo actual")).toBeInTheDocument();
@@ -71,5 +74,51 @@ describe("ScrMemberDetailPage", () => {
     expect(screen.getByRole("button", { name: "Generar estado de cuenta" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pausar" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dar de baja" })).toBeInTheDocument();
+  });
+
+  it("shows the latest monthly member statement link and generation result on detail", async () => {
+    getMember.mockResolvedValueOnce({
+      id: "22222222-2222-4222-8222-222222222222",
+      orgId: "11111111-1111-4111-8111-111111111111",
+      displayName: "Ana Mora",
+      status: "activo",
+      role: "aportante",
+      initialSavingsBalance: "40.0000",
+    });
+    getMemberBalance.mockResolvedValueOnce({
+      memberId: "22222222-2222-4222-8222-222222222222",
+      displayName: "Ana Mora",
+      currentBalance: "120.5000",
+      state: "al_dia",
+      whatsappNumber: "+593991234567",
+      balanceShareUrl: "https://wa.me/593991234567?text=saldo",
+    });
+    listStatementArchive.mockResolvedValueOnce([
+      {
+        id: "member-statement-1",
+        kind: "monthly_member",
+        memberId: "22222222-2222-4222-8222-222222222222",
+        periodLabel: "2026-06",
+        periodCloseId: "period-close-1",
+        pdfUri: "/statement-archive/public/abc.pdf",
+      },
+      {
+        id: "close-1",
+        kind: "monthly_close",
+        periodCloseId: "period-close-1",
+        periodLabel: "2026-06",
+      },
+    ]);
+
+    render(await ScrMemberDetailPage({
+      params: Promise.resolve({ id: "22222222-2222-4222-8222-222222222222" }),
+      searchParams: Promise.resolve({ estado: "generado" }),
+    }));
+
+    expect(screen.getByText("Estado de cuenta listo.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Abrir estado de cuenta 2026-06" })).toHaveAttribute(
+      "href",
+      "/statement-archive/public/abc.pdf",
+    );
   });
 });

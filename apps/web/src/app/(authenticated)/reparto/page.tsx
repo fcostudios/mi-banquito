@@ -10,9 +10,22 @@ export const dynamic = "force-dynamic";
 const pageCopy = messages.pages.reparto;
 const shareOutCopy = messages.yearEndShareOut;
 
-export default async function ScrYearEndShareOutPage() {
+function shareOutErrorMessage(error?: string) {
+  if (error === "governance-required") return shareOutCopy.governanceRequiredError;
+  if (error === "year-end-close-required") return shareOutCopy.yearEndCloseRequiredError;
+  if (error === "draft-failed") return shareOutCopy.genericError;
+  return null;
+}
+
+export default async function ScrYearEndShareOutPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await requireTreasurer();
   const year = new Date().getUTCFullYear();
+  const { error } = await searchParams;
+  const errorMessage = shareOutErrorMessage(error);
   const shareOut = await createShareOutService().getLatestDraft({ orgId: session.orgId, year });
 
   return (
@@ -21,6 +34,12 @@ export default async function ScrYearEndShareOutPage() {
         <h1 className="text-2xl font-bold text-text-primary">{pageCopy.title}</h1>
         <p className="mt-2 text-text-secondary">{shareOutCopy.description}</p>
       </header>
+
+      {errorMessage ? (
+        <p className="rounded-md border border-border bg-surface p-4 text-sm font-semibold text-text-primary">
+          {errorMessage}
+        </p>
+      ) : null}
 
       <form action={runShareOutDraftAction} className="rounded-md border border-border bg-surface p-5">
         <input type="hidden" name="year" value={year} />

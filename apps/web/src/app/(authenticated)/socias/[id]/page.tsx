@@ -14,11 +14,14 @@ const dashboardCopy = messages.sprint1.dashboard;
 
 export default async function ScrMemberDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ estado?: string }>;
 }) {
   const session = await requireTreasurer();
   const { id } = await params;
+  const { estado } = await (searchParams ?? Promise.resolve({} as { estado?: string }));
   const ledger = createLedgerService();
   const [row, balanceRow, archivedStatements] = await Promise.all([
     ledger.getMember(session.orgId, id),
@@ -29,6 +32,11 @@ export default async function ScrMemberDetailPage({
   const state = row.status === "activo" ? "al_dia" : "atrasado";
   const currentBalance = balanceRow?.currentBalance ?? row.initialSavingsBalance;
   const latestPeriodClose = archivedStatements.find((statement) => statement.kind === "monthly_close" && statement.periodCloseId);
+  const latestMemberStatement = archivedStatements.find((statement) =>
+    statement.kind === "monthly_member"
+    && statement.memberId === row.id
+    && statement.pdfUri
+  );
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-6" data-screen="SCR-member-detail">
@@ -73,9 +81,27 @@ export default async function ScrMemberDetailPage({
           <form action={generateMemberStatementsAction}>
             <input type="hidden" name="periodCloseId" value={latestPeriodClose.periodCloseId} />
             <input type="hidden" name="memberId" value={row.id} />
+            <input type="hidden" name="returnTo" value={`/socias/${row.id}?estado=generado`} />
             <ButtonPrimary type="submit">{memberCopy.generateStatement}</ButtonPrimary>
           </form>
         ) : null}
+        <div className="grid gap-2 md:col-span-2">
+          {estado === "generado" ? (
+            <p className="rounded-md border border-primary bg-primary-soft p-3 text-sm font-semibold text-text-primary">
+              {memberCopy.statementReady}
+            </p>
+          ) : null}
+          {latestMemberStatement?.pdfUri ? (
+            <a
+              className="inline-flex min-h-12 items-center justify-center rounded-md border border-primary bg-surface px-4 font-semibold text-primary"
+              href={latestMemberStatement.pdfUri}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {memberCopy.openStatement.replace("{{period}}", latestMemberStatement.periodLabel)}
+            </a>
+          ) : null}
+        </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2" aria-label={memberCopy.statusActions}>
