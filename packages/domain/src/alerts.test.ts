@@ -453,6 +453,60 @@ describe("alerts", () => {
     ]);
   });
 
+  it("uses a newer approved governance decision over an older share-out for A5", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [],
+      [],
+      [],
+    ], [[
+      {
+        year: 2026,
+        commitment: "450.0000",
+        projected_available: "300.0000",
+        source_kind: "share_out",
+        status: "draft",
+        version: 1,
+        committed_at: new Date("2026-06-01T00:00:00.000Z"),
+      },
+      {
+        year: 2026,
+        commitment: "700.0000",
+        projected_available: "300.0000",
+        source_kind: "governance_decision",
+        status: "approved",
+        version: 2,
+        committed_at: new Date("2026-07-01T00:00:00.000Z"),
+      },
+    ]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a5CommitmentsScanned: 1,
+        a5AlertsEmitted: 1,
+        a5AlertsSkippedExisting: 0,
+        a5Failures: 0,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toEqual([
+      expect.objectContaining({
+        alertKind: "A5",
+        subjectId: orgId,
+        payload: expect.objectContaining({
+          year: 2026,
+          commitment: "700.0000",
+          projectedAvailable: "300.0000",
+        }),
+      }),
+    ]);
+  });
+
   it("lists only currently visible alerts and counts them", async () => {
     const now = new Date("2026-07-03T00:00:00.000Z");
     const fakeDb = new FakeDb([
