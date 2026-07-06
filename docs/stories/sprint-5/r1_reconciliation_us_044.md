@@ -22,12 +22,16 @@ As a treasurer, I want to enter what my bank app shows and immediately see wheth
 | Blocked By | US-008, US-029, US-036 |
 ## Acceptance Criteria
 
-- [ ] AC-1: `SCR-monthly-close` step 1 renders a large numeric input for the declared bank balance; on submit the system computes the `pool_balance` derived view for the cycle and displays the declared balance, the computed pool, and their difference (discrepancy).
-- [ ] AC-2: The discrepancy is rendered with a green / amber / red text-and-background state driven by the cycle tolerance from `GroupConfig.config` — green when `|discrepancy| ≤ tolerance`, red/amber when outside.
-- [ ] AC-3: When the discrepancy is within tolerance, the "Cerrar el mes" CTA is enabled; when outside tolerance, the CTA is disabled and the treasurer is routed to resolution or annotation (see US-045).
-- [ ] AC-4: Submitting the declared balance writes/updates the `ReconciliationCycle` row for the current `ContributionCycle` (declared balance, computed pool, discrepancy) idempotently — re-submitting for the same cycle updates the open cycle rather than inserting a duplicate.
-- [ ] AC-5: The declared-balance write is rejected if the target cycle's period is already locked (period-lock invariant; see US-046/US-070).
-- [ ] AC-6: The write and its `AuditLogEntry` insert occur in a single DB transaction; an injected audit-write failure rolls back the reconciliation write (NFR-SEC-04).
+- [x] AC-1: `SCR-monthly-close` step 1 renders a large numeric input for the declared bank balance; on submit the system computes the `pool_balance` derived view for the cycle and displays the declared balance, the computed pool, and their difference (discrepancy).
+- [x] AC-2: The discrepancy is rendered with a green / amber / red text-and-background state driven by the cycle tolerance from `GroupConfig.config` — green when `|discrepancy| ≤ tolerance`, red/amber when outside.
+- [x] AC-3: When the discrepancy is within tolerance, the "Cerrar el mes" CTA is enabled; when outside tolerance, the CTA is disabled and the treasurer is routed to resolution or annotation (see US-045).
+- [x] AC-4: Submitting the declared balance writes/updates the `ReconciliationCycle` row for the current `ContributionCycle` (declared balance, computed pool, discrepancy) idempotently — re-submitting for the same cycle updates the open cycle rather than inserting a duplicate.
+- [x] AC-5: The declared-balance write is rejected if the target cycle's period is already locked (period-lock invariant; see US-046/US-070).
+- [x] AC-6: The write and its `AuditLogEntry` insert occur in a single DB transaction; an injected audit-write failure rolls back the reconciliation write (NFR-SEC-04).
+
+## Closeout
+
+Closed in Sprint 5 monthly-close slice. Verified by reconciliation domain tests, cierre page tests, and the live June 2026 close.
 
 ## Technical Notes
 - **Data model:** `ReconciliationCycle` (1:1 with `ContributionCycle` via `reconciles_as`) holds declared balance, computed pool, discrepancy, tolerance snapshot, `resolution_kind`, `resolution_note`. `pool_balance` is a derived view over the cycle's ledger entries (`Contribution`, `Withdrawal`, `Repayment`, `InterestAccrual`, `Expense`). No new migration if `ReconciliationCycle` already exists from US-008; otherwise a timestamp-slug migration per HR-25 (`slug=reconciliation_cycle`).

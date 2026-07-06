@@ -173,26 +173,31 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 **Stories:** 10 | **Points:** 0 SP
 
-> **Status:** Implemented and verified for the monthly-close Sprint 5 path. The
-> `/cierre` workflow, A7/A8 alerting, lifecycle guardrails, migrations, Vercel Blob
-> monthly-close PDF artifact, WhatsApp share URL, and archive listing are in place.
-> Full US-086 per-member and year-end PDF generation remains outside this monthly-close
-> implementation slice unless Sprint 5 is scoped to monthly close only.
+> **Status:** Closed for the monthly-close operating slice. The `/cierre`
+> workflow, A7/A8 alerting, platform bootstrap, org lifecycle guardrails,
+> migrations, Vercel Blob monthly-close PDF artifact, authenticated archive
+> route, hash verifier, and archive listing are shipped and verified.
+>
+> **Carry-over to Sprint 6:** US-060 still needs artifact delivery that a
+> president can open without app login, and US-086 still needs the live
+> per-member monthly PDF and year-end PDF generators. The shared PDF template
+> already supports the richer sections; the missing work is generation and
+> delivery for those artifact types.
 
 ### Execution Order
 
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |
 |---|-------|-------|------|------|---------------|-----|------------|--------|----------|------|
-| 1 | full-stack | **US-044** ⬜ | Treasurer enters declared bank balance and sees discrepancy in cierre flow | ? ?SP | `See story file` | — | US-008, US-029, US-036 | →4 | — | [r1_reconciliation_us_044.md](sprint-5/r1_reconciliation_us_044.md) |
-| 2 | full-stack | **US-079** ⬜ | Operator bootstraps the FcoStudios platform organization | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_079.md](sprint-5/r1_chg_us_079.md) |
-| 3 | full-stack | **US-080** ⬜ | Operator freezes or archives a tenant organization with audit trail | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_080.md](sprint-5/r1_chg_us_080.md) |
-| 4 | full-stack | **US-086** ⬜ | Per-member statement PDF + year-end PDF explain content richly | ? ?SP | `See story file` | — | — | →1 | — | [r1_chg_us_086.md](sprint-5/r1_chg_us_086.md) |
-| 5 | full-stack | **US-088** ⬜ | System emits A8 *Período no cerrado en últimos N días* (Medium, treasurer + plat | ? ?SP | `See story file` | — | US-008, US-012, US-019 | — | — | [r1_chg_us_088.md](sprint-5/r1_chg_us_088.md) |
-| 6 | full-stack | **US-045** ⬜ | Treasurer annotates a discrepancy outside tolerance with required reason | ? ?SP | `See story file` | — | US-044 | →2 | — | [r1_reconciliation_us_045.md](sprint-5/r1_reconciliation_us_045.md) |
-| 7 | full-stack | **US-047** ⬜ | System generates the monthly close PDF with canonical-JSON SHA-256 hash | ? ?SP | `See story file` | — | US-046, US-064, US-059 | →8 | — | [r1_reporting_us_047.md](sprint-5/r1_reporting_us_047.md) |
-| 8 | full-stack | **US-060** ⬜ | President receives monthly close PDF via WhatsApp from treasurer | ? ?SP | `See story file` | — | US-047 | — | — | [r1_artifact_us_060.md](sprint-5/r1_artifact_us_060.md) |
-| 9 | full-stack | **US-067** ⬜ | System emits A7 discrepancia bancaria detectada alert | ? ?SP | `See story file` | — | US-044 | →1 | — | [r1_alerts_us_067.md](sprint-5/r1_alerts_us_067.md) |
-| 10 | full-stack | **US-046** ⬜ | Treasurer locks the monthly close and the period becomes immutable | ? ?SP | `See story file` | — | US-045, US-044 | →6 | — | [r1_reconciliation_us_046.md](sprint-5/r1_reconciliation_us_046.md) |
+| 1 | full-stack | **US-044** ✅ | Treasurer enters declared bank balance and sees discrepancy in cierre flow | ? ?SP | `See story file` | — | US-008, US-029, US-036 | →4 | — | [r1_reconciliation_us_044.md](sprint-5/r1_reconciliation_us_044.md) |
+| 2 | full-stack | **US-079** ✅ | Operator bootstraps the FcoStudios platform organization | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_079.md](sprint-5/r1_chg_us_079.md) |
+| 3 | full-stack | **US-080** ✅ | Operator freezes or archives a tenant organization with audit trail | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_080.md](sprint-5/r1_chg_us_080.md) |
+| 4 | full-stack | **US-086** ↗ | Per-member statement PDF + year-end PDF explain content richly | ? ?SP | `See story file` | — | US-048, US-053 | →1 | — | [r1_chg_us_086.md](sprint-5/r1_chg_us_086.md) |
+| 5 | full-stack | **US-088** ✅ | System emits A8 *Período no cerrado en últimos N días* (Medium, treasurer + plat | ? ?SP | `See story file` | — | US-008, US-012, US-019 | — | — | [r1_chg_us_088.md](sprint-5/r1_chg_us_088.md) |
+| 6 | full-stack | **US-045** ✅ | Treasurer annotates a discrepancy outside tolerance with required reason | ? ?SP | `See story file` | — | US-044 | →2 | — | [r1_reconciliation_us_045.md](sprint-5/r1_reconciliation_us_045.md) |
+| 7 | full-stack | **US-047** ✅ | System generates the monthly close PDF with canonical-JSON SHA-256 hash | ? ?SP | `See story file` | — | US-046, US-064, US-059 | →8 | — | [r1_reporting_us_047.md](sprint-5/r1_reporting_us_047.md) |
+| 8 | full-stack | **US-060** ↗ | President receives monthly close PDF via WhatsApp from treasurer | ? ?SP | `See story file` | — | US-047 | — | — | [r1_artifact_us_060.md](sprint-5/r1_artifact_us_060.md) |
+| 9 | full-stack | **US-067** ✅ | System emits A7 discrepancia bancaria detectada alert | ? ?SP | `See story file` | — | US-044 | →1 | — | [r1_alerts_us_067.md](sprint-5/r1_alerts_us_067.md) |
+| 10 | full-stack | **US-046** ✅ | Treasurer locks the monthly close and the period becomes immutable | ? ?SP | `See story file` | — | US-045, US-044 | →6 | — | [r1_reconciliation_us_046.md](sprint-5/r1_reconciliation_us_046.md) |
 
 ### References
 
@@ -205,6 +210,11 @@ See `docs/specs/09_architecture.md` for bounded context details.
 ## Sprint 6: Sprint 6
 
 **Stories:** 10 | **Points:** 0 SP
+
+> **Carry-over intake:** Finish US-060 public/signed monthly-close PDF delivery
+> for president WhatsApp sharing, and finish US-086 generation for
+> `member_monthly` and `year_end` archives while implementing US-048, US-049,
+> US-053, and US-059.
 
 ### Execution Order
 
