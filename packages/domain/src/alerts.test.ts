@@ -343,6 +343,116 @@ describe("alerts", () => {
     expect(insertedRows(fakeDb, alert)).toHaveLength(0);
   });
 
+  it("emits A4 for projected liquidity below margin and dedupes by org month", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [{ safetyMarginAmount: "100.0000", config: { safety_margin_amount: "100.0000" } }],
+      [
+        { monthOn: "2026-08-01", projectedBalance: "80.0000" },
+        { monthOn: "2026-09-01", projectedBalance: "75.0000" },
+      ],
+      [],
+      [{
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        orgId,
+        alertKind: "A4",
+        subjectKind: "liquidity_projection",
+        subjectId: orgId,
+        payload: { month: "2026-09" },
+        dedupWindowEnd: new Date("2026-07-13T00:00:00.000Z"),
+        createdAt: new Date("2026-07-06T00:00:00.000Z"),
+      }],
+    ], [[]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a4OrgsScanned: 1,
+        a4MonthsScanned: 2,
+        a4AlertsEmitted: 1,
+        a4AlertsSkippedExisting: 1,
+        a4Failures: 0,
+        a5CommitmentsScanned: 0,
+        a5AlertsEmitted: 0,
+        a5AlertsSkippedExisting: 0,
+        a5Failures: 0,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toEqual([
+      expect.objectContaining({
+        alertKind: "A4",
+        severity: "high",
+        audience: "treasurer",
+        subjectKind: "liquidity_projection",
+        subjectId: orgId,
+        payload: expect.objectContaining({ month: "2026-08" }),
+      }),
+    ]);
+    expect(insertedRows(fakeDb, auditLogEntry)).toEqual([
+      expect.objectContaining({ actionKind: "alert.liquidity_low_margin.emit" }),
+    ]);
+  });
+
+  it("emits A5 for share-out commitments above projected cash and dedupes by org year", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [],
+      [],
+      [],
+      [{
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        orgId,
+        alertKind: "A5",
+        subjectKind: "year_end_share_out",
+        subjectId: orgId,
+        payload: { year: 2027 },
+        dedupWindowEnd: new Date("2026-07-13T00:00:00.000Z"),
+        createdAt: new Date("2026-07-06T00:00:00.000Z"),
+      }],
+    ], [[
+      { year: 2026, commitment: "500.0000", projected_available: "300.0000" },
+      { year: 2027, commitment: "600.0000", projected_available: "100.0000" },
+    ]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a4OrgsScanned: 1,
+        a4MonthsScanned: 0,
+        a4AlertsEmitted: 0,
+        a4AlertsSkippedExisting: 0,
+        a4Failures: 0,
+        a5CommitmentsScanned: 2,
+        a5AlertsEmitted: 1,
+        a5AlertsSkippedExisting: 1,
+        a5Failures: 0,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toEqual([
+      expect.objectContaining({
+        alertKind: "A5",
+        severity: "high",
+        audience: "treasurer",
+        subjectKind: "year_end_share_out",
+        subjectId: orgId,
+        payload: expect.objectContaining({ year: 2026, commitment: "500.0000", projectedAvailable: "300.0000" }),
+      }),
+    ]);
+    expect(insertedRows(fakeDb, auditLogEntry)).toEqual([
+      expect.objectContaining({ actionKind: "alert.shareout_commitment.emit" }),
+    ]);
+  });
+
   it("lists only currently visible alerts and counts them", async () => {
     const now = new Date("2026-07-03T00:00:00.000Z");
     const fakeDb = new FakeDb([

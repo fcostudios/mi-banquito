@@ -4,10 +4,12 @@ const mocks = vi.hoisted(() => ({
   createAlertsService: vi.fn(),
   emitCloseOverdueAlerts: vi.fn(),
   emitSprint6DailyAlerts: vi.fn(),
+  emitSprint7DailyAlerts: vi.fn(),
   createCompensationService: vi.fn(),
   awardDueTreasurerCompensation: vi.fn(),
   insert: vi.fn(),
   values: vi.fn(),
+  execute: vi.fn(),
 }));
 
 vi.mock("@mi-banquito/domain", () => ({
@@ -18,6 +20,7 @@ vi.mock("@mi-banquito/domain", () => ({
 
 vi.mock("@mi-banquito/db", () => ({
   db: {
+    execute: mocks.execute,
     insert: mocks.insert,
   },
 }));
@@ -36,6 +39,7 @@ const routes = [
 ] as const;
 
 beforeEach(() => {
+  mocks.execute.mockResolvedValue(undefined);
   mocks.values.mockResolvedValue(undefined);
   mocks.insert.mockReturnValue({
     values: mocks.values,
@@ -63,9 +67,22 @@ beforeEach(() => {
     skippedExisting: 0,
     failures: [],
   });
+  mocks.emitSprint7DailyAlerts.mockResolvedValue({
+    a4OrgsScanned: 1,
+    a4MonthsScanned: 12,
+    a4AlertsEmitted: 1,
+    a4AlertsSkippedExisting: 2,
+    a4Failures: 0,
+    a5CommitmentsScanned: 1,
+    a5AlertsEmitted: 1,
+    a5AlertsSkippedExisting: 1,
+    a5Failures: 0,
+    failures: [],
+  });
   mocks.createAlertsService.mockReturnValue({
     emitCloseOverdueAlerts: mocks.emitCloseOverdueAlerts,
     emitSprint6DailyAlerts: mocks.emitSprint6DailyAlerts,
+    emitSprint7DailyAlerts: mocks.emitSprint7DailyAlerts,
   });
   mocks.createCompensationService.mockReturnValue({
     awardDueTreasurerCompensation: mocks.awardDueTreasurerCompensation,
@@ -130,6 +147,15 @@ describe("daily cron route", () => {
           sprint6PendingReconciliationAlertsEmitted: 1,
           sprint6LoanDueSoonAlertsEmitted: 2,
           sprint6ContributionLateAlertsEmitted: 3,
+          sprint7A4OrgsScanned: 1,
+          sprint7A4MonthsScanned: 12,
+          sprint7A4AlertsEmitted: 1,
+          sprint7A4AlertsSkippedExisting: 2,
+          sprint7A4Failures: 0,
+          sprint7A5CommitmentsScanned: 1,
+          sprint7A5AlertsEmitted: 1,
+          sprint7A5AlertsSkippedExisting: 1,
+          sprint7A5Failures: 0,
           failures: [],
         },
       });
@@ -137,6 +163,9 @@ describe("daily cron route", () => {
         today: expect.any(Date),
       });
       expect(mocks.emitSprint6DailyAlerts).toHaveBeenCalledWith({
+        today: expect.any(Date),
+      });
+      expect(mocks.emitSprint7DailyAlerts).toHaveBeenCalledWith({
         today: expect.any(Date),
       });
     } else {

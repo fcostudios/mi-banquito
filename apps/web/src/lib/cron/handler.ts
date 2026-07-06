@@ -52,6 +52,15 @@ export type CronRunSummary = {
   sprint6PendingReconciliationAlertsEmitted?: number;
   sprint6LoanDueSoonAlertsEmitted?: number;
   sprint6ContributionLateAlertsEmitted?: number;
+  sprint7A4OrgsScanned?: number;
+  sprint7A4MonthsScanned?: number;
+  sprint7A4AlertsEmitted?: number;
+  sprint7A4AlertsSkippedExisting?: number;
+  sprint7A4Failures?: number;
+  sprint7A5CommitmentsScanned?: number;
+  sprint7A5AlertsEmitted?: number;
+  sprint7A5AlertsSkippedExisting?: number;
+  sprint7A5Failures?: number;
   failures: Array<{ orgId: string; loanId?: string; message: string }>;
 };
 
@@ -447,6 +456,15 @@ async function runTreasurerCompensationCron(
     sprint6PendingReconciliationAlertsEmitted: 0,
     sprint6LoanDueSoonAlertsEmitted: 0,
     sprint6ContributionLateAlertsEmitted: 0,
+    sprint7A4OrgsScanned: 0,
+    sprint7A4MonthsScanned: 0,
+    sprint7A4AlertsEmitted: 0,
+    sprint7A4AlertsSkippedExisting: 0,
+    sprint7A4Failures: 0,
+    sprint7A5CommitmentsScanned: 0,
+    sprint7A5AlertsEmitted: 0,
+    sprint7A5AlertsSkippedExisting: 0,
+    sprint7A5Failures: 0,
     failures: [],
   };
 
@@ -480,6 +498,22 @@ async function runTreasurerCompensationCron(
       summary.sprint6LoanDueSoonAlertsEmitted = sprint6Alerts.loanDueSoonAlertsEmitted;
       summary.sprint6ContributionLateAlertsEmitted = sprint6Alerts.contributionLateAlertsEmitted;
       summary.failures.push(...sprint6Alerts.failures);
+
+      await refreshDerivedViews();
+      const sprint7Alerts = await createAlertsService().emitSprint7DailyAlerts({
+        today: new Date(`${today}T00:00:00.000Z`),
+      });
+      summary.orgsProcessed = Math.max(summary.orgsProcessed, sprint7Alerts.a4OrgsScanned);
+      summary.sprint7A4OrgsScanned = sprint7Alerts.a4OrgsScanned;
+      summary.sprint7A4MonthsScanned = sprint7Alerts.a4MonthsScanned;
+      summary.sprint7A4AlertsEmitted = sprint7Alerts.a4AlertsEmitted;
+      summary.sprint7A4AlertsSkippedExisting = sprint7Alerts.a4AlertsSkippedExisting;
+      summary.sprint7A4Failures = sprint7Alerts.a4Failures;
+      summary.sprint7A5CommitmentsScanned = sprint7Alerts.a5CommitmentsScanned;
+      summary.sprint7A5AlertsEmitted = sprint7Alerts.a5AlertsEmitted;
+      summary.sprint7A5AlertsSkippedExisting = sprint7Alerts.a5AlertsSkippedExisting;
+      summary.sprint7A5Failures = sprint7Alerts.a5Failures;
+      summary.failures.push(...sprint7Alerts.failures);
     }
   } catch (error) {
     summary.failures.push({
