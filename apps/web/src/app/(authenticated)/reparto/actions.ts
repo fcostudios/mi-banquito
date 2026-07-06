@@ -1,15 +1,31 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createShareOutService } from "@mi-banquito/domain";
 
 import { requireTreasurer } from "@/lib/auth/require-session";
 import { uploadYearEndArtifact } from "@/lib/year-end-artifact";
 
+function redirectKnownDraftError(error: unknown): never {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message === "surplus_governance_decision_required") {
+    redirect("/reparto?error=governance-required");
+  }
+  if (message === "year_end_period_close_required") {
+    redirect("/reparto?error=year-end-close-required");
+  }
+  redirect("/reparto?error=draft-failed");
+}
+
 export async function runShareOutDraftAction(formData: FormData) {
   const session = await requireTreasurer();
   const year = Number(formData.get("year"));
-  await createShareOutService().runDraft({ orgId: session.orgId, actorId: session.actorId, year });
+  try {
+    await createShareOutService().runDraft({ orgId: session.orgId, actorId: session.actorId, year });
+  } catch (error) {
+    redirectKnownDraftError(error);
+  }
   revalidatePath("/reparto");
 }
 

@@ -268,8 +268,11 @@
     "description": "Revisa la decisión aprobada, calcula el reparto y aprueba cuando cuadre.",
     "governanceTitle": "Decisión de gobernanza requerida",
     "governanceDescription": "El reparto usa la decisión aprobada del año y el cierre anual archivado.",
-    "calculate": "Calcular reparto {{year}}",
+    "calculate": "Generar reparto {{year}}",
     "empty": "Aún no hay un borrador de reparto para {{year}}.",
+    "governanceRequiredError": "Antes de generar el reparto, registra y aprueba la decisión de gobernanza del año.",
+    "yearEndCloseRequiredError": "Antes de generar el reparto, cierra el período anual correspondiente.",
+    "genericError": "No se pudo generar el reparto todavía.",
     "year": "Año",
     "total": "Reparto total",
     "loanPool": "Pool préstamos",
@@ -429,7 +432,13 @@
       "statusActions": "Cambios de estado",
       "currentBalance": "Saldo actual",
       "shareBalance": "Compartir saldo por WhatsApp",
-      "generateStatement": "Generar estado de cuenta"
+      "generateStatement": "Generar estado de cuenta",
+      "searchLabel": "Buscar socias",
+      "searchAction": "Buscar",
+      "searchPlaceholder": "Nombre de la socia",
+      "statementReady": "Estado de cuenta listo.",
+      "openStatement": "Abrir estado de cuenta {{period}}",
+      "noSearchResults": "No hay socias con ese nombre."
     },
     "group": {
       "title": "Mi grupo",

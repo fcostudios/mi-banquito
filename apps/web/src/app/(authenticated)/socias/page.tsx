@@ -19,11 +19,16 @@ function stateLabel(state: string) {
 export default async function MemberListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ nueva?: string }>;
+  searchParams: Promise<{ nueva?: string; q?: string }>;
 }) {
   const session = await requireTreasurer();
   const rows = await createLedgerService().listMembersWithCompliance(session.orgId);
-  const { nueva } = await searchParams;
+  const { nueva, q } = await searchParams;
+  const searchQuery = String(q ?? "").trim();
+  const normalizedSearchQuery = searchQuery.toLocaleLowerCase("es-EC");
+  const visibleRows = normalizedSearchQuery
+    ? rows.filter((row) => row.displayName.toLocaleLowerCase("es-EC").includes(normalizedSearchQuery))
+    : rows;
   const activeCount = rows.filter((row) => row.status === "activo").length;
   const pausedCount = rows.filter((row) => row.status === "en_pausa").length;
   const inactiveCount = rows.filter((row) => row.status === "baja").length;
@@ -56,14 +61,31 @@ export default async function MemberListPage({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-md border border-border bg-surface">
+      <form className="grid gap-3 rounded-md border border-border bg-surface p-4 md:grid-cols-[1fr_auto] md:items-end" action="/socias">
+        <label className="grid gap-2 text-sm font-semibold text-text-primary" htmlFor="member-search">
+          {copy.searchLabel}
+          <input
+            id="member-search"
+            className="min-h-12 rounded-md border border-border bg-surface px-4 font-normal text-text-primary"
+            name="q"
+            placeholder={copy.searchPlaceholder}
+            defaultValue={searchQuery}
+            type="search"
+          />
+        </label>
+        <ButtonPrimary type="submit">{copy.searchAction}</ButtonPrimary>
+      </form>
+
+      <section className="overflow-hidden rounded-md border border-border bg-surface" role="list" aria-label={copy.title}>
         {rows.length === 0 ? <p className="p-5 text-text-secondary">{copy.empty}</p> : null}
-        {rows.map((row) => {
+        {rows.length > 0 && visibleRows.length === 0 ? <p className="p-5 text-text-secondary">{copy.noSearchResults}</p> : null}
+        {visibleRows.map((row) => {
           const highlighted = nueva === row.id;
           return (
             <Link
               key={row.id}
               href={`/socias/${row.id}`}
+              role="listitem"
               className={`grid min-h-20 gap-3 border-b border-border p-4 text-text-primary last:border-b-0 md:grid-cols-[1fr_auto] md:items-center ${
                 highlighted ? "bg-primary-soft" : "hover:bg-surface-muted"
               }`}
