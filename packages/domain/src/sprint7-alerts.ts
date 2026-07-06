@@ -41,7 +41,7 @@ export type BuildA6LoanPastDueAlertInput = {
   orgId: string;
   loanId: string;
   borrowerName: string;
-  borrowerKind: "member" | "external";
+  borrowerKind: "member" | "non_member";
   guarantorName?: string;
   daysLate: number;
   now: Date;

@@ -81,7 +81,7 @@ describe("Sprint 7 alert builders", () => {
       orgId: "11111111-1111-4111-8111-111111111111",
       loanId: "33333333-3333-4333-8333-333333333333",
       borrowerName: "Ana externa",
-      borrowerKind: "external",
+      borrowerKind: "non_member",
       guarantorName: "Pancho",
       daysLate: 5,
       now: new Date("2026-07-06T10:00:00.000Z"),
