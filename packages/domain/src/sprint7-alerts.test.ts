@@ -62,7 +62,9 @@ describe("Sprint 7 alert builders", () => {
     });
 
     expect(memberAlert.audience).toBe("treasurer");
+    expect(memberAlert.dedupWindowEnd?.toISOString()).toBe("2026-07-07T10:00:00.000Z");
     expect(memberAlert.payload.copy).toBe("El préstamo de Pancho está en mora desde hace 3 días.");
+    expect(externalAlert.dedupWindowEnd?.toISOString()).toBe("2026-07-07T10:00:00.000Z");
     expect(externalAlert.payload.copy).toBe("El préstamo externo de Ana externa está en mora desde hace 5 días. Garante: Pancho.");
   });
 
@@ -92,6 +94,7 @@ describe("Sprint 7 alert builders", () => {
 
     expect(alert.alertKind).toBe("A11");
     expect(alert.severity).toBe("low");
+    expect(alert.dedupWindowEnd?.toISOString()).toBe("2026-07-13T10:00:00.000Z");
     expect(alert.payload.copy).toBe("Pancho registró 3 aportes consecutivos sin foto de comprobante.");
   });
 
