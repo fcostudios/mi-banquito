@@ -22,12 +22,16 @@ As the system, I want to emit the A8 *Período no cerrado en últimos N días* a
 | Blocked By | US-008, US-012, US-019 |
 ## Acceptance Criteria
 
-- [ ] AC-1: A daily cron checks each org; if `today - latest PeriodClose.closed_at > GroupConfig.config.close_overdue_threshold_days` (default 14), it emits an `Alert` with `alert_kind = A8`, `severity = medium`, `audience = both`.
-- [ ] AC-2: Dedup window is 24h — at most one A8 per org per day; a re-run inside the window updates the existing alert rather than emitting a duplicate.
-- [ ] AC-3: Treasurer-side copy reads *"No has cerrado el mes en los últimos {n} días."* with `{n}` = days since the last close.
-- [ ] AC-4: Operator-side, the `/admin` per-org snapshot shows a row *"Org {id} — no monthly close in {n} days."* (audience=both surfaces in both the treasurer bell and the operator console).
-- [ ] AC-5: When the org has never closed a period, the threshold is measured from a sensible baseline (org/first-cycle creation) so a brand-new org does not immediately alert before its first close is due.
-- [ ] AC-6: The alert is cleared/auto-dismissed once a `PeriodClose` brings the org back within the threshold; emission writes an `AuditLogEntry`.
+- [x] AC-1: A daily cron checks each org; if `today - latest PeriodClose.closed_at > GroupConfig.config.close_overdue_threshold_days` (default 14), it emits an `Alert` with `alert_kind = A8`, `severity = medium`, `audience = both`.
+- [x] AC-2: Dedup window is 24h — at most one A8 per org per day; a re-run inside the window updates the existing alert rather than emitting a duplicate.
+- [x] AC-3: Treasurer-side copy reads *"No has cerrado el mes en los últimos {n} días."* with `{n}` = days since the last close.
+- [x] AC-4: Operator-side, the `/admin` per-org snapshot shows a row *"Org {id} — no monthly close in {n} days."* (audience=both surfaces in both the treasurer bell and the operator console).
+- [x] AC-5: When the org has never closed a period, the threshold is measured from a sensible baseline (org/first-cycle creation) so a brand-new org does not immediately alert before its first close is due.
+- [x] AC-6: The alert is cleared/auto-dismissed once a `PeriodClose` brings the org back within the threshold; emission writes an `AuditLogEntry`.
+
+## Closeout
+
+Closed in Sprint 5 monthly-close slice. Verified by alert domain tests, admin snapshot implementation, and cron route coverage.
 
 ## Technical Notes
 - **Data model:** `Alert` (`alerts_context`): `org_id`, `alert_kind` (A8), `severity` (medium), `audience` (both), `payload` (jsonb: days-since-close `n`), `dedup_window_end` (24h). Reads `PeriodClose.closed_at` (latest per org) and `GroupConfig.config.close_overdue_threshold_days` (default 14). No new migration if `Alert`/`GroupConfig` exist from US-008.

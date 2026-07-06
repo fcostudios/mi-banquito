@@ -25,11 +25,15 @@ As a member or president, I want to read a PDF that explains itself, so that dis
 ## Acceptance Criteria
 
 - [ ] AC-1 (per-member monthly PDF, extends US-048): includes an opening-balance row, the month-over-month delta, each contribution/withdrawal with its `SlipPhoto` reference URL, the closing balance, the treasurer's name, and the group's bank-account last-4 digits.
-- [ ] AC-2 (monthly-close PDF, extends US-047): includes a per-member month-net summary table, an open-loans-with-next-due roster, an active-alerts snapshot, the annotated discrepancy with `resolution_note`, and a president-friendly headline (F21).
+- [x] AC-2 (monthly-close PDF, extends US-047): includes a per-member month-net summary table, an open-loans-with-next-due roster, an active-alerts snapshot, the annotated discrepancy with `resolution_note`, and a president-friendly headline (F21).
 - [ ] AC-3 (year-end per-member PDF, extends US-053): includes accumulated savings, saldo ponderado (USD-días), the group total USD-días, the member's share %, a 3-line plain-Spanish explanation ("Tu participación es proporcional al tiempo que tu dinero estuvo en el fondo durante el año, no al saldo acumulado."), and any applied override + motivo.
-- [ ] AC-4: All three sections render via the extended `organism.pdf-statement-template` using design-system tokens; copy is es-EC.
+- [x] AC-4: All three sections render via the extended `organism.pdf-statement-template` using design-system tokens; copy is es-EC.
 - [ ] AC-5: Adding these content sections does not change the canonical-JSON + SHA-256 hashing contract (US-047) other than incorporating the new payload fields — generation stays deterministic and idempotent (UPSERT on the natural key) so re-render of identical data yields an identical hash.
 - [ ] AC-6: PDF generation (a system action) emits its `AuditLogEntry` in the same transaction as the `StatementArchive` write (NFR-SEC-04).
+
+## Closeout
+
+Carry over to Sprint 6. Sprint 5 completed the monthly-close enrichment and shared PDF template coverage. AC-1 and AC-3 remain open because live `member_monthly` and `year_end` archive generation depends on US-048 and US-053. AC-5 and AC-6 remain open for the carried-over generators.
 
 ## Technical Notes
 - **Data model:** no new entity — extends the payloads written to `StatementArchive` for `kind ∈ {member_monthly, monthly_close, year_end}`. Reads `SlipPhoto` URLs, member balances, open `Loan`/`LoanSchedule`, `Alert` snapshot, `ReconciliationCycle.resolution_note`, and year-end `saldo_ponderado_usd_dias` / share %.
