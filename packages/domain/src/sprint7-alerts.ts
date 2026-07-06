@@ -188,7 +188,7 @@ export function buildA4LiquidityLowMarginAlert(input: BuildA4LiquidityLowMarginA
 
 export function buildA5ShareOutCommitmentAlert(input: BuildA5ShareOutCommitmentAlertInput): Sprint7AlertInsert {
   const shortfall = cents(input.commitment) - cents(input.projectedAvailable);
-  const copy = `El compromiso de reparto ${input.year} excede la proyección disponible por ${money(shortfall)}.`;
+  const copy = `El compromiso de reparto ${input.year} es ${money(cents(input.commitment))}; la proyección disponible es ${money(cents(input.projectedAvailable))}; faltan ${money(shortfall)}.`;
   return baseAlert({
     orgId: input.orgId,
     alertKind: "A5",
