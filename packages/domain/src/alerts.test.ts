@@ -17,6 +17,10 @@ class FakeSelectBuilder {
     return this;
   }
 
+  innerJoin() {
+    return this;
+  }
+
   where() {
     return this;
   }
@@ -57,9 +61,11 @@ class FakeInsertBuilder {
 class FakeDb {
   readonly inserts: InsertRecord[] = [];
   private readonly selectResults: unknown[][];
+  private readonly executeResults: unknown[][];
 
-  constructor(selectResults: unknown[][] = []) {
+  constructor(selectResults: unknown[][] = [], executeResults: unknown[][] = []) {
     this.selectResults = [...selectResults];
+    this.executeResults = [...executeResults];
   }
 
   select() {
@@ -68,6 +74,10 @@ class FakeDb {
 
   insert(table: unknown) {
     return new FakeInsertBuilder(table, this.inserts);
+  }
+
+  execute() {
+    return Promise.resolve({ rows: this.executeResults.shift() ?? [] });
   }
 }
 
@@ -199,6 +209,138 @@ describe("alerts", () => {
         body: "María debe $15.00",
       })).toBe("Mi Banquito: Préstamo en mora. María debe $15.00");
     });
+  });
+
+  it("builds A1 pending reconciliation copy for the prior month", async () => {
+    await withMockedDb(new FakeDb(), async () => {
+      const { pendingReconciliationAlertPayload } = await import("./alerts");
+      expect(pendingReconciliationAlertPayload({ prevMonth: "junio 2026" })).toEqual({
+        title: "Conciliación pendiente",
+        body: "El mes de junio 2026 aún no está cerrado. Te recomiendo cerrar antes de la próxima reunión.",
+        prevMonth: "junio 2026",
+      });
+    });
+  });
+
+  it("builds A2 loan due soon copy with member and outstanding balance", async () => {
+    await withMockedDb(new FakeDb(), async () => {
+      const { loanDueSoonAlertPayload } = await import("./alerts");
+      expect(loanDueSoonAlertPayload({ member: "Ana Mora", outstanding: "125.50" })).toEqual({
+        title: "Préstamo próximo a vencer",
+        body: "El préstamo de Ana Mora vence en 7 días. Saldo actual: USD 125.50.",
+        member: "Ana Mora",
+        outstanding: "125.50",
+      });
+    });
+  });
+
+  it("builds A3 late contribution copy with month, member, and days", async () => {
+    await withMockedDb(new FakeDb(), async () => {
+      const { contributionLateAlertPayload } = await import("./alerts");
+      expect(contributionLateAlertPayload({ month: "julio 2026", member: "Ana Mora", days: 8 })).toEqual({
+        title: "Aporte atrasado",
+        body: "El aporte de julio 2026 de Ana Mora está atrasado por 8 días.",
+        month: "julio 2026",
+        member: "Ana Mora",
+        days: 8,
+      });
+    });
+  });
+
+  it("emits A1/A2/A3 Sprint 6 daily alerts and counts dedup skips", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const loanId = "22222222-2222-4222-8222-222222222222";
+    const memberId = "33333333-3333-4333-8333-333333333333";
+    const duplicateMemberId = "44444444-4444-4444-8444-444444444444";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [],
+      [],
+      [],
+      [],
+      [{
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        orgId,
+        alertKind: "A3",
+        severity: "medium",
+        audience: "treasurer",
+        subjectKind: "member",
+        subjectId: duplicateMemberId,
+        payload: {},
+        dedupWindowEnd: new Date("2026-07-06T00:00:00.000Z"),
+        createdAt: new Date("2026-07-05T00:00:00.000Z"),
+      }],
+    ], [
+      [{ loan_id: loanId, member: "Ana Mora", outstanding: "125.5" }],
+      [
+        { member_id: memberId, display_name: "Ana Mora", closes_on: "2026-07-01" },
+        { member_id: duplicateMemberId, display_name: "Bea Solis", closes_on: "2026-07-01" },
+      ],
+    ]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint6DailyAlerts({
+        today: new Date("2026-07-05T12:00:00.000Z"),
+      })).resolves.toEqual({
+        pendingReconciliationAlertsEmitted: 1,
+        loanDueSoonAlertsEmitted: 1,
+        contributionLateAlertsEmitted: 1,
+        skippedExisting: 1,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toEqual([
+      expect.objectContaining({
+        alertKind: "A1",
+        severity: "high",
+        audience: "treasurer",
+        subjectKind: "contribution_cycle",
+        subjectId: orgId,
+        payload: expect.objectContaining({ prevMonth: "junio 2026" }),
+      }),
+      expect.objectContaining({
+        alertKind: "A2",
+        severity: "medium",
+        audience: "treasurer",
+        subjectKind: "loan",
+        subjectId: loanId,
+        payload: expect.objectContaining({ member: "Ana Mora", outstanding: "125.50" }),
+      }),
+      expect.objectContaining({
+        alertKind: "A3",
+        severity: "medium",
+        audience: "treasurer",
+        subjectKind: "member",
+        subjectId: memberId,
+        payload: expect.objectContaining({ month: "julio 2026", member: "Ana Mora", days: 4 }),
+      }),
+    ]);
+  });
+
+  it("skips A1 when the prior month is already closed", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" }],
+      [],
+    ], [[], []]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint6DailyAlerts({
+        today: new Date("2026-07-05T12:00:00.000Z"),
+      })).resolves.toEqual({
+        pendingReconciliationAlertsEmitted: 0,
+        loanDueSoonAlertsEmitted: 0,
+        contributionLateAlertsEmitted: 0,
+        skippedExisting: 1,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toHaveLength(0);
   });
 
   it("lists only currently visible alerts and counts them", async () => {

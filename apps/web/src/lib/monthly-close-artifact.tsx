@@ -1,9 +1,9 @@
 import React from "react";
-import { put } from "@vercel/blob";
 import { Document, Page, StyleSheet, Text, View, pdf } from "@react-pdf/renderer";
 import type { MonthlyCloseArtifactInput, MonthlyCloseArtifactResult } from "@mi-banquito/domain";
 
 import messages from "@/lib/i18n/en-US.json";
+import { writePrivateStatementArtifact } from "./statement-artifact";
 
 const copy = messages.monthlyClose;
 
@@ -115,16 +115,15 @@ function MonthlyCloseDocument({ input }: { input: MonthlyCloseArtifactInput }) {
 
 export async function uploadMonthlyCloseArtifact(input: MonthlyCloseArtifactInput): Promise<MonthlyCloseArtifactResult> {
   const blob = await pdf(<MonthlyCloseDocument input={input} />).toBlob();
-  const pathname = `monthly-close/${input.orgId}/${input.canonicalPayloadHash}.pdf`;
-  await put(pathname, blob, {
-    access: "private",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/pdf",
+  const artifact = await writePrivateStatementArtifact({
+    folder: "monthly-close",
+    orgId: input.orgId,
+    canonicalPayloadHash: input.canonicalPayloadHash,
+    pdfBytes: blob,
   });
 
   return {
-    pdfUri: `/statement-archive/monthly-close/${input.canonicalPayloadHash}.pdf`,
-    byteSize: blob.size,
+    pdfUri: artifact.pdfUri,
+    byteSize: artifact.byteSize,
   };
 }

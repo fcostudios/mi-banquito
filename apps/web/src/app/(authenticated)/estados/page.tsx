@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { createReportingService } from "@mi-banquito/domain";
+import { ButtonPrimary } from "@mi-banquito/ui";
 
 import { requireTreasurer } from "@/lib/auth/require-session";
 import { ecDate } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
+import { generateMemberStatementsAction, shareStatementAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,8 @@ const copy = messages.statementArchive;
 export default async function ScrStatementsArchivePage() {
   const session = await requireTreasurer();
   const rows = await createReportingService().listStatementArchive(session.orgId);
+  const latestPeriodClose = rows.find((row) => row.kind === "monthly_close" && row.periodCloseId);
+  const memberRows = rows.filter((row) => row.kind === "monthly_member");
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6" data-screen="SCR-statements-archive">
@@ -20,6 +24,15 @@ export default async function ScrStatementsArchivePage() {
         <h1 className="text-2xl font-bold text-text-primary">{pageCopy.title}</h1>
         <p className="mt-2 text-text-secondary">{copy.description}</p>
       </div>
+
+      {latestPeriodClose?.periodCloseId ? (
+        <form action={generateMemberStatementsAction} className="rounded-md border border-border bg-surface p-4">
+          <input type="hidden" name="periodCloseId" value={latestPeriodClose.periodCloseId} />
+          <ButtonPrimary type="submit">
+            {copy.generateMemberStatements.replace("{{period}}", latestPeriodClose.periodLabel)}
+          </ButtonPrimary>
+        </form>
+      ) : null}
 
       {rows.length === 0 ? (
         <p className="rounded-md border border-border bg-surface p-4 text-sm text-text-secondary">{copy.empty}</p>
@@ -46,6 +59,12 @@ export default async function ScrStatementsArchivePage() {
                     <Link className="text-primary underline-offset-4 hover:underline" href={row.pdfUri}>
                       {copy.openPdf}
                     </Link>
+                    {row.kind === "monthly_member" ? (
+                      <form action={shareStatementAction} className="mt-2">
+                        <input type="hidden" name="statementArchiveId" value={row.id} />
+                        <ButtonPrimary type="submit">{copy.shareWhatsapp}</ButtonPrimary>
+                      </form>
+                    ) : null}
                   </td>
                 </tr>
               ))}
@@ -53,6 +72,12 @@ export default async function ScrStatementsArchivePage() {
           </table>
         </div>
       )}
+
+      {memberRows.length > 0 ? (
+        <p className="text-sm text-text-secondary">
+          {copy.memberStatementsReady.replace("{{count}}", String(memberRows.length))}
+        </p>
+      ) : null}
     </main>
   );
 }

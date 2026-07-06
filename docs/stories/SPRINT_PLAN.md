@@ -220,16 +220,16 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |
 |---|-------|-------|------|------|---------------|-----|------------|--------|----------|------|
-| 1 | full-stack | **US-051** ⬜ | Treasurer opens year-end share-out wizard with time-weighted breakdown by source | ? ?SP | `See story file` | — | US-008, US-046, US-100 | →3 | — | [r1_reporting_us_051.md](sprint-6/r1_reporting_us_051.md) |
-| 2 | full-stack | **US-058** ⬜ | Treasurer views balance for any member via partial-name search on home | ? ?SP | `See story file` | — | US-026, US-031, US-056 | — | — | [r1_ledger_us_058.md](sprint-6/r1_ledger_us_058.md) |
-| 3 | full-stack | **US-061** ⬜ | System emits A1 conciliacion pendiente alert | ? ?SP | `See story file` | — | US-008, US-012 | — | — | [r1_alerts_us_061.md](sprint-6/r1_alerts_us_061.md) |
-| 4 | full-stack | **US-062** ⬜ | System emits A2 prestamo proximo a vencer alert | ? ?SP | `See story file` | — | US-008, US-040 | →7 | — | [r1_alerts_us_062.md](sprint-6/r1_alerts_us_062.md) |
-| 5 | full-stack | **US-049** ⬜ | Treasurer shares a statement via WhatsApp share intent | ? ?SP | `See story file` | — | US-048, US-047 | →1 | — | [r1_reporting_us_049.md](sprint-6/r1_reporting_us_049.md) |
-| 6 | full-stack | **US-059** ⬜ | Member receives statement via WhatsApp from treasurer | ? ?SP | `See story file` | — | US-049 | →2 | — | [r1_artifact_us_059.md](sprint-6/r1_artifact_us_059.md) |
-| 7 | full-stack | **US-063** ⬜ | System emits A3 aporte atrasado alert | ? ?SP | `See story file` | — | US-062, US-008, US-031 | →4 | — | [r1_alerts_us_063.md](sprint-6/r1_alerts_us_063.md) |
-| 8 | full-stack | **US-048** ⬜ | Treasurer generates per-member statements as a batch and individually | ? ?SP | `See story file` | — | US-046, US-047, US-062 | →2 | — | [r1_reporting_us_048.md](sprint-6/r1_reporting_us_048.md) |
-| 9 | full-stack | **US-052** ⬜ | Treasurer overrides a per-member share with required reason and audit | ? ?SP | `See story file` | — | US-051, US-113, US-048 | →1 | — | [r1_reporting_us_052.md](sprint-6/r1_reporting_us_052.md) |
-| 10 | full-stack | **US-053** ⬜ | Treasurer approves year-end share-out which writes payouts and PDFs | ? ?SP | `See story file` | — | US-051, US-052, US-105 | →2 | — | [r1_reporting_us_053.md](sprint-6/r1_reporting_us_053.md) |
+| 1 | full-stack | **US-051** ✅ | Treasurer opens year-end share-out wizard with time-weighted breakdown by source | ? ?SP | `See story file` | — | US-008, US-046, US-100 | →3 | — | [r1_reporting_us_051.md](sprint-6/r1_reporting_us_051.md) |
+| 2 | full-stack | **US-058** ✅ | Treasurer views balance for any member via partial-name search on home | ? ?SP | `See story file` | — | US-026, US-031, US-056 | — | — | [r1_ledger_us_058.md](sprint-6/r1_ledger_us_058.md) |
+| 3 | full-stack | **US-061** ✅ | System emits A1 conciliacion pendiente alert | ? ?SP | `See story file` | — | US-008, US-012 | — | — | [r1_alerts_us_061.md](sprint-6/r1_alerts_us_061.md) |
+| 4 | full-stack | **US-062** ✅ | System emits A2 prestamo proximo a vencer alert | ? ?SP | `See story file` | — | US-008, US-040 | →7 | — | [r1_alerts_us_062.md](sprint-6/r1_alerts_us_062.md) |
+| 5 | full-stack | **US-049** ✅ | Treasurer shares a statement via WhatsApp share intent | ? ?SP | `See story file` | — | US-048, US-047 | →1 | — | [r1_reporting_us_049.md](sprint-6/r1_reporting_us_049.md) |
+| 6 | full-stack | **US-059** ✅ | Member receives statement via WhatsApp from treasurer | ? ?SP | `See story file` | — | US-049 | →2 | — | [r1_artifact_us_059.md](sprint-6/r1_artifact_us_059.md) |
+| 7 | full-stack | **US-063** ✅ | System emits A3 aporte atrasado alert | ? ?SP | `See story file` | — | US-062, US-008, US-031 | →4 | — | [r1_alerts_us_063.md](sprint-6/r1_alerts_us_063.md) |
+| 8 | full-stack | **US-048** ✅ | Treasurer generates per-member statements as a batch and individually | ? ?SP | `See story file` | — | US-046, US-047, US-062 | →2 | — | [r1_reporting_us_048.md](sprint-6/r1_reporting_us_048.md) |
+| 9 | full-stack | **US-052** ✅ | Treasurer overrides a per-member share with required reason and audit | ? ?SP | `See story file` | — | US-051, US-113, US-048 | →1 | — | [r1_reporting_us_052.md](sprint-6/r1_reporting_us_052.md) |
+| 10 | full-stack | **US-053** ✅ | Treasurer approves year-end share-out which writes payouts and PDFs | ? ?SP | `See story file` | — | US-051, US-052, US-105 | →2 | — | [r1_reporting_us_053.md](sprint-6/r1_reporting_us_053.md) |
 
 ### References
 

@@ -1,0 +1,75 @@
+import "@testing-library/jest-dom/vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+import ScrMemberDetailPage from "./page";
+
+vi.mock("@/lib/auth/require-session", () => ({
+  requireTreasurer: () => Promise.resolve({
+    orgId: "11111111-1111-4111-8111-111111111111",
+    actorId: "33333333-3333-4333-8333-333333333333",
+  }),
+}));
+
+vi.mock("./actions", () => ({
+  transitionMemberStatusAction: vi.fn(),
+}));
+
+vi.mock("../../estados/actions", () => ({
+  generateMemberStatementsAction: vi.fn(),
+}));
+
+const getMember = vi.fn();
+const getMemberBalance = vi.fn();
+const listStatementArchive = vi.fn();
+
+vi.mock("@mi-banquito/domain", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@mi-banquito/domain")>();
+  return {
+    ...actual,
+    createLedgerService: () => ({
+      getMember,
+      getMemberBalance,
+    }),
+    createReportingService: () => ({
+      listStatementArchive,
+    }),
+  };
+});
+
+describe("ScrMemberDetailPage", () => {
+  it("shows the prominent current balance and WhatsApp share affordance", async () => {
+    getMember.mockResolvedValueOnce({
+      id: "22222222-2222-4222-8222-222222222222",
+      orgId: "11111111-1111-4111-8111-111111111111",
+      displayName: "Ana Mora",
+      status: "activo",
+      role: "aportante",
+      initialSavingsBalance: "40.0000",
+    });
+    getMemberBalance.mockResolvedValueOnce({
+      memberId: "22222222-2222-4222-8222-222222222222",
+      displayName: "Ana Mora",
+      currentBalance: "120.5000",
+      state: "al_dia",
+      whatsappNumber: "+593991234567",
+      balanceShareUrl: "https://wa.me/593991234567?text=saldo",
+    });
+    listStatementArchive.mockResolvedValueOnce([{
+      id: "close-1",
+      kind: "monthly_close",
+      periodCloseId: "period-close-1",
+      periodLabel: "2026-06",
+    }]);
+
+    render(await ScrMemberDetailPage({ params: Promise.resolve({ id: "22222222-2222-4222-8222-222222222222" }) }));
+
+    expect(screen.getByRole("heading", { name: "Ana Mora" })).toBeInTheDocument();
+    expect(screen.getByText("Saldo actual")).toBeInTheDocument();
+    expect(screen.getByText("USD 120.50")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Compartir saldo por WhatsApp" })).toHaveAttribute("href", "https://wa.me/593991234567?text=saldo");
+    expect(screen.getByRole("button", { name: "Generar estado de cuenta" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pausar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dar de baja" })).toBeInTheDocument();
+  });
+});

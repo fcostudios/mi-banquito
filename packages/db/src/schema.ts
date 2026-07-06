@@ -556,6 +556,34 @@ export const memberComplianceState = pgMaterializedView("mv_member_compliance_st
   memberId: uuid("member_id").notNull(),
   displayName: text("display_name").notNull(),
   state: text("state").notNull(),
+  currentBalance: numeric("current_balance", { precision: 18, scale: 4 }).notNull(),
+  refreshedAt: timestamp("refreshed_at").notNull(),
+}).existing();
+
+export const memberTimeWeightedBalance = pgMaterializedView("mv_member_time_weighted_balance", {
+  orgId: uuid("org_id").notNull(),
+  memberId: uuid("member_id").notNull(),
+  fiscalYear: integer("fiscal_year").notNull(),
+  accumulatedSavings: numeric("accumulated_savings", { precision: 18, scale: 4 }).notNull(),
+  saldoPonderadoUsdDias: numeric("saldo_ponderado_usd_dias", { precision: 18, scale: 4 }).notNull(),
+  refreshedAt: timestamp("refreshed_at").notNull(),
+}).existing();
+
+export const loanActivityPoints = pgMaterializedView("mv_loan_activity_points", {
+  orgId: uuid("org_id").notNull(),
+  memberId: uuid("member_id").notNull(),
+  fiscalYear: integer("fiscal_year").notNull(),
+  loanActivityBasis: numeric("loan_activity_basis", { precision: 18, scale: 4 }).notNull(),
+  refreshedAt: timestamp("refreshed_at").notNull(),
+}).existing();
+
+export const distributableSurplus = pgMaterializedView("mv_distributable_surplus", {
+  orgId: uuid("org_id").notNull(),
+  fiscalYear: integer("fiscal_year").notNull(),
+  interestTotal: numeric("interest_total", { precision: 18, scale: 4 }).notNull(),
+  feesTotal: numeric("fees_total", { precision: 18, scale: 4 }).notNull(),
+  cxcAnterior: numeric("cxc_anterior", { precision: 18, scale: 4 }).notNull(),
+  distributableSurplus: numeric("distributable_surplus", { precision: 18, scale: 4 }).notNull(),
   refreshedAt: timestamp("refreshed_at").notNull(),
 }).existing();
 

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createAlertsService: vi.fn(),
   emitCloseOverdueAlerts: vi.fn(),
+  emitSprint6DailyAlerts: vi.fn(),
   createCompensationService: vi.fn(),
   awardDueTreasurerCompensation: vi.fn(),
   insert: vi.fn(),
@@ -55,8 +56,16 @@ beforeEach(() => {
     alertsCleared: 0,
     failures: [],
   });
+  mocks.emitSprint6DailyAlerts.mockResolvedValue({
+    pendingReconciliationAlertsEmitted: 1,
+    loanDueSoonAlertsEmitted: 2,
+    contributionLateAlertsEmitted: 3,
+    skippedExisting: 0,
+    failures: [],
+  });
   mocks.createAlertsService.mockReturnValue({
     emitCloseOverdueAlerts: mocks.emitCloseOverdueAlerts,
+    emitSprint6DailyAlerts: mocks.emitSprint6DailyAlerts,
   });
   mocks.createCompensationService.mockReturnValue({
     awardDueTreasurerCompensation: mocks.awardDueTreasurerCompensation,
@@ -118,10 +127,16 @@ describe("daily cron route", () => {
           closeOverdueAlertsEmitted: 1,
           closeOverdueAlertsSkippedExisting: 0,
           closeOverdueAlertsCleared: 0,
+          sprint6PendingReconciliationAlertsEmitted: 1,
+          sprint6LoanDueSoonAlertsEmitted: 2,
+          sprint6ContributionLateAlertsEmitted: 3,
           failures: [],
         },
       });
       expect(mocks.emitCloseOverdueAlerts).toHaveBeenCalledWith({
+        today: expect.any(Date),
+      });
+      expect(mocks.emitSprint6DailyAlerts).toHaveBeenCalledWith({
         today: expect.any(Date),
       });
     } else {

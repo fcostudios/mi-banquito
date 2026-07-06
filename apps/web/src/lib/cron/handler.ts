@@ -49,6 +49,9 @@ export type CronRunSummary = {
   closeOverdueAlertsEmitted?: number;
   closeOverdueAlertsSkippedExisting?: number;
   closeOverdueAlertsCleared?: number;
+  sprint6PendingReconciliationAlertsEmitted?: number;
+  sprint6LoanDueSoonAlertsEmitted?: number;
+  sprint6ContributionLateAlertsEmitted?: number;
   failures: Array<{ orgId: string; loanId?: string; message: string }>;
 };
 
@@ -441,6 +444,9 @@ async function runTreasurerCompensationCron(
     closeOverdueAlertsEmitted: 0,
     closeOverdueAlertsSkippedExisting: 0,
     closeOverdueAlertsCleared: 0,
+    sprint6PendingReconciliationAlertsEmitted: 0,
+    sprint6LoanDueSoonAlertsEmitted: 0,
+    sprint6ContributionLateAlertsEmitted: 0,
     failures: [],
   };
 
@@ -466,6 +472,14 @@ async function runTreasurerCompensationCron(
       summary.closeOverdueAlertsSkippedExisting = closeOverdue.alertsSkippedExisting;
       summary.closeOverdueAlertsCleared = closeOverdue.alertsCleared;
       summary.failures.push(...closeOverdue.failures);
+
+      const sprint6Alerts = await createAlertsService().emitSprint6DailyAlerts({
+        today: new Date(`${today}T00:00:00.000Z`),
+      });
+      summary.sprint6PendingReconciliationAlertsEmitted = sprint6Alerts.pendingReconciliationAlertsEmitted;
+      summary.sprint6LoanDueSoonAlertsEmitted = sprint6Alerts.loanDueSoonAlertsEmitted;
+      summary.sprint6ContributionLateAlertsEmitted = sprint6Alerts.contributionLateAlertsEmitted;
+      summary.failures.push(...sprint6Alerts.failures);
     }
   } catch (error) {
     summary.failures.push({

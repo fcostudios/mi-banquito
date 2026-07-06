@@ -21,12 +21,12 @@ As a treasurer, I want the system to alert me when a loan is about to fall due, 
 | Backstage Process | — |
 | Blocked By | US-008, US-040 |
 ## Acceptance Criteria
-- [ ] AC-1: Post-commit on `RecomputeARAging` (P8 / `mv_ar_aging`), the system scans for loans with a `LoanSchedule.due_on ≤ today + 7 days AND status = pendiente`.
-- [ ] AC-2: For each matching loan it emits an `Alert` with `alert_kind=A2`, `severity=medium`, `audience=treasurer`.
-- [ ] AC-3: The Spanish copy is: *"El préstamo de {member} vence en 7 días. Saldo actual: USD {outstanding}."* — `{member}` and `{outstanding}` resolved into the `payload` template variables.
-- [ ] AC-4: The alert de-duplicates over a 24h window — UNIQUE(`org_id`, `alert_kind`, `subject_kind`, `subject_id`, `dedup_window_end`); the same loan does not produce a duplicate within the window.
-- [ ] AC-5: Loans not within the 7-day window, or not `pendiente`, do not trigger an alert.
-- [ ] AC-6: The alert is `org_id`-scoped and surfaces on the treasurer's alert bell (30 s poll); `subject_kind=Loan`, `subject_id` = the loan.
+- [x] AC-1: Post-commit on `RecomputeARAging` (P8 / `mv_ar_aging`), the system scans for loans with a `LoanSchedule.due_on ≤ today + 7 days AND status = pendiente`.
+- [x] AC-2: For each matching loan it emits an `Alert` with `alert_kind=A2`, `severity=medium`, `audience=treasurer`.
+- [x] AC-3: The Spanish copy is: *"El préstamo de {member} vence en 7 días. Saldo actual: USD {outstanding}."* — `{member}` and `{outstanding}` resolved into the `payload` template variables.
+- [x] AC-4: The alert de-duplicates over a 24h window — UNIQUE(`org_id`, `alert_kind`, `subject_kind`, `subject_id`, `dedup_window_end`); the same loan does not produce a duplicate within the window.
+- [x] AC-5: Loans not within the 7-day window, or not `pendiente`, do not trigger an alert.
+- [x] AC-6: The alert is `org_id`-scoped and surfaces on the treasurer's alert bell (30 s poll); `subject_kind=Loan`, `subject_id` = the loan.
 
 ## Technical Notes
 - **Data model:** `Alert` (`alerts_context`, append-only) — `alert_kind=A2`, `severity=medium`, `audience=treasurer`, `subject_kind=Loan`, `payload` jsonb with `{member}`/`{outstanding}`, 24h `dedup_window_end`. Reads `LoanSchedule` (`due_on`, `status`) + `mv_ar_aging` (outstanding). No new migration unless the enum lacks `A2`.

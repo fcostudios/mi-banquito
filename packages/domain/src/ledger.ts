@@ -71,6 +71,13 @@ export type MemberComplianceRow = {
   tone: ComplianceTone;
 };
 
+export type MemberBalanceRow = {
+  memberId: string;
+  displayName: string;
+  currentBalance: string;
+  state: ComplianceState;
+};
+
 export type CashBalanceRow = {
   orgId: string;
   bankBalance: string;
@@ -251,6 +258,17 @@ export function availableCapitalAfterBaseFund(input: { poolBalance: string; base
   return money4(Number(input.poolBalance) - Number(input.baseFundPool));
 }
 
+export function buildBalanceShareUrl(input: {
+  whatsappNumber: string | null;
+  memberName: string;
+  currentBalance: string;
+}): string | null {
+  const digits = input.whatsappNumber?.replace(/\D/g, "") ?? "";
+  if (!digits) return null;
+  const message = `Hola ${input.memberName}, tu saldo actual en Mi Banquito es USD ${money2(input.currentBalance)}.`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
+
 export const buildMemberCreationLedgerPlan = (
   input: BuildMemberCreationLedgerPlanInput,
 ): MemberCreationLedgerPlan => {
@@ -406,8 +424,10 @@ export interface LedgerService {
   listMembers(orgId: string): Promise<MemberRow[]>;
   listMembersWithCompliance(orgId: string): Promise<MemberWithCompliance[]>;
   listComplianceRows(orgId: string): Promise<MemberComplianceRow[]>;
+  searchMembersWithBalance(orgId: string): Promise<MemberBalanceRow[]>;
   /** Read by id: org-scoped single row (a dynamic-route detail page calls this). */
   getMember(orgId: string, id: string): Promise<MemberRow | undefined>;
+  getMemberBalance(orgId: string, id: string): Promise<(MemberBalanceRow & { whatsappNumber: string | null; balanceShareUrl: string | null }) | undefined>;
   /** Mutation: insert a validated row. The tenant is supplied separately (from the
    *  session), never by the caller's input. */
   createMember(orgId: string, input: NewMemberInput): Promise<MemberRow>;
@@ -554,11 +574,52 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
       tone: row.complianceTone,
     }));
   },
+  async searchMembersWithBalance(orgId) {
+    const rows = await db.select({
+      memberId: memberComplianceState.memberId,
+      displayName: memberComplianceState.displayName,
+      currentBalance: memberComplianceState.currentBalance,
+      state: memberComplianceState.state,
+    }).from(memberComplianceState)
+      .where(eq(memberComplianceState.orgId, orgId))
+      .orderBy(memberComplianceState.displayName);
+    return rows.map((row) => ({
+      ...row,
+      currentBalance: String(row.currentBalance),
+      state: row.state as ComplianceState,
+    }));
+  },
   async getMember(orgId, id) {
     // org_id ALWAYS in the where — a row id alone never crosses tenants.
     const [row] = await db.select().from(member)
       .where(and(eq(member.orgId, orgId), eq(member.id, id)));
     return row;
+  },
+  async getMemberBalance(orgId, id) {
+    const [row] = await db.select({
+      memberId: memberComplianceState.memberId,
+      displayName: memberComplianceState.displayName,
+      currentBalance: memberComplianceState.currentBalance,
+      state: memberComplianceState.state,
+      whatsappNumber: member.whatsappNumber,
+    }).from(memberComplianceState)
+      .innerJoin(member, and(eq(member.id, memberComplianceState.memberId), eq(member.orgId, memberComplianceState.orgId)))
+      .where(and(eq(memberComplianceState.orgId, orgId), eq(memberComplianceState.memberId, id)))
+      .limit(1);
+    if (!row) return undefined;
+    const currentBalance = String(row.currentBalance);
+    return {
+      memberId: row.memberId,
+      displayName: row.displayName,
+      currentBalance,
+      state: row.state as ComplianceState,
+      whatsappNumber: row.whatsappNumber,
+      balanceShareUrl: buildBalanceShareUrl({
+        whatsappNumber: row.whatsappNumber,
+        memberName: row.displayName,
+        currentBalance,
+      }),
+    };
   },
   async createMember(orgId, input) {
     const [row] = await db.insert(member).values({ ...input, orgId }).returning();

@@ -25,7 +25,7 @@ describe("uploadMonthlyCloseArtifact", () => {
     vi.mocked(put).mockClear();
   });
 
-  it("uploads monthly close PDFs as private blobs and returns the authenticated archive route", async () => {
+  it("uploads monthly close PDFs as private blobs and returns the public unlisted archive route", async () => {
     const result = await uploadMonthlyCloseArtifact({
       orgId: "11111111-1111-4111-8111-111111111111",
       periodLabel: "2026-06",
@@ -66,7 +66,7 @@ describe("uploadMonthlyCloseArtifact", () => {
       }),
     );
     expect(result).toEqual({
-      pdfUri: `/statement-archive/monthly-close/${"a".repeat(64)}.pdf`,
+      pdfUri: `/statement-archive/public/${"a".repeat(64)}.pdf`,
       byteSize: 3,
     });
   });

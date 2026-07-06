@@ -259,7 +259,43 @@
     "period": "Período",
     "generatedAt": "Generado",
     "hash": "Hash",
-    "openPdf": "Abrir PDF"
+    "openPdf": "Abrir PDF",
+    "shareWhatsapp": "Compartir por WhatsApp",
+    "generateMemberStatements": "Generar estados de cuenta de {{period}}",
+    "memberStatementsReady": "{{count}} estados por socia listos para compartir."
+  },
+  "yearEndShareOut": {
+    "description": "Revisa la decisión aprobada, calcula el reparto y aprueba cuando cuadre.",
+    "governanceTitle": "Decisión de gobernanza requerida",
+    "governanceDescription": "El reparto usa la decisión aprobada del año y el cierre anual archivado.",
+    "calculate": "Calcular reparto {{year}}",
+    "empty": "Aún no hay un borrador de reparto para {{year}}.",
+    "year": "Año",
+    "total": "Reparto total",
+    "loanPool": "Pool préstamos",
+    "adjustment": "Ajuste",
+    "member": "Socia",
+    "savings": "Ahorros",
+    "loanActivity": "Actividad préstamo",
+    "draft": "Draft",
+    "final": "Final",
+    "override": "Override",
+    "saveOverride": "Guardar override",
+    "approve": "Aprobar reparto",
+    "approveConfirmTitle": "Confirmar aprobación",
+    "approveConfirmText": "Confirmo que el reparto fue revisado y que esta aprobación generará retiros, snapshots y PDFs.",
+    "approveConfirmCheckbox": "Entiendo que la aprobación no debe repetirse",
+    "reason": "Razón",
+    "finalAmountForMember": "Monto final {{member}}",
+    "reasonForMember": "Razón {{member}}"
+  },
+  "statementPdf": {
+    "monthlyMemberTitle": "Estado de cuenta",
+    "yearEndMemberTitle": "Estado fin de año",
+    "yearEndShareOutTitle": "Reparto fin de año",
+    "yearEndSnapshotTitle": "Balance fin de año",
+    "appName": "Mi Banquito",
+    "hash": "Hash"
   },
   "verifier": {
     "title": "Verificación de documento"
@@ -359,6 +395,9 @@
       },
       "complianceTitle": "Estado de socias",
       "complianceDescription": "Misma fuente de verdad que la lista de socias.",
+      "memberSearchTitle": "Buscar saldo de socia",
+      "memberSearchLabel": "Buscar socia por nombre",
+      "memberSearchEmpty": "No hay socias con ese nombre.",
       "viewMembers": "Ver socias",
       "current": "Al día",
       "late": "Atrasadas",
@@ -387,7 +426,10 @@
       "statusSummary": "Resumen de estado",
       "openDetail": "Abrir detalle",
       "memberInfo": "Información",
-      "statusActions": "Cambios de estado"
+      "statusActions": "Cambios de estado",
+      "currentBalance": "Saldo actual",
+      "shareBalance": "Compartir saldo por WhatsApp",
+      "generateStatement": "Generar estado de cuenta"
     },
     "group": {
       "title": "Mi grupo",

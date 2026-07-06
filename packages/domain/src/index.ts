@@ -11,3 +11,11 @@ export * from "./platform";
 export * from "./reconciliation";
 export * from "./reporting";
 export * from "./rules/loans/declining-balance";
+export {
+  applyShareOutOverride,
+  assertShareOutReconciled,
+  computeTwoPoolDraft,
+  createShareOutService,
+  fiscalYearForDate as shareOutFiscalYearForDate,
+} from "./shareout";
+export type { ShareOutArtifactInput, ShareOutArtifactResult, ShareOutDraftView } from "./shareout";

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   availableCapitalAfterBaseFund,
+  buildBalanceShareUrl,
   buildMemberCreationLedgerPlan,
   buildMemberStatusTransitionLedgerPlan,
   complianceToneForState,
@@ -264,5 +265,23 @@ describe("US-032 base fund quota", () => {
 
   it("subtracts base fund from available capital", () => {
     expect(availableCapitalAfterBaseFund({ poolBalance: "1000.0000", baseFundPool: "250.0000" })).toBe("750.0000");
+  });
+});
+
+describe("US-058 balance sharing", () => {
+  it("builds a WhatsApp balance URL with member name and current balance", () => {
+    expect(buildBalanceShareUrl({
+      whatsappNumber: "+593 99 123 4567",
+      memberName: "Ana Mora",
+      currentBalance: "120.50",
+    })).toBe("https://wa.me/593991234567?text=Hola%20Ana%20Mora%2C%20tu%20saldo%20actual%20en%20Mi%20Banquito%20es%20USD%20120.50.");
+  });
+
+  it("returns null when the member has no WhatsApp number", () => {
+    expect(buildBalanceShareUrl({
+      whatsappNumber: null,
+      memberName: "Ana Mora",
+      currentBalance: "120.50",
+    })).toBeNull();
   });
 });

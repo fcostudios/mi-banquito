@@ -1,6 +1,15 @@
-import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
-import { alert, alertAction, auditLogEntry, groupConfig, organization, periodClose } from "@mi-banquito/db/schema";
+import {
+  alert,
+  alertAction,
+  auditLogEntry,
+  contributionCycle,
+  groupConfig,
+  memberComplianceState,
+  organization,
+  periodClose,
+} from "@mi-banquito/db/schema";
 import { withTenantTransaction } from "@mi-banquito/db/tenant";
 import { writeWithAudit } from "./audit";
 
@@ -51,6 +60,14 @@ export type CloseOverdueAlertRunSummary = {
   failures: Array<{ orgId: string; message: string }>;
 };
 
+export type Sprint6AlertRunSummary = {
+  pendingReconciliationAlertsEmitted: number;
+  loanDueSoonAlertsEmitted: number;
+  contributionLateAlertsEmitted: number;
+  skippedExisting: number;
+  failures: Array<{ orgId: string; message: string }>;
+};
+
 export interface AlertsService {
   readonly context: "alerts";
   listVisibleAlerts(input: { orgId: string; audience: AlertAudience; now?: Date }): Promise<VisibleAlert[]>;
@@ -58,6 +75,7 @@ export interface AlertsService {
   dismissAlert(input: { orgId: string; alertId: string; actorId: string; audience: AlertAudience; reason?: string }): Promise<void>;
   snoozeAlert(input: { orgId: string; alertId: string; actorId: string; audience: AlertAudience; snoozedUntil: Date; reason?: string }): Promise<void>;
   emitCloseOverdueAlerts(input: { today: Date }): Promise<CloseOverdueAlertRunSummary>;
+  emitSprint6DailyAlerts(input: { today: Date }): Promise<Sprint6AlertRunSummary>;
 }
 
 type AlertPayload = {
@@ -67,11 +85,19 @@ type AlertPayload = {
 };
 
 type AlertReadTx = {
-  select(): {
-    from(table: typeof alert): {
-      where(condition: unknown): Promise<Array<typeof alert.$inferSelect>>;
-    };
-  };
+  select(): any;
+};
+
+type Sprint6DueSoonRow = {
+  loan_id: string;
+  member: string | null;
+  outstanding: string | number;
+};
+
+type Sprint6LateContributionRow = {
+  member_id: string;
+  display_name: string;
+  closes_on: string;
 };
 
 const SYSTEM_ACTOR_ID = "00000000-0000-4000-8000-000000000000";
@@ -118,6 +144,33 @@ export function closeOverdueAlertState(input: CloseOverdueAlertInput): CloseOver
     overdue: daysSinceClose > thresholdDays,
     daysSinceClose,
     thresholdDays,
+  };
+}
+
+export function pendingReconciliationAlertPayload(input: { prevMonth: string }) {
+  return {
+    title: "Conciliación pendiente",
+    body: `El mes de ${input.prevMonth} aún no está cerrado. Te recomiendo cerrar antes de la próxima reunión.`,
+    prevMonth: input.prevMonth,
+  };
+}
+
+export function loanDueSoonAlertPayload(input: { member: string; outstanding: string }) {
+  return {
+    title: "Préstamo próximo a vencer",
+    body: `El préstamo de ${input.member} vence en 7 días. Saldo actual: USD ${input.outstanding}.`,
+    member: input.member,
+    outstanding: input.outstanding,
+  };
+}
+
+export function contributionLateAlertPayload(input: { month: string; member: string; days: number }) {
+  return {
+    title: "Aporte atrasado",
+    body: `El aporte de ${input.month} de ${input.member} está atrasado por ${input.days} días.`,
+    month: input.month,
+    member: input.member,
+    days: input.days,
   };
 }
 
@@ -190,6 +243,36 @@ async function assertActionableAlert(input: {
   if (!row) {
     throw new Error("alert_not_actionable");
   }
+}
+
+function esMonthYear(date: Date): string {
+  return new Intl.DateTimeFormat("es-EC", { month: "long", year: "numeric", timeZone: "UTC" })
+    .format(date)
+    .replace(/\s+de\s+/, " ");
+}
+
+function dateOnly(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+async function hasActiveDedupedAlert(input: {
+  tx: AlertReadTx;
+  orgId: string;
+  alertKind: string;
+  subjectKind: string;
+  subjectId: string;
+  today: Date;
+}): Promise<boolean> {
+  const [existing] = await input.tx.select().from(alert)
+    .where(and(
+      eq(alert.orgId, input.orgId),
+      eq(alert.alertKind, input.alertKind),
+      eq(alert.subjectKind, input.subjectKind),
+      eq(alert.subjectId, input.subjectId),
+    ))
+    .orderBy(desc(alert.createdAt));
+
+  return Boolean(existing && dateValue(existing.dedupWindowEnd) > input.today);
 }
 
 export const createAlertsService = (): AlertsService => ({
@@ -290,6 +373,201 @@ export const createAlertsService = (): AlertsService => ({
         });
       },
     }));
+  },
+  async emitSprint6DailyAlerts(input) {
+    const today = dayStartUtc(input.today);
+    const dedupWindowEnd = new Date(today.getTime() + MS_PER_DAY);
+    const dueSoonOn = new Date(today.getTime() + 7 * MS_PER_DAY).toISOString().slice(0, 10);
+    const todayOn = today.toISOString().slice(0, 10);
+    const month = esMonthYear(today);
+    const summary: Sprint6AlertRunSummary = {
+      pendingReconciliationAlertsEmitted: 0,
+      loanDueSoonAlertsEmitted: 0,
+      contributionLateAlertsEmitted: 0,
+      skippedExisting: 0,
+      failures: [],
+    };
+
+    const orgs = await db.select({ id: organization.id }).from(organization)
+      .where(eq(organization.status, "active"));
+
+    for (const org of orgs) {
+      try {
+        await withTenantTransaction(org.id, async (tx) => {
+          if (today.getUTCDate() === 5) {
+            const prevMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
+            const prevMonthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 0));
+            const [closedPriorCycle] = await tx.select({ id: periodClose.id })
+              .from(periodClose)
+              .innerJoin(contributionCycle, and(
+                eq(contributionCycle.id, periodClose.cycleId),
+                eq(contributionCycle.orgId, periodClose.orgId),
+              ))
+              .where(and(
+                eq(periodClose.orgId, org.id),
+                sql`${contributionCycle.closesOn} >= ${dateOnly(prevMonthStart)}`,
+                sql`${contributionCycle.closesOn} <= ${dateOnly(prevMonthEnd)}`,
+              ))
+              .limit(1);
+            const subjectId = org.id;
+            if (closedPriorCycle) {
+              summary.skippedExisting += 1;
+            } else {
+            const existing = await hasActiveDedupedAlert({
+              tx,
+              orgId: org.id,
+              alertKind: "A1",
+              subjectKind: "contribution_cycle",
+              subjectId,
+              today,
+            });
+
+            if (existing) {
+              summary.skippedExisting += 1;
+            } else {
+              const prevMonth = esMonthYear(prevMonthStart);
+              await tx.insert(alert).values({
+                orgId: org.id,
+                alertKind: "A1",
+                severity: "high",
+                audience: "treasurer",
+                subjectKind: "contribution_cycle",
+                subjectId,
+                payload: pendingReconciliationAlertPayload({ prevMonth }),
+                dedupWindowEnd,
+                dismissedAt: null,
+                dismissedBy: null,
+                snoozedUntil: null,
+                createdAt: today,
+              });
+              summary.pendingReconciliationAlertsEmitted += 1;
+            }
+            }
+          }
+
+          const dueSoonResult = await (tx as { execute(query: unknown): Promise<{ rows?: Sprint6DueSoonRow[] } | Sprint6DueSoonRow[]> }).execute(sql`
+            SELECT
+              l.id AS loan_id,
+              COALESCE(m.display_name, 'persona externa') AS member,
+              GREATEST(
+                COALESCE(ls.principal_due, 0) - COALESCE(ls.paid_principal_to_date, 0)
+                + COALESCE(ls.interest_due, 0) - COALESCE(ls.paid_interest_to_date, 0),
+                0
+              )::numeric(18, 2)::text AS outstanding
+            FROM loan_schedule ls
+            JOIN loan l
+              ON l.id = ls.loan_id
+             AND l.org_id = ls.org_id
+            LEFT JOIN member m
+              ON m.id = COALESCE(l.member_id, l.borrower_member_id)
+             AND m.org_id = l.org_id
+            WHERE ls.org_id = ${org.id}
+              AND ls.status = 'pendiente'
+              AND ls.due_on >= ${todayOn}
+              AND ls.due_on <= ${dueSoonOn}
+          `);
+          const dueSoonRows = Array.isArray(dueSoonResult) ? dueSoonResult : dueSoonResult.rows ?? [];
+
+          for (const row of dueSoonRows) {
+            const subjectId = row.loan_id;
+            const existing = await hasActiveDedupedAlert({
+              tx,
+              orgId: org.id,
+              alertKind: "A2",
+              subjectKind: "loan",
+              subjectId,
+              today,
+            });
+            if (existing) {
+              summary.skippedExisting += 1;
+              continue;
+            }
+
+            await tx.insert(alert).values({
+              orgId: org.id,
+              alertKind: "A2",
+              severity: "medium",
+              audience: "treasurer",
+              subjectKind: "loan",
+              subjectId,
+              payload: loanDueSoonAlertPayload({
+                member: row.member ?? "persona externa",
+                outstanding: Number(row.outstanding).toFixed(2),
+              }),
+              dedupWindowEnd,
+              dismissedAt: null,
+              dismissedBy: null,
+              snoozedUntil: null,
+              createdAt: today,
+            });
+            summary.loanDueSoonAlertsEmitted += 1;
+          }
+
+          const lateResult = await (tx as { execute(query: unknown): Promise<{ rows?: Sprint6LateContributionRow[] } | Sprint6LateContributionRow[]> }).execute(sql`
+            WITH current_cycle AS (
+              SELECT DISTINCT ON (cc.org_id)
+                cc.org_id,
+                cc.closes_on
+              FROM contribution_cycle cc
+              WHERE cc.org_id = ${org.id}
+                AND cc.status = 'open'
+              ORDER BY cc.org_id, cc.closes_on DESC, cc.created_at DESC
+            )
+            SELECT
+              mcs.member_id,
+              mcs.display_name,
+              current_cycle.closes_on::text AS closes_on
+            FROM mv_member_compliance_state mcs
+            JOIN current_cycle
+              ON current_cycle.org_id = mcs.org_id
+            WHERE mcs.org_id = ${org.id}
+              AND mcs.state = 'atrasado'
+          `);
+          const lateRows = Array.isArray(lateResult) ? lateResult : lateResult.rows ?? [];
+
+          for (const row of lateRows) {
+            const subjectId = row.member_id;
+            const closesOn = new Date(`${row.closes_on}T00:00:00.000Z`);
+            const daysLate = Math.max(0, Math.floor((today.getTime() - closesOn.getTime()) / MS_PER_DAY));
+            const existing = await hasActiveDedupedAlert({
+              tx,
+              orgId: org.id,
+              alertKind: "A3",
+              subjectKind: "member",
+              subjectId,
+              today,
+            });
+            if (existing) {
+              summary.skippedExisting += 1;
+              continue;
+            }
+
+            await tx.insert(alert).values({
+              orgId: org.id,
+              alertKind: "A3",
+              severity: "medium",
+              audience: "treasurer",
+              subjectKind: "member",
+              subjectId,
+              payload: contributionLateAlertPayload({ month, member: row.display_name, days: daysLate }),
+              dedupWindowEnd,
+              dismissedAt: null,
+              dismissedBy: null,
+              snoozedUntil: null,
+              createdAt: today,
+            });
+            summary.contributionLateAlertsEmitted += 1;
+          }
+        });
+      } catch (error) {
+        summary.failures.push({
+          orgId: org.id,
+          message: error instanceof Error ? error.message : "Unknown Sprint 6 alert failure",
+        });
+      }
+    }
+
+    return summary;
   },
   async emitCloseOverdueAlerts(input) {
     const summary: CloseOverdueAlertRunSummary = {

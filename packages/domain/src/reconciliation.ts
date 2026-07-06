@@ -545,7 +545,10 @@ function monthlyClosePayload(input: {
 }
 
 export function monthlyCloseShareUrl(pdfUri: string): string {
-  return `https://wa.me/?text=${encodeURIComponent(`Revisa el cierre del mes: ${pdfUri}`)}`;
+  const publicUri = /^https?:\/\//i.test(pdfUri)
+    ? pdfUri
+    : `${(process.env.APP_BASE_URL ?? "https://mi-banquito.vercel.app").replace(/\/$/, "")}${pdfUri.startsWith("/") ? pdfUri : `/${pdfUri}`}`;
+  return `https://wa.me/?text=${encodeURIComponent(`Revisa el cierre del mes: ${publicUri}`)}`;
 }
 
 async function latestClosedMonthlyCloseSnapshot(

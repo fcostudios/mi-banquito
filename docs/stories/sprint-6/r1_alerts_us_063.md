@@ -21,12 +21,12 @@ As a treasurer, I want the system to alert me when a member's contribution becom
 | Backstage Process | — |
 | Blocked By | US-008, US-031 |
 ## Acceptance Criteria
-- [ ] AC-1: Post-commit on `RecomputeMemberCompliance` (P7 / `mv_member_compliance_state`), when a member's compliance state transitions to `atrasado` (per `GroupConfig.late_threshold_days`), the system emits an `Alert`.
-- [ ] AC-2: The alert carries `alert_kind=A3`, `severity=medium`, `audience=treasurer`.
-- [ ] AC-3: The Spanish copy is: *"El aporte de {month} de {member} está atrasado por {days} días."* — `{month}`, `{member}`, `{days}` resolved into the `payload` template variables.
-- [ ] AC-4: The threshold is read from `GroupConfig.late_threshold_days` (config-driven, not hardcoded); a member only crossing the threshold triggers the alert.
-- [ ] AC-5: The alert de-duplicates over a 24h window — UNIQUE(`org_id`, `alert_kind`, `subject_kind`, `subject_id`, `dedup_window_end`); the same member does not re-emit within the window.
-- [ ] AC-6: A member who is NOT yet past the threshold (still within grace) does not trigger an alert; `org_id`-scoped; `subject_kind=Member`, surfaces on the alert bell (30 s poll).
+- [x] AC-1: Post-commit on `RecomputeMemberCompliance` (P7 / `mv_member_compliance_state`), when a member's compliance state transitions to `atrasado` (per `GroupConfig.late_threshold_days`), the system emits an `Alert`.
+- [x] AC-2: The alert carries `alert_kind=A3`, `severity=medium`, `audience=treasurer`.
+- [x] AC-3: The Spanish copy is: *"El aporte de {month} de {member} está atrasado por {days} días."* — `{month}`, `{member}`, `{days}` resolved into the `payload` template variables.
+- [x] AC-4: The threshold is read from `GroupConfig.late_threshold_days` (config-driven, not hardcoded); a member only crossing the threshold triggers the alert.
+- [x] AC-5: The alert de-duplicates over a 24h window — UNIQUE(`org_id`, `alert_kind`, `subject_kind`, `subject_id`, `dedup_window_end`); the same member does not re-emit within the window.
+- [x] AC-6: A member who is NOT yet past the threshold (still within grace) does not trigger an alert; `org_id`-scoped; `subject_kind=Member`, surfaces on the alert bell (30 s poll).
 
 ## Technical Notes
 - **Data model:** `Alert` (`alerts_context`, append-only) — `alert_kind=A3`, `severity=medium`, `audience=treasurer`, `subject_kind=Member`, `payload` jsonb with `{month}`/`{member}`/`{days}`, 24h `dedup_window_end`. Reads `mv_member_compliance_state` (state transition) + `GroupConfig.late_threshold_days`. No new migration unless the enum lacks `A3`.

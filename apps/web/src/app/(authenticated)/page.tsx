@@ -4,6 +4,7 @@ import { createLedgerService } from "@mi-banquito/domain";
 import { StatusPill } from "@mi-banquito/ui";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import messages from "@/lib/i18n/en-US.json";
+import { MemberSearch } from "./member-search";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,11 @@ function stateLabel(state: string) {
 
 export default async function ScrTreasurerHomePage() {
   const session = await requireTreasurer();
-  const rows = await createLedgerService().listComplianceRows(session.orgId);
+  const ledger = createLedgerService();
+  const [rows, memberSearchRows] = await Promise.all([
+    ledger.listComplianceRows(session.orgId),
+    ledger.searchMembersWithBalance(session.orgId),
+  ]);
   const summary = rows.reduce(
     (acc, row) => {
       if (row.state === "al_dia" || row.state === "al_día") acc.current += 1;
@@ -70,6 +75,19 @@ export default async function ScrTreasurerHomePage() {
           );
         })}
       </section>
+
+      <MemberSearch
+        rows={memberSearchRows.map((row) => ({
+          memberId: row.memberId,
+          displayName: row.displayName,
+          currentBalance: String(row.currentBalance),
+        }))}
+        labels={{
+          title: copy.memberSearchTitle,
+          search: copy.memberSearchLabel,
+          empty: copy.memberSearchEmpty,
+        }}
+      />
 
       <section className="grid gap-4 lg:grid-cols-[1.35fr_.65fr]">
         <div className="rounded-md border border-border bg-surface">
