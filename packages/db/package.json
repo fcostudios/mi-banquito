@@ -12,6 +12,7 @@
   },
   "scripts": {
     "db:push": "drizzle-kit push",
+    "backfill:auth0-org-id": "node scripts/backfill-auth0-org-id.mjs",
     "seed:platform": "node --experimental-strip-types seed/platform-bootstrap.ts",
     "verify": "node scripts/verify-schema.mjs",
     "type-check": "tsc --noEmit",

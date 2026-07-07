@@ -19,6 +19,7 @@ const PLATFORM_OPERATOR_ID = "22222222-2222-4222-8222-222222222222";
 const MEMBER_ID = "33333333-3333-4333-8333-333333333333";
 const USER_ACCOUNT_ID = "44444444-4444-4444-8444-444444444444";
 const MEMBERSHIP_ID = "55555555-5555-4555-8555-555555555555";
+const LOCAL_AUTH0_ORG_ID = process.env.AUTH0_ORGANIZATION?.trim() || "org_local";
 
 export async function main() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -50,16 +51,17 @@ export async function main() {
     await pool.query(
       `
       INSERT INTO organization (
-        id, display_name, country_code, currency_code, timezone,
+        id, display_name, auth0_org_id, country_code, currency_code, timezone,
         default_language, status, created_at, created_by, created_by_kind,
         updated_at, updated_by, platform_operator_id
       )
       VALUES (
-        $1, 'FcoStudios Local Banquito', 'EC', 'USD', 'America/Guayaquil',
+        $1, 'FcoStudios Local Banquito', $3, 'EC', 'USD', 'America/Guayaquil',
         'es-EC', 'active', now(), $2, 'platform_operator', now(), $2, $2
       )
       ON CONFLICT (id) DO UPDATE
       SET display_name = EXCLUDED.display_name,
+          auth0_org_id = EXCLUDED.auth0_org_id,
           country_code = EXCLUDED.country_code,
           currency_code = EXCLUDED.currency_code,
           timezone = EXCLUDED.timezone,
@@ -69,7 +71,7 @@ export async function main() {
           updated_by = EXCLUDED.updated_by,
           platform_operator_id = EXCLUDED.platform_operator_id;
       `,
-      [LOCAL_ORG_ID, PLATFORM_OPERATOR_ID],
+      [LOCAL_ORG_ID, PLATFORM_OPERATOR_ID, LOCAL_AUTH0_ORG_ID],
     );
 
     await pool.query(

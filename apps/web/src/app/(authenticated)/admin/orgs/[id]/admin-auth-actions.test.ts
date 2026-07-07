@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const dbMocks = vi.hoisted(() => ({
+  dbSelect: vi.fn(),
+  withTenantTransaction: vi.fn(),
+}));
+
 const orgId = "11111111-1111-4111-8111-111111111111";
 const actorId = "22222222-2222-4222-8222-222222222222";
 const userAccountId = "33333333-3333-4333-8333-333333333333";
@@ -26,11 +31,13 @@ vi.mock("@/lib/auth/require-session", () => ({
 }));
 
 vi.mock("@mi-banquito/db", () => ({
-  db: {},
+  db: {
+    select: dbMocks.dbSelect,
+  },
 }));
 
 vi.mock("@mi-banquito/db/tenant", () => ({
-  withTenantTransaction: vi.fn(),
+  withTenantTransaction: dbMocks.withTenantTransaction,
 }));
 
 function inviteForm(email = "tesorera@example.com", displayName = "Tesorera Nueva") {
@@ -60,6 +67,21 @@ async function buildActions() {
   });
 }
 
+function txWithRows(rows: unknown[]) {
+  return {
+    select: vi.fn(() => {
+      const builder = {
+        from: vi.fn(() => builder),
+        innerJoin: vi.fn(() => builder),
+        where: vi.fn(() => builder),
+        orderBy: vi.fn(() => builder),
+        limit: vi.fn(() => Promise.resolve(rows)),
+      };
+      return builder;
+    }),
+  };
+}
+
 describe("admin Auth0 access actions", () => {
   beforeEach(() => {
     requirePlatformOperator.mockReset();
@@ -67,6 +89,11 @@ describe("admin Auth0 access actions", () => {
     sendPasswordlessLink.mockReset();
     revalidatePath.mockClear();
     redirect.mockClear();
+    dbMocks.dbSelect.mockReset();
+    dbMocks.dbSelect.mockImplementation(() => {
+      throw new Error("global db select should not be used for tenant-scoped admin auth reads");
+    });
+    dbMocks.withTenantTransaction.mockReset();
     Object.values(repo).forEach((fn) => fn.mockReset());
 
     requirePlatformOperator.mockResolvedValue({ actorId, userId: "auth0|operator" });
@@ -203,5 +230,59 @@ describe("admin Auth0 access actions", () => {
       providerRequestId: "pwd_123",
       status: "sent",
     }));
+  });
+});
+
+describe("adminAuthRepository tenant RLS reads", () => {
+  beforeEach(() => {
+    dbMocks.dbSelect.mockReset();
+    dbMocks.dbSelect.mockImplementation(() => {
+      throw new Error("global db select should not be used for tenant-scoped admin auth reads");
+    });
+    dbMocks.withTenantTransaction.mockReset();
+  });
+
+  it("reads existing treasurer access inside a tenant transaction", async () => {
+    const tx = txWithRows([{
+      userAccountId,
+      memberId,
+      authSubject: `pending:tesorera@example.com`,
+    }]);
+    dbMocks.withTenantTransaction.mockImplementation(async (_orgId, run) => run(tx));
+    const { adminAuthRepository } = await import("./admin-auth-actions");
+
+    await expect(adminAuthRepository.findTreasurerAccessByEmail(orgId, "tesorera@example.com"))
+      .resolves.toEqual({ userAccountId, memberId, accepted: false });
+
+    expect(dbMocks.withTenantTransaction).toHaveBeenCalledWith(orgId, expect.any(Function));
+    expect(dbMocks.dbSelect).not.toHaveBeenCalled();
+  });
+
+  it("reads reset rate limits inside a tenant transaction", async () => {
+    const tx = txWithRows([{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }]);
+    dbMocks.withTenantTransaction.mockImplementation(async (_orgId, run) => run(tx));
+    const { adminAuthRepository } = await import("./admin-auth-actions");
+
+    await expect(adminAuthRepository.findRecentSentAction({
+      orgId,
+      email: "tesorera@example.com",
+      actionKind: "treasurer_login_reset",
+      since: new Date("2026-07-07T13:55:00.000Z"),
+    })).resolves.toEqual({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" });
+
+    expect(dbMocks.withTenantTransaction).toHaveBeenCalledWith(orgId, expect.any(Function));
+    expect(dbMocks.dbSelect).not.toHaveBeenCalled();
+  });
+
+  it("reads active treasurer access inside a tenant transaction", async () => {
+    const tx = txWithRows([{ userAccountId, memberId }]);
+    dbMocks.withTenantTransaction.mockImplementation(async (_orgId, run) => run(tx));
+    const { adminAuthRepository } = await import("./admin-auth-actions");
+
+    await expect(adminAuthRepository.findActiveTreasurerByEmail(orgId, "tesorera@example.com"))
+      .resolves.toEqual({ userAccountId, memberId });
+
+    expect(dbMocks.withTenantTransaction).toHaveBeenCalledWith(orgId, expect.any(Function));
+    expect(dbMocks.dbSelect).not.toHaveBeenCalled();
   });
 });

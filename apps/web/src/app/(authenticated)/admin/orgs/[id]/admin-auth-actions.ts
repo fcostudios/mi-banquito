@@ -286,31 +286,33 @@ export const adminAuthRepository: AdminAuthRepository = {
   },
 
   async findTreasurerAccessByEmail(orgId, email) {
-    const [row] = await db
-      .select({
-        userAccountId: userAccount.id,
-        memberId: userOrgMembership.memberId,
-        authSubject: userAccount.authSubject,
-      })
-      .from(userAccount)
-      .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
-      .where(and(
-        eq(userAccount.email, email),
-        eq(userAccount.status, "active"),
-        eq(userOrgMembership.orgId, orgId),
-        eq(userOrgMembership.status, "active"),
-        eq(userOrgMembership.role, "TESORERA"),
-      ))
-      .limit(1);
+    return withTenantTransaction(orgId, async (tx) => {
+      const [row] = await tx
+        .select({
+          userAccountId: userAccount.id,
+          memberId: userOrgMembership.memberId,
+          authSubject: userAccount.authSubject,
+        })
+        .from(userAccount)
+        .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
+        .where(and(
+          eq(userAccount.email, email),
+          eq(userAccount.status, "active"),
+          eq(userOrgMembership.orgId, orgId),
+          eq(userOrgMembership.status, "active"),
+          eq(userOrgMembership.role, "TESORERA"),
+        ))
+        .limit(1);
 
-    if (!row?.memberId) {
-      return undefined;
-    }
-    return {
-      userAccountId: row.userAccountId,
-      memberId: row.memberId,
-      accepted: !isPendingAuthSubject(row.authSubject, email),
-    };
+      if (!row?.memberId) {
+        return undefined;
+      }
+      return {
+        userAccountId: row.userAccountId,
+        memberId: row.memberId,
+        accepted: !isPendingAuthSubject(row.authSubject, email),
+      };
+    });
   },
 
   async createPendingTreasurerAccess(input) {
@@ -372,39 +374,43 @@ export const adminAuthRepository: AdminAuthRepository = {
   },
 
   async findRecentSentAction(input) {
-    const [row] = await db
-      .select({ id: authAdminAction.id })
-      .from(authAdminAction)
-      .where(and(
-        eq(authAdminAction.orgId, input.orgId),
-        eq(authAdminAction.targetEmail, input.email),
-        eq(authAdminAction.actionKind, input.actionKind),
-        eq(authAdminAction.status, "sent"),
-        gte(authAdminAction.createdAt, input.since),
-      ))
-      .orderBy(desc(authAdminAction.createdAt))
-      .limit(1);
-    return row;
+    return withTenantTransaction(input.orgId, async (tx) => {
+      const [row] = await tx
+        .select({ id: authAdminAction.id })
+        .from(authAdminAction)
+        .where(and(
+          eq(authAdminAction.orgId, input.orgId),
+          eq(authAdminAction.targetEmail, input.email),
+          eq(authAdminAction.actionKind, input.actionKind),
+          eq(authAdminAction.status, "sent"),
+          gte(authAdminAction.createdAt, input.since),
+        ))
+        .orderBy(desc(authAdminAction.createdAt))
+        .limit(1);
+      return row;
+    });
   },
 
   async findActiveTreasurerByEmail(orgId, email) {
-    const [row] = await db
-      .select({
-        userAccountId: userAccount.id,
-        memberId: userOrgMembership.memberId,
-      })
-      .from(userAccount)
-      .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
-      .where(and(
-        eq(userAccount.email, email),
-        eq(userAccount.status, "active"),
-        ne(userAccount.authSubject, `pending:${email}`),
-        eq(userOrgMembership.orgId, orgId),
-        eq(userOrgMembership.status, "active"),
-        eq(userOrgMembership.role, "TESORERA"),
-      ))
-      .limit(1);
-    return row?.memberId ? { userAccountId: row.userAccountId, memberId: row.memberId } : undefined;
+    return withTenantTransaction(orgId, async (tx) => {
+      const [row] = await tx
+        .select({
+          userAccountId: userAccount.id,
+          memberId: userOrgMembership.memberId,
+        })
+        .from(userAccount)
+        .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
+        .where(and(
+          eq(userAccount.email, email),
+          eq(userAccount.status, "active"),
+          ne(userAccount.authSubject, `pending:${email}`),
+          eq(userOrgMembership.orgId, orgId),
+          eq(userOrgMembership.status, "active"),
+          eq(userOrgMembership.role, "TESORERA"),
+        ))
+        .limit(1);
+      return row?.memberId ? { userAccountId: row.userAccountId, memberId: row.memberId } : undefined;
+    });
   },
 
   async logAction(input) {
