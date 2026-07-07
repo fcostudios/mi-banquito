@@ -528,7 +528,16 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
         });
       });
 
-      await auth0.createOrganization({ displayName: input.displayName, orgId });
+      const auth0Org = await auth0.createOrganization({ displayName: input.displayName, orgId });
+      if (auth0Org.auth0OrgId) {
+        await db.update(organization)
+          .set({
+            auth0OrgId: auth0Org.auth0OrgId,
+            updatedAt: new Date(),
+            updatedBy: actorId,
+          })
+          .where(eq(organization.id, orgId));
+      }
       return orgId;
     },
     async listOrganizations() {

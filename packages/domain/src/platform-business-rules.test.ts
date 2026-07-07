@@ -404,6 +404,13 @@ describe("US-024 business-rules projection", () => {
         orgId: "99999999-9999-4999-8999-999999999999",
         version: 1,
       }));
+      expect(updatedRows(fakeDb, organization)).toEqual([
+        expect.objectContaining({
+          auth0OrgId: "auth0-org-1",
+          updatedAt: expect.any(Date),
+          updatedBy: "22222222-2222-4222-8222-222222222222",
+        }),
+      ]);
       expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(1);
     } finally {
       vi.doUnmock("@mi-banquito/db");
