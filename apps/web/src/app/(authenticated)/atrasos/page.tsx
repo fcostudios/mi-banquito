@@ -73,6 +73,12 @@ export default async function ScrArAgingPage({
   const sort = sortKey(searchValue(query.sort));
   const error = searchValue(query.error);
   const promiseSaved = searchValue(query.promise) === "1";
+  const promiseOutcome = searchValue(query.promiseOutcome);
+  const promiseOutcomeMessage = promiseOutcome === "kept"
+    ? copy.promiseKept
+    : promiseOutcome === "broken"
+      ? copy.promiseBroken
+      : "";
   const rows = sortRows(
     await createCollectionsService().listAgingRows(session.orgId, reason),
     sort,
@@ -92,6 +98,11 @@ export default async function ScrArAgingPage({
       {promiseSaved ? (
         <p className="rounded-md border border-success bg-success/10 p-4 text-text-primary" role="status">
           {copy.promiseSaved}
+        </p>
+      ) : null}
+      {promiseOutcomeMessage ? (
+        <p className="rounded-md border border-success bg-success/10 p-4 text-text-primary" role="status">
+          {promiseOutcomeMessage}
         </p>
       ) : null}
 

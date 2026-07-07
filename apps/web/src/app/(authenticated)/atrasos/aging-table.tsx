@@ -7,10 +7,10 @@ import {
   type DateOnlyString,
 } from "@mi-banquito/domain";
 import { currentEcuadorDateString } from "@mi-banquito/contracts";
-import { ButtonPrimary } from "@mi-banquito/ui";
+import { ButtonPrimary, ButtonSecondary } from "@mi-banquito/ui";
 import { ecCurrency } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
-import { markPromiseAction, recordChaseAttemptAction } from "./actions";
+import { markPromiseAction, markPromiseOutcomeAction, recordChaseAttemptAction } from "./actions";
 import { PromiseDialog } from "./promise-dialog";
 
 const copy = messages.atrasos;
@@ -60,6 +60,27 @@ function hiddenSourceFields(row: CollectionsAgingRow) {
       <input type="hidden" name="cycleId" value={row.cycleId ?? ""} />
       <input type="hidden" name="periodLabel" value={row.periodLabel} />
     </>
+  );
+}
+
+function PromiseOutcomeActions({ promiseId }: { promiseId: string }) {
+  return (
+    <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+      <form action={markPromiseOutcomeAction} className="w-full sm:w-auto">
+        <input type="hidden" name="promiseId" value={promiseId} />
+        <input type="hidden" name="outcome" value="kept" />
+        <ButtonSecondary type="submit" className="min-h-12 w-full justify-center rounded-md border border-primary bg-surface px-4 font-semibold text-primary sm:w-auto">
+          {copy.promiseKeptAction}
+        </ButtonSecondary>
+      </form>
+      <form action={markPromiseOutcomeAction} className="w-full sm:w-auto">
+        <input type="hidden" name="promiseId" value={promiseId} />
+        <input type="hidden" name="outcome" value="broken" />
+        <ButtonSecondary type="submit" className="min-h-12 w-full justify-center rounded-md border border-border bg-surface px-4 font-semibold text-text-primary sm:w-auto">
+          {copy.promiseBrokenAction}
+        </ButtonSecondary>
+      </form>
+    </div>
   );
 }
 
@@ -151,6 +172,9 @@ export function AgingTable({ rows }: { rows: CollectionsAgingRow[] }) {
                   defaultPromisedOn={defaultPromisedOn}
                   controlId={controlId}
                 />
+                {row.openPromiseId ? (
+                  <PromiseOutcomeActions promiseId={row.openPromiseId} />
+                ) : null}
                 <div className="flex flex-wrap gap-2">
                   {rowWhatsappUrl ? (
                     <form action={recordChaseAttemptAction}>

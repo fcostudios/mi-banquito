@@ -6,6 +6,7 @@ const redirect = vi.fn((path: string): never => {
 });
 const revalidatePath = vi.fn();
 const markPromise = vi.fn();
+const markPromiseOutcome = vi.fn();
 const buildChaseAttempt = vi.fn();
 const recordChaseAttempt = vi.fn();
 const requireTreasurer = vi.fn();
@@ -24,6 +25,7 @@ vi.mock("@mi-banquito/domain", async (importOriginal) => {
     ...actual,
     createCollectionsService: () => ({
       markPromise,
+      markPromiseOutcome,
       buildChaseAttempt,
       recordChaseAttempt,
     }),
@@ -61,11 +63,19 @@ function chaseFormData() {
   return formData;
 }
 
+function promiseOutcomeFormData(outcome = "kept") {
+  const formData = new FormData();
+  formData.set("promiseId", "55555555-5555-4555-8555-555555555555");
+  formData.set("outcome", outcome);
+  return formData;
+}
+
 describe("atrasos actions", () => {
   beforeEach(() => {
     redirect.mockClear();
     revalidatePath.mockClear();
     markPromise.mockReset();
+    markPromiseOutcome.mockReset();
     buildChaseAttempt.mockReset();
     recordChaseAttempt.mockReset();
     requireTreasurer.mockReset();
@@ -115,6 +125,36 @@ describe("atrasos actions", () => {
       "Revisa los datos antes de continuar.",
     );
     expect(markPromise).not.toHaveBeenCalled();
+  });
+
+  it("marks a promise outcome and redirects with visible success", async () => {
+    const { markPromiseOutcomeAction } = await import("./actions");
+    markPromiseOutcome.mockResolvedValue(undefined);
+
+    await expect(markPromiseOutcomeAction(promiseOutcomeFormData("kept")))
+      .rejects.toThrow("NEXT_REDIRECT:/atrasos?promiseOutcome=kept");
+
+    expect(markPromiseOutcome).toHaveBeenCalledWith({
+      orgId,
+      actorId,
+      promiseId: "55555555-5555-4555-8555-555555555555",
+      outcome: "kept",
+      todayIso: currentEcuadorDateString(),
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/atrasos");
+    expect(revalidatePath).toHaveBeenCalledWith("/historial");
+  });
+
+  it("maps malformed promise outcome input to a friendly generic message", async () => {
+    const { markPromiseOutcomeAction } = await import("./actions");
+
+    await expect(markPromiseOutcomeAction(promiseOutcomeFormData("unknown")))
+      .rejects.toThrow("NEXT_REDIRECT:/atrasos?error=");
+
+    expect(decodeURIComponent(redirect.mock.calls[0]?.[0] ?? "")).toContain(
+      "Revisa los datos antes de continuar.",
+    );
+    expect(markPromiseOutcome).not.toHaveBeenCalled();
   });
 
   it("recomputes WhatsApp chase details on the server before auditing", async () => {

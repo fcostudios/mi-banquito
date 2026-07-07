@@ -45,6 +45,8 @@ describe("ScrArAgingPage", () => {
         daysLate: 14,
         amountDue: "25.5000",
         lastActionAt: new Date("2026-07-02T15:00:00.000Z"),
+        openPromiseId: "55555555-5555-4555-8555-555555555555",
+        openPromisePromisedOn: "2026-07-11",
       },
     ]);
 
@@ -60,7 +62,12 @@ describe("ScrArAgingPage", () => {
     expect(within(row).getByText("14 días")).toBeInTheDocument();
     expect(within(row).getByText("2026-07-02")).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "Marcar promesa" })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Cumplida" })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Sigue pendiente" })).toBeInTheDocument();
     expect(container.querySelector('input[name="promisedOn"]')).toHaveValue("2026-07-11");
+    expect(container.querySelector('input[name="promiseId"]')).toHaveValue("55555555-5555-4555-8555-555555555555");
+    expect(container.querySelector('input[name="outcome"][value="kept"]')).toBeInTheDocument();
+    expect(container.querySelector('input[name="outcome"][value="broken"]')).toBeInTheDocument();
     expect(within(row).queryByRole("link", { name: "Avisar por WhatsApp" })).not.toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "Avisar por WhatsApp" })).toBeInTheDocument();
     expect(within(row).queryByRole("button", { name: "Registrar aviso" })).not.toBeInTheDocument();
