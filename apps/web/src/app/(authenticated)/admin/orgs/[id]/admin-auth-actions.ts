@@ -12,6 +12,7 @@ import messages from "@/lib/i18n/en-US.json";
 import { db } from "@mi-banquito/db";
 import { withTenantTransaction } from "@mi-banquito/db/tenant";
 import {
+  auditLogEntry,
   authAdminAction,
   member,
   organization,
@@ -52,6 +53,17 @@ type AuthAdminActionInput = {
   createdAt: Date;
 };
 
+type AdminAuditInput = {
+  orgId: string;
+  actorKind: "platform_operator" | "system";
+  actorId: string;
+  actionKind: string;
+  subjectKind: string;
+  subjectId: string | null;
+  payloadSnapshot: Record<string, unknown>;
+  createdAt: Date;
+};
+
 type AdminAuthRepository = {
   getOrganization(orgId: string): Promise<OrganizationAccess | undefined>;
   findTreasurerAccessByEmail(orgId: string, email: string): Promise<TreasurerAccess | undefined>;
@@ -64,6 +76,7 @@ type AdminAuthRepository = {
   }): Promise<{ id: string } | undefined>;
   findActiveTreasurerByEmail(orgId: string, email: string): Promise<Omit<TreasurerAccess, "accepted"> | undefined>;
   logAction(input: AuthAdminActionInput): Promise<void>;
+  logAuditEntry(input: AdminAuditInput): Promise<void>;
 };
 
 type AdminAuthActionDeps = {
@@ -219,6 +232,21 @@ export function createAdminAuthActions(deps: AdminAuthActionDeps) {
         since: new Date(now.getTime() - 5 * 60 * 1000),
       });
       if (recent) {
+        await deps.repo.logAuditEntry({
+          orgId: parsed.data.orgId,
+          actorKind: "platform_operator",
+          actorId: session.actorId,
+          actionKind: "treasurer_login_reset.rate_limited",
+          subjectKind: "organization",
+          subjectId: parsed.data.orgId,
+          payloadSnapshot: {
+            email: parsed.data.email,
+            action: "treasurer_login_reset",
+            rateLimited: true,
+            since: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
+          },
+          createdAt: now,
+        });
         redirectError(deps, parsed.data.orgId, "reset-rate-limited");
       }
 
@@ -243,6 +271,20 @@ export function createAdminAuthActions(deps: AdminAuthActionDeps) {
           status: "sent",
           createdAt: now,
         });
+        await deps.repo.logAuditEntry({
+          orgId: parsed.data.orgId,
+          actorKind: "platform_operator",
+          actorId: session.actorId,
+          actionKind: "treasurer_login_reset.sent",
+          subjectKind: "user_account",
+          subjectId: treasurer.userAccountId,
+          payloadSnapshot: {
+            email: parsed.data.email,
+            action: "treasurer_login_reset",
+            providerRequestId: result.providerRequestId,
+          },
+          createdAt: now,
+        });
       } catch (error) {
         await deps.repo.logAction({
           orgId: parsed.data.orgId,
@@ -253,6 +295,20 @@ export function createAdminAuthActions(deps: AdminAuthActionDeps) {
           actorId: session.actorId,
           status: "failed",
           errorMessage: auth0ErrorMessage(error),
+          createdAt: now,
+        });
+        await deps.repo.logAuditEntry({
+          orgId: parsed.data.orgId,
+          actorKind: "platform_operator",
+          actorId: session.actorId,
+          actionKind: "treasurer_login_reset.failed",
+          subjectKind: "user_account",
+          subjectId: treasurer.userAccountId,
+          payloadSnapshot: {
+            email: parsed.data.email,
+            action: "treasurer_login_reset",
+            errorMessage: auth0ErrorMessage(error),
+          },
           createdAt: now,
         });
         redirectError(deps, parsed.data.orgId, "reset-failed");
@@ -349,7 +405,7 @@ export const adminAuthRepository: AdminAuthRepository = {
         joinedOn: input.now.toISOString().slice(0, 10),
         role: "tesorera",
         status: "activo",
-        authSubject: pendingAuthSubject,
+        authSubject: null,
         initialSavingsBalance: "0.0000",
         notes: null,
         createdAt: input.now,
@@ -426,6 +482,24 @@ export const adminAuthRepository: AdminAuthRepository = {
         providerRequestId: input.providerRequestId,
         status: input.status,
         errorMessage: input.errorMessage,
+        createdAt: input.createdAt,
+      });
+    });
+  },
+
+  async logAuditEntry(input) {
+    await withTenantTransaction(input.orgId, async (tx) => {
+      await tx.insert(auditLogEntry).values({
+        id: randomUUID(),
+        orgId: input.orgId,
+        actorKind: input.actorKind,
+        actorId: input.actorId,
+        actionKind: input.actionKind,
+        subjectKind: input.subjectKind,
+        subjectId: input.subjectId,
+        payloadSnapshot: input.payloadSnapshot,
+        reason: null,
+        at: input.createdAt,
         createdAt: input.createdAt,
       });
     });

@@ -18,11 +18,17 @@ type PasswordlessLinkInput = {
   auth0OrgId: string;
 };
 
+type CreateOrganizationInput = {
+  displayName: string;
+  orgId: string;
+};
+
 type ProviderResult = {
   providerRequestId?: string;
 };
 
 export type Auth0AdminClient = {
+  createOrganization(input: CreateOrganizationInput): Promise<{ auth0OrgId?: string }>;
   inviteTreasurer(input: InviteTreasurerInput): Promise<ProviderResult>;
   sendPasswordlessLink(input: PasswordlessLinkInput): Promise<ProviderResult>;
 };
@@ -59,6 +65,17 @@ function providerRequestIdFrom(body: Record<string, unknown>): string | undefine
   return typeof id === "string" ? id : undefined;
 }
 
+function organizationName(input: CreateOrganizationInput): string {
+  const normalized = input.displayName
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 32);
+  return `${normalized || "org"}-${input.orgId.slice(0, 8)}`;
+}
+
 export function createAuth0AdminClient(config: Auth0AdminClientConfig): Auth0AdminClient {
   const origin = baseUrl(config.domain);
 
@@ -83,6 +100,28 @@ export function createAuth0AdminClient(config: Auth0AdminClientConfig): Auth0Adm
   }
 
   return {
+    async createOrganization(input) {
+      const token = await managementToken();
+      const body = await fetchJson(
+        `${origin}/api/v2/organizations`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            name: organizationName(input),
+            display_name: input.displayName,
+            metadata: {
+              db_org_id: input.orgId,
+            },
+          }),
+        },
+        "auth0_organization_failed",
+      );
+      return { auth0OrgId: providerRequestIdFrom(body) };
+    },
+
     async inviteTreasurer(input) {
       const token = await managementToken();
       const body = await fetchJson(

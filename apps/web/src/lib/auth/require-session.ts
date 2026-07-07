@@ -5,7 +5,8 @@ import { getDbOrgIdFromUser, getRolesFromUser } from "@/lib/auth/session-claims"
 import { hasMinRole, type AppRole } from "@/lib/auth/roles";
 import { ROUTE_ACCESS_DENIED, ROUTE_LOGIN } from "@/lib/routes";
 import { db } from "@mi-banquito/db";
-import { organization, platformOperator, userAccount, userOrgMembership } from "@mi-banquito/db/schema";
+import { withTenantTransaction } from "@mi-banquito/db/tenant";
+import { auditLogEntry, member, organization, platformOperator, userAccount, userOrgMembership } from "@mi-banquito/db/schema";
 
 export type RequiredSession = {
   userId: string;
@@ -119,43 +120,70 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
     redirect(ROUTE_ACCESS_DENIED);
   }
 
-  let [membership] = await db
-    .select({ memberId: userOrgMembership.memberId, userAccountId: userAccount.id, role: userOrgMembership.role })
-    .from(userAccount)
-    .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
-    .where(and(
-      eq(userAccount.authSubject, userId),
-      eq(userOrgMembership.orgId, orgId),
-      eq(userOrgMembership.status, "active"),
-    ));
-
-  if (!membership?.memberId && email && emailVerified) {
-    const pendingAuthSubject = `pending:${email}`;
-    const [pendingMembership] = await db
-      .select({
-        memberId: userOrgMembership.memberId,
-        userAccountId: userAccount.id,
-        role: userOrgMembership.role,
-        authSubject: userAccount.authSubject,
-      })
+  let [membership] = await withTenantTransaction(orgId, async (tx) =>
+    tx
+      .select({ memberId: userOrgMembership.memberId, userAccountId: userAccount.id, role: userOrgMembership.role })
       .from(userAccount)
       .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
       .where(and(
-        eq(userAccount.email, email),
-        eq(userAccount.authSubject, pendingAuthSubject),
-        eq(userAccount.status, "active"),
+        eq(userAccount.authSubject, userId),
         eq(userOrgMembership.orgId, orgId),
         eq(userOrgMembership.status, "active"),
-      ));
+      )));
+
+  if (!membership?.memberId && email && emailVerified) {
+    const pendingAuthSubject = `pending:${email}`;
+    const [pendingMembership] = await withTenantTransaction(orgId, async (tx) =>
+      tx
+        .select({
+          memberId: userOrgMembership.memberId,
+          userAccountId: userAccount.id,
+          role: userOrgMembership.role,
+          authSubject: userAccount.authSubject,
+        })
+        .from(userAccount)
+        .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
+        .where(and(
+          eq(userAccount.email, email),
+          eq(userAccount.authSubject, pendingAuthSubject),
+          eq(userAccount.status, "active"),
+          eq(userOrgMembership.orgId, orgId),
+          eq(userOrgMembership.status, "active"),
+        )));
 
     if (pendingMembership?.memberId) {
-      await db
-        .update(userAccount)
-        .set({ authSubject: userId, updatedAt: new Date() })
-        .where(and(
-          eq(userAccount.id, pendingMembership.userAccountId),
-          eq(userAccount.authSubject, pendingAuthSubject),
-        ));
+      const now = new Date();
+      const pendingMemberId = pendingMembership.memberId;
+      const pendingUserAccountId = pendingMembership.userAccountId;
+      await withTenantTransaction(orgId, async (tx) => {
+        await tx
+          .update(userAccount)
+          .set({ authSubject: userId, updatedAt: now })
+          .where(and(
+            eq(userAccount.id, pendingUserAccountId),
+            eq(userAccount.authSubject, pendingAuthSubject),
+          ));
+        await tx
+          .update(member)
+          .set({ authSubject: userId, updatedAt: now })
+          .where(eq(member.id, pendingMemberId));
+        await tx.insert(auditLogEntry).values({
+          orgId,
+          actorKind: "system",
+          actorId: pendingMemberId,
+          actionKind: "auth.invite.accepted",
+          subjectKind: "member",
+          subjectId: pendingMemberId,
+          payloadSnapshot: {
+            email,
+            authSubject: userId,
+            userAccountId: pendingUserAccountId,
+          },
+          reason: null,
+          at: now,
+          createdAt: now,
+        });
+      });
       membership = pendingMembership;
     }
   }

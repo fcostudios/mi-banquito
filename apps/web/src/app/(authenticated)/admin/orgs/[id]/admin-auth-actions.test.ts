@@ -11,6 +11,7 @@ const userAccountId = "33333333-3333-4333-8333-333333333333";
 const memberId = "44444444-4444-4444-8444-444444444444";
 
 const requirePlatformOperator = vi.fn();
+const createOrganization = vi.fn();
 const inviteTreasurer = vi.fn();
 const sendPasswordlessLink = vi.fn();
 const revalidatePath = vi.fn();
@@ -24,6 +25,7 @@ const repo = {
   findRecentSentAction: vi.fn(),
   findActiveTreasurerByEmail: vi.fn(),
   logAction: vi.fn(),
+  logAuditEntry: vi.fn(),
 };
 
 vi.mock("@/lib/auth/require-session", () => ({
@@ -59,7 +61,7 @@ async function buildActions() {
   const { createAdminAuthActions } = await import("./admin-auth-actions");
   return createAdminAuthActions({
     requirePlatformOperator,
-    auth0Client: { inviteTreasurer, sendPasswordlessLink },
+    auth0Client: { createOrganization, inviteTreasurer, sendPasswordlessLink },
     repo,
     revalidatePath,
     redirect,
@@ -80,6 +82,27 @@ function txWithRows(rows: unknown[]) {
       return builder;
     }),
   };
+}
+
+function txForPendingCreate() {
+  const inserted: Array<Record<string, unknown>> = [];
+  const tx = {
+    select: vi.fn(() => {
+      const builder = {
+        from: vi.fn(() => builder),
+        where: vi.fn(() => builder),
+        limit: vi.fn(() => Promise.resolve([])),
+      };
+      return builder;
+    }),
+    insert: vi.fn(() => ({
+      values: vi.fn((values: Record<string, unknown>) => {
+        inserted.push(values);
+        return Promise.resolve(undefined);
+      }),
+    })),
+  };
+  return { tx, inserted };
 }
 
 describe("admin Auth0 access actions", () => {
@@ -200,7 +223,19 @@ describe("admin Auth0 access actions", () => {
       .rejects.toThrow(`NEXT_REDIRECT:/admin/orgs/${orgId}?authAccessError=reset-rate-limited`);
 
     expect(sendPasswordlessLink).not.toHaveBeenCalled();
-    expect(repo.logAction).not.toHaveBeenCalled();
+    expect(repo.logAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      orgId,
+      actorKind: "platform_operator",
+      actorId,
+      actionKind: "treasurer_login_reset.rate_limited",
+      subjectKind: "organization",
+      subjectId: orgId,
+      payloadSnapshot: expect.objectContaining({
+        email: "tesorera@example.com",
+        action: "treasurer_login_reset",
+        rateLimited: true,
+      }),
+    }));
   });
 
   it("requires an active treasurer account before sending a magic-link recovery email", async () => {
@@ -229,6 +264,15 @@ describe("admin Auth0 access actions", () => {
       targetUserId: userAccountId,
       providerRequestId: "pwd_123",
       status: "sent",
+    }));
+    expect(repo.logAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      actionKind: "treasurer_login_reset.sent",
+      subjectKind: "user_account",
+      subjectId: userAccountId,
+      payloadSnapshot: expect.objectContaining({
+        email: "tesorera@example.com",
+        action: "treasurer_login_reset",
+      }),
     }));
   });
 });
@@ -284,5 +328,31 @@ describe("adminAuthRepository tenant RLS reads", () => {
 
     expect(dbMocks.withTenantTransaction).toHaveBeenCalledWith(orgId, expect.any(Function));
     expect(dbMocks.dbSelect).not.toHaveBeenCalled();
+  });
+
+  it("creates pending treasurer members without a stale member auth subject", async () => {
+    const { tx, inserted } = txForPendingCreate();
+    dbMocks.withTenantTransaction.mockImplementation(async (_orgId, run) => run(tx));
+    const { adminAuthRepository } = await import("./admin-auth-actions");
+
+    await adminAuthRepository.createPendingTreasurerAccess({
+      orgId,
+      email: "tesorera@example.com",
+      displayName: "Tesorera Nueva",
+      actorId,
+      now: new Date("2026-07-07T14:00:00.000Z"),
+    });
+
+    expect(inserted).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        email: "tesorera@example.com",
+        authSubject: "pending:tesorera@example.com",
+      }),
+      expect.objectContaining({
+        displayName: "Tesorera Nueva",
+        role: "tesorera",
+        authSubject: null,
+      }),
+    ]));
   });
 });

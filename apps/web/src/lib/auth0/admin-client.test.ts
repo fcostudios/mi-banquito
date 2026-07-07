@@ -103,6 +103,49 @@ describe("createAuth0AdminClient", () => {
     );
   });
 
+  it("creates an Auth0 organization through the Management API", async () => {
+    const { createAuth0AdminClient } = await import("./admin-client");
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ access_token: "mgmt-token" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: "org_created" }),
+      });
+
+    const client = createAuth0AdminClient({
+      domain: "example.us.auth0.com",
+      clientId: "client-id",
+      clientSecret: "client-secret",
+    });
+
+    await expect(client.createOrganization({
+      displayName: "Banquito Centro",
+      orgId: "11111111-1111-4111-8111-111111111111",
+    })).resolves.toEqual({ auth0OrgId: "org_created" });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://example.us.auth0.com/api/v2/organizations",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          authorization: "Bearer mgmt-token",
+        }),
+        body: JSON.stringify({
+          name: "banquito-centro-11111111",
+          display_name: "Banquito Centro",
+          metadata: {
+            db_org_id: "11111111-1111-4111-8111-111111111111",
+          },
+        }),
+      }),
+    );
+  });
+
+
   it("raises a redacted error when Auth0 rejects a request", async () => {
     const { createAuth0AdminClient } = await import("./admin-client");
     fetchMock.mockResolvedValueOnce({
