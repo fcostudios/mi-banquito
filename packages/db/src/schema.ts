@@ -69,6 +69,20 @@ export const alertAction = pgTable("alert_action", {
   createdAt: timestamp("created_at").notNull(),
 });
 
+export const authAdminAction = pgTable("auth_admin_action", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  actionKind: text("action_kind").notNull(),
+  targetEmail: text("target_email").notNull(),
+  targetUserId: uuid("target_user_id").references((): AnyPgColumn => userAccount.id),
+  actorKind: text("actor_kind").notNull(),
+  actorId: uuid("actor_id").notNull(),
+  providerRequestId: text("provider_request_id"),
+  status: text("status").notNull(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").notNull(),
+});
+
 export const auditLogEntry = pgTable("audit_log_entry", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   orgId: uuid("org_id"),
@@ -478,6 +492,7 @@ export const pilotLogEntry = pgTable("pilot_log_entry", {
 export const organization = pgTable("organization", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   displayName: text("display_name").notNull(),
+  auth0OrgId: text("auth0_org_id"),
   countryCode: text("country_code").notNull(),
   currencyCode: text("currency_code").notNull(),
   timezone: text("timezone").notNull(),
