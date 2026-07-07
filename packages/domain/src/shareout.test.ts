@@ -1,4 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { getTableName } from "drizzle-orm";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  auditLogEntry,
+  statementArchive,
+  statementArchiveSupersession,
+  withdrawal,
+  yearEndShareOut,
+  yearEndShareOutLine,
+  yearEndShareOutReversal,
+} from "@mi-banquito/db/schema";
 
 import {
   applyShareOutOverride,
@@ -6,6 +17,149 @@ import {
   computeTwoPoolDraft,
   fiscalYearForDate,
 } from "./shareout";
+
+type InsertRecord = {
+  tableName: string;
+  values: Record<string, unknown> | Array<Record<string, unknown>>;
+};
+
+type UpdateRecord = {
+  tableName: string;
+  values: Record<string, unknown>;
+};
+
+const tableNameOf = (table: unknown): string => getTableName(table as Parameters<typeof getTableName>[0]);
+
+class FakeSelectBuilder {
+  private tableName = "";
+
+  constructor(private readonly nextResult: (tableName: string) => unknown[]) {}
+
+  from(table: unknown) {
+    this.tableName = tableNameOf(table);
+    return this;
+  }
+
+  where() {
+    return this;
+  }
+
+  orderBy() {
+    return this;
+  }
+
+  limit() {
+    return Promise.resolve(this.nextResult(this.tableName));
+  }
+
+  then<TResult1 = unknown[], TResult2 = never>(
+    onfulfilled?: ((value: unknown[]) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2> {
+    return Promise.resolve(this.nextResult(this.tableName)).then(onfulfilled, onrejected);
+  }
+}
+
+class FakeInsertBuilder {
+  private inserted: Record<string, unknown> | Array<Record<string, unknown>> | null = null;
+
+  constructor(
+    private readonly table: unknown,
+    private readonly inserts: InsertRecord[],
+    private readonly nextReturning: (tableName: string, inserted: Record<string, unknown> | Array<Record<string, unknown>>) => unknown[],
+  ) {}
+
+  values(values: Record<string, unknown> | Array<Record<string, unknown>>) {
+    this.inserted = values;
+    this.inserts.push({ tableName: tableNameOf(this.table), values });
+    return this;
+  }
+
+  onConflictDoNothing() {
+    return this;
+  }
+
+  returning() {
+    return Promise.resolve(this.nextReturning(tableNameOf(this.table), this.inserted ?? {}));
+  }
+}
+
+class FakeUpdateBuilder {
+  constructor(private readonly table: unknown, private readonly updates: UpdateRecord[]) {}
+
+  set(values: Record<string, unknown>) {
+    this.updates.push({ tableName: tableNameOf(this.table), values });
+    return this;
+  }
+
+  where() {
+    return Promise.resolve([]);
+  }
+}
+
+class FakeDb {
+  readonly inserts: InsertRecord[] = [];
+  readonly updates: UpdateRecord[] = [];
+  readonly executes: string[] = [];
+  private readonly selectResultsByTableName: Record<string, unknown[][]>;
+  private readonly insertReturningByTableName: Record<string, unknown[][]>;
+
+  constructor(
+    selectResultsByTableName: Record<string, unknown[][]> = {},
+    insertReturningByTableName: Record<string, unknown[][]> = {},
+  ) {
+    this.selectResultsByTableName = { ...selectResultsByTableName };
+    this.insertReturningByTableName = { ...insertReturningByTableName };
+  }
+
+  select() {
+    return new FakeSelectBuilder((tableName) => this.selectResultsByTableName[tableName]?.shift() ?? []);
+  }
+
+  insert(table: unknown) {
+    return new FakeInsertBuilder(table, this.inserts, (tableName, inserted) => {
+      const queued = this.insertReturningByTableName[tableName]?.shift();
+      if (queued) return queued;
+      const row = Array.isArray(inserted) ? inserted[0] : inserted;
+      return row ? [{ id: `${tableName}-inserted`, ...row }] : [];
+    });
+  }
+
+  update(table: unknown) {
+    return new FakeUpdateBuilder(table, this.updates);
+  }
+
+  execute(query: unknown) {
+    this.executes.push(String(query));
+    return Promise.resolve([]);
+  }
+}
+
+function insertedRows(fakeDb: FakeDb, table: unknown): Array<Record<string, unknown>> {
+  return fakeDb.inserts
+    .filter((entry) => entry.tableName === tableNameOf(table))
+    .flatMap((entry) => Array.isArray(entry.values) ? entry.values : [entry.values]);
+}
+
+function updatedRows(fakeDb: FakeDb, table: unknown): Array<Record<string, unknown>> {
+  return fakeDb.updates
+    .filter((entry) => entry.tableName === tableNameOf(table))
+    .map((entry) => entry.values);
+}
+
+async function withMockedShareOutDb<T>(fakeDb: FakeDb, callback: () => Promise<T>): Promise<T> {
+  vi.resetModules();
+  vi.doMock("@mi-banquito/db/tenant", () => ({
+    withTenantTransaction: async <R>(_orgId: string, run: (tx: FakeDb) => Promise<R>): Promise<R> => run(fakeDb),
+    withWritableTenantTransaction: async <R>(_orgId: string, run: (tx: FakeDb) => Promise<R>): Promise<R> => run(fakeDb),
+  }));
+  try {
+    return await callback();
+  } finally {
+    vi.doUnmock("@mi-banquito/db/tenant");
+    vi.resetModules();
+  }
+}
 
 describe("year-end share-out", () => {
   it("bins fiscal years by configured start month", () => {
@@ -76,5 +230,146 @@ describe("year-end share-out", () => {
         { finalShareAmount: "60.0000" },
       ],
     })).not.toThrow();
+  });
+
+  it("reverses a distributed share-out inside the grace window with offset withdrawals and audit", async () => {
+    const fakeDb = new FakeDb({
+      [tableNameOf(yearEndShareOut)]: [[{
+        id: "shareout-1",
+        orgId: "org-1",
+        year: 2026,
+        status: "distributed",
+        approvedAt: new Date("2026-07-01T12:00:00.000Z"),
+      }]],
+      [tableNameOf(yearEndShareOutReversal)]: [[]],
+      [tableNameOf(yearEndShareOutLine)]: [[{
+        id: "line-1",
+        orgId: "org-1",
+        yearEndShareOutId: "shareout-1",
+        memberId: "member-1",
+        finalShareAmount: "26.5000",
+        withdrawalId: "withdrawal-1",
+      }]],
+      [tableNameOf(statementArchive)]: [[
+        { id: "archive-1", orgId: "org-1", yearEndShareOutId: "shareout-1" },
+        { id: "archive-2", orgId: "org-1", yearEndShareOutId: "shareout-1" },
+      ]],
+    }, {
+      [tableNameOf(yearEndShareOutReversal)]: [[{ id: "reversal-1" }]],
+      [tableNameOf(withdrawal)]: [[{ id: "withdrawal-reversal-1" }]],
+    });
+
+    await withMockedShareOutDb(fakeDb, async () => {
+      const { createShareOutService } = await import("./shareout");
+      const service = createShareOutService({ now: () => new Date("2026-07-05T12:00:00.000Z") });
+
+      await expect(service.reverseApprovedShareOut({
+        orgId: "org-1",
+        actorId: "actor-1",
+        shareOutId: "shareout-1",
+        reason: "Acta corrigió reparto anual",
+      })).resolves.toEqual({
+        reversed: true,
+        reversalId: "reversal-1",
+        shareOutId: "shareout-1",
+        offsetsCreated: 1,
+      });
+    });
+
+    expect(insertedRows(fakeDb, withdrawal)).toEqual([
+      expect.objectContaining({
+        orgId: "org-1",
+        memberId: "member-1",
+        amount: "-26.5000",
+        kind: "year_end_reversal",
+        shareOutId: "shareout-1",
+        reversesId: "withdrawal-1",
+        reverseReason: "Acta corrigió reparto anual",
+        yearEndShareOutLineId: "line-1",
+      }),
+    ]);
+    expect(insertedRows(fakeDb, yearEndShareOutReversal)).toEqual([
+      expect.objectContaining({
+        orgId: "org-1",
+        yearEndShareOutId: "shareout-1",
+        reason: "Acta corrigió reparto anual",
+        reversedBy: "actor-1",
+        reversalPayload: expect.objectContaining({
+          withdrawalOffsets: [expect.objectContaining({ amount: "-26.5000", reversesId: "withdrawal-1" })],
+        }),
+      }),
+    ]);
+    expect(updatedRows(fakeDb, yearEndShareOut)).toEqual([
+      expect.objectContaining({ status: "reversed" }),
+    ]);
+    expect(updatedRows(fakeDb, statementArchive)).toEqual([]);
+    expect(insertedRows(fakeDb, statementArchiveSupersession)).toHaveLength(2);
+    expect(insertedRows(fakeDb, auditLogEntry)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        actionKind: "year_end_share_out.reversed",
+        subjectKind: "year_end_share_out",
+        subjectId: "shareout-1",
+        reason: "Acta corrigió reparto anual",
+      }),
+    ]));
+  });
+
+  it("blocks reversal outside the ten-day grace window", async () => {
+    const fakeDb = new FakeDb({
+      [tableNameOf(yearEndShareOut)]: [[{
+        id: "shareout-1",
+        orgId: "org-1",
+        year: 2026,
+        status: "distributed",
+        approvedAt: new Date("2026-07-01T12:00:00.000Z"),
+      }]],
+      [tableNameOf(yearEndShareOutReversal)]: [[]],
+    });
+
+    await withMockedShareOutDb(fakeDb, async () => {
+      const { createShareOutService } = await import("./shareout");
+      const service = createShareOutService({ now: () => new Date("2026-07-12T12:00:00.000Z") });
+
+      await expect(service.reverseApprovedShareOut({
+        orgId: "org-1",
+        actorId: "actor-1",
+        shareOutId: "shareout-1",
+        reason: "Acta corrigió reparto anual",
+      })).rejects.toThrow("share_out_reversal_window_closed");
+    });
+    expect(insertedRows(fakeDb, withdrawal)).toEqual([]);
+  });
+
+  it("returns the existing reversal without creating duplicate offsets", async () => {
+    const fakeDb = new FakeDb({
+      [tableNameOf(yearEndShareOut)]: [[{
+        id: "shareout-1",
+        orgId: "org-1",
+        year: 2026,
+        status: "reversed",
+        approvedAt: new Date("2026-07-01T12:00:00.000Z"),
+      }]],
+      [tableNameOf(yearEndShareOutReversal)]: [[{ id: "reversal-1", yearEndShareOutId: "shareout-1" }]],
+    });
+
+    await withMockedShareOutDb(fakeDb, async () => {
+      const { createShareOutService } = await import("./shareout");
+      const service = createShareOutService({ now: () => new Date("2026-07-05T12:00:00.000Z") });
+
+      await expect(service.reverseApprovedShareOut({
+        orgId: "org-1",
+        actorId: "actor-1",
+        shareOutId: "shareout-1",
+        reason: "Acta corrigió reparto anual",
+      })).resolves.toEqual({
+        reversed: false,
+        reversalId: "reversal-1",
+        shareOutId: "shareout-1",
+        offsetsCreated: 0,
+      });
+    });
+
+    expect(insertedRows(fakeDb, withdrawal)).toEqual([]);
+    expect(insertedRows(fakeDb, yearEndShareOutReversal)).toEqual([]);
   });
 });

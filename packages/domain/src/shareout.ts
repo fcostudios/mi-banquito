@@ -7,15 +7,18 @@ import {
   memberTimeWeightedBalance,
   periodClose,
   statementArchive,
+  statementArchiveSupersession,
   surplusGovernanceDecision,
   withdrawal,
   yearEndBalanceSnapshot,
   yearEndBalanceSnapshotLine,
   yearEndShareOut,
   yearEndShareOutLine,
+  yearEndShareOutReversal,
 } from "@mi-banquito/db/schema";
 import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import { canonicalJson, sha256Hex } from "./reporting";
+import { assertShareOutReversalAllowed, buildShareOutReversalPlan } from "./year-end-reversal";
 
 function cents4(value: string | number): bigint {
   return BigInt(Math.round(Number(value) * 10000));
@@ -122,7 +125,8 @@ function totalMoney(lines: Array<{ value: string | null }>) {
   return money4(lines.reduce((sum, line) => sum + cents4(line.value ?? "0.0000"), ZERO));
 }
 
-export function createShareOutService() {
+export function createShareOutService(options: { now?: () => Date } = {}) {
+  const clock = options.now ?? (() => new Date());
   return {
     async getLatestDraft(input: { orgId: string; year?: number }): Promise<ShareOutDraftView | null> {
       return withTenantTransaction(input.orgId, async (tx) => {
@@ -652,6 +656,173 @@ export function createShareOutService() {
           createdAt: now,
         });
         return { shareOutId: shareOut.id, withdrawalsCreated: lines.length };
+      });
+    },
+    async reverseApprovedShareOut(input: {
+      orgId: string;
+      actorId: string;
+      shareOutId: string;
+      reason: string;
+      graceDays?: number;
+    }) {
+      return withWritableTenantTransaction(input.orgId, async (tx) => {
+        const [shareOut] = await tx.select().from(yearEndShareOut)
+          .where(and(eq(yearEndShareOut.orgId, input.orgId), eq(yearEndShareOut.id, input.shareOutId)))
+          .limit(1);
+        if (!shareOut) throw new Error("share_out_not_found");
+
+        const [existingReversal] = await tx.select().from(yearEndShareOutReversal)
+          .where(and(
+            eq(yearEndShareOutReversal.orgId, input.orgId),
+            eq(yearEndShareOutReversal.yearEndShareOutId, input.shareOutId),
+          ))
+          .limit(1);
+        if (existingReversal) {
+          return {
+            reversed: false,
+            reversalId: existingReversal.id,
+            shareOutId: input.shareOutId,
+            offsetsCreated: 0,
+          };
+        }
+
+        const reversedAt = clock();
+        assertShareOutReversalAllowed({
+          status: shareOut.status,
+          approvedAt: shareOut.approvedAt,
+          now: reversedAt,
+          graceDays: input.graceDays ?? 10,
+        });
+
+        const lines = await tx.select().from(yearEndShareOutLine)
+          .where(and(
+            eq(yearEndShareOutLine.orgId, input.orgId),
+            eq(yearEndShareOutLine.yearEndShareOutId, input.shareOutId),
+          ));
+        const plan = buildShareOutReversalPlan({
+          shareOutId: input.shareOutId,
+          reason: input.reason,
+          lines: lines.map((line) => ({
+            id: line.id,
+            memberId: line.memberId,
+            finalShareAmount: String(line.finalShareAmount),
+            withdrawalId: line.withdrawalId,
+          })),
+        });
+        const [reversal] = await tx.insert(yearEndShareOutReversal).values({
+          orgId: input.orgId,
+          yearEndShareOutId: input.shareOutId,
+          reason: plan.reason,
+          reversedAt,
+          reversedBy: input.actorId,
+          reversalPayload: plan,
+          createdAt: reversedAt,
+        }).onConflictDoNothing().returning();
+        if (!reversal) {
+          const [raceWinner] = await tx.select().from(yearEndShareOutReversal)
+            .where(and(
+              eq(yearEndShareOutReversal.orgId, input.orgId),
+              eq(yearEndShareOutReversal.yearEndShareOutId, input.shareOutId),
+            ))
+            .limit(1);
+          if (!raceWinner) throw new Error("share_out_reversal_conflict");
+          return {
+            reversed: false,
+            reversalId: raceWinner.id,
+            shareOutId: input.shareOutId,
+            offsetsCreated: 0,
+          };
+        }
+
+        let offsetsCreated = 0;
+        for (const offset of plan.withdrawalOffsets) {
+          const [withdrawalRow] = await tx.insert(withdrawal).values({
+            orgId: input.orgId,
+            memberId: offset.memberId,
+            amount: offset.amount,
+            currencyCode: "USD",
+            datedOn: reversedAt.toISOString().slice(0, 10),
+            recordedAt: reversedAt,
+            kind: "year_end_reversal",
+            shareOutId: input.shareOutId,
+            notes: "Reverso reparto fin de año",
+            reversesId: offset.reversesId,
+            reverseReason: plan.reason,
+            adjustmentCycleId: null,
+            clientRequestId: null,
+            createdAt: reversedAt,
+            createdBy: input.actorId,
+            createdByKind: "member",
+            yearEndShareOutLineId: offset.lineId,
+          }).returning();
+          offsetsCreated += 1;
+          await tx.insert(auditLogEntry).values({
+            orgId: input.orgId,
+            actorKind: "member",
+            actorId: input.actorId,
+            actionKind: "shareout.withdrawal.reverse",
+            subjectKind: "withdrawal",
+            subjectId: withdrawalRow.id,
+            payloadSnapshot: {
+              shareOutId: input.shareOutId,
+              reversalId: reversal.id,
+              lineId: offset.lineId,
+              amount: offset.amount,
+              reversesId: offset.reversesId,
+            },
+            reason: plan.reason,
+            at: reversedAt,
+            createdAt: reversedAt,
+          });
+        }
+
+        const archives = await tx.select().from(statementArchive)
+          .where(and(
+            eq(statementArchive.orgId, input.orgId),
+            eq(statementArchive.yearEndShareOutId, input.shareOutId),
+          ));
+        if (archives.length > 0) {
+          await tx.insert(statementArchiveSupersession).values(archives.map((archive) => ({
+            orgId: input.orgId,
+            supersededStatementArchiveId: archive.id,
+            supersedingStatementArchiveId: null,
+            yearEndShareOutReversalId: reversal.id,
+            reason: plan.reason,
+            createdAt: reversedAt,
+          }))).onConflictDoNothing();
+        }
+
+        await tx.update(yearEndShareOut).set({
+          status: "reversed",
+        }).where(and(eq(yearEndShareOut.orgId, input.orgId), eq(yearEndShareOut.id, input.shareOutId)));
+        await tx.insert(auditLogEntry).values({
+          orgId: input.orgId,
+          actorKind: "member",
+          actorId: input.actorId,
+          actionKind: "year_end_share_out.reversed",
+          subjectKind: "year_end_share_out",
+          subjectId: input.shareOutId,
+          payloadSnapshot: {
+            shareOutId: input.shareOutId,
+            reversalId: reversal.id,
+            offsetsCreated,
+            supersededStatementArchiveIds: archives.map((archive) => archive.id),
+          },
+          reason: plan.reason,
+          at: reversedAt,
+          createdAt: reversedAt,
+        });
+        await tx.execute(sql`REFRESH MATERIALIZED VIEW mv_member_compliance_state`);
+        await tx.execute(sql`REFRESH MATERIALIZED VIEW mv_available_capital`);
+        await tx.execute(sql`REFRESH MATERIALIZED VIEW mv_cash_balances`);
+        await tx.execute(sql`REFRESH MATERIALIZED VIEW mv_liquidez_proyectada`);
+
+        return {
+          reversed: true,
+          reversalId: reversal.id,
+          shareOutId: input.shareOutId,
+          offsetsCreated,
+        };
       });
     },
   };

@@ -37,8 +37,8 @@ export const surplus_governance_decision_status_enum = pgEnum("surplus_governanc
 export const user_account_status_enum = pgEnum("user_account_status_enum", ["active", "disabled"]);
 export const user_org_membership_status_enum = pgEnum("user_org_membership_status_enum", ["active", "revoked"]);
 export const withdrawal_created_by_kind_enum = pgEnum("withdrawal_created_by_kind_enum", ["member", "system"]);
-export const withdrawal_kind_enum = pgEnum("withdrawal_kind_enum", ["member_refund", "year_end_share_out", "other", "referral_commission_credit", "treasurer_compensation_disbursement"]);
-export const year_end_share_out_status_enum = pgEnum("year_end_share_out_status_enum", ["draft", "approved", "distributed", "locked"]);
+export const withdrawal_kind_enum = pgEnum("withdrawal_kind_enum", ["member_refund", "year_end_share_out", "other", "referral_commission_credit", "treasurer_compensation_disbursement", "year_end_reversal"]);
+export const year_end_share_out_status_enum = pgEnum("year_end_share_out_status_enum", ["draft", "approved", "distributed", "locked", "reversed"]);
 export const loan_disbursement_source_enum = pgEnum("loan_disbursement_source_enum", ["bank_transfer", "petty_cash"]);
 
 export const alert = pgTable("alert", {
@@ -774,6 +774,27 @@ export const statementArchive = pgTable("statement_archive", {
   byteSize: integer("byte_size").notNull(),
   createdAt: timestamp("created_at").notNull(),
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
+});
+
+export const yearEndShareOutReversal = pgTable("year_end_share_out_reversal", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  yearEndShareOutId: uuid("year_end_share_out_id").references((): AnyPgColumn => yearEndShareOut.id).notNull(),
+  reason: text("reason").notNull(),
+  reversedAt: timestamp("reversed_at").notNull(),
+  reversedBy: uuid("reversed_by").notNull(),
+  reversalPayload: jsonb("reversal_payload").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+});
+
+export const statementArchiveSupersession = pgTable("statement_archive_supersession", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  supersededStatementArchiveId: uuid("superseded_statement_archive_id").references((): AnyPgColumn => statementArchive.id).notNull(),
+  supersedingStatementArchiveId: uuid("superseding_statement_archive_id").references((): AnyPgColumn => statementArchive.id),
+  yearEndShareOutReversalId: uuid("year_end_share_out_reversal_id").references((): AnyPgColumn => yearEndShareOutReversal.id).notNull(),
+  reason: text("reason").notNull(),
+  createdAt: timestamp("created_at").notNull(),
 });
 
 export const surplusGovernanceDecision = pgTable("surplus_governance_decision", {
