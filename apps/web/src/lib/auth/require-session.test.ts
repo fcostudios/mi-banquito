@@ -8,6 +8,7 @@ const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 const selectResponses: unknown[][] = [];
 const updateSet = vi.fn();
 const updateWhere = vi.fn();
+const insertValues = vi.fn();
 const db = {
   select: vi.fn(() => ({
     from: () => ({
@@ -21,6 +22,9 @@ const db = {
     set: updateSet.mockReturnValue({
       where: updateWhere.mockResolvedValue(undefined),
     }),
+  })),
+  insert: vi.fn(() => ({
+    values: insertValues.mockResolvedValue(undefined),
   })),
 };
 
@@ -43,11 +47,21 @@ vi.mock("@mi-banquito/db", () => ({
   db,
 }));
 
+vi.mock("@mi-banquito/db/tenant", () => ({
+  withTenantTransaction: (_orgId: string, run: (tx: typeof db) => Promise<unknown>) => run(db),
+}));
+
 vi.mock("@mi-banquito/db/schema", () => ({
   organization: {
     id: "organization.id",
     displayName: "organization.display_name",
     status: "organization.status",
+  },
+  auditLogEntry: "audit_log_entry",
+  member: {
+    id: "member.id",
+    authSubject: "member.auth_subject",
+    updatedAt: "member.updated_at",
   },
   platformOperator: {
     id: "platform_operator.id",
@@ -76,8 +90,10 @@ describe("requireRole", () => {
     redirect.mockClear();
     db.select.mockClear();
     db.update.mockClear();
+    db.insert.mockClear();
     updateSet.mockReset();
     updateWhere.mockReset();
+    insertValues.mockReset();
     warn.mockClear();
     selectResponses.length = 0;
   });
@@ -131,6 +147,24 @@ describe("requireRole", () => {
       authSubject: "auth0|real-user",
       updatedAt: expect.any(Date),
     });
+    expect(updateSet).toHaveBeenCalledWith({
+      authSubject: "auth0|real-user",
+      updatedAt: expect.any(Date),
+    });
+    expect(db.update).toHaveBeenCalledTimes(2);
+    expect(insertValues).toHaveBeenCalledWith(expect.objectContaining({
+      orgId: "11111111-1111-4111-8111-111111111111",
+      actorKind: "system",
+      actorId: "33333333-3333-4333-8333-333333333333",
+      actionKind: "auth.invite.accepted",
+      subjectKind: "member",
+      subjectId: "33333333-3333-4333-8333-333333333333",
+      payloadSnapshot: expect.objectContaining({
+        email: "pancho@fcostudios.io",
+        authSubject: "auth0|real-user",
+        userAccountId: "44444444-4444-4444-8444-444444444444",
+      }),
+    }));
   });
 
   it("uses configured Auth0 organization and active DB membership role when custom claims are absent", async () => {
