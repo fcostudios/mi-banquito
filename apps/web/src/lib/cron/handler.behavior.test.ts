@@ -240,4 +240,45 @@ describe("accrue-interest cron A6 alerts", () => {
     expect(summary.transitionsToMora).toBe(0);
     expect(insertedRows(fakeDb, alert)).toHaveLength(0);
   });
+
+  it("inserts only one A6 alert for one loan during a multi-day replay transition", async () => {
+    const rows = overdueCronRows("originated");
+    const fakeDb = new FakeCronDb({
+      selectResults: [
+        [rows.org],
+        [rows.config],
+        [rows.loan],
+        [rows.schedule],
+        [],
+        [],
+        [],
+      ],
+      executeResults: [[{
+        borrower_kind: "member",
+        borrower_name: "Pancho",
+        guarantor_name: null,
+        days_late: 30,
+      }]],
+    });
+    const { runAccrueInterestCron } = await importCronWithDb(fakeDb);
+
+    const summary = await runAccrueInterestCron(
+      new Request("http://localhost/api/cron/accrue-interest?from_date=2026-07-01&to_date=2026-07-03"),
+    );
+
+    expect(summary.moraFeesPlanned).toBe(3);
+    expect(summary.transitionsToMora).toBe(1);
+    expect(insertedRows(fakeDb, alert)).toEqual([
+      expect.objectContaining({
+        alertKind: "A6",
+        audience: "treasurer",
+        subjectId: loanId,
+        payload: expect.objectContaining({
+          borrowerName: "Pancho",
+          borrowerKind: "member",
+          daysLate: 30,
+        }),
+      }),
+    ]);
+  });
 });
