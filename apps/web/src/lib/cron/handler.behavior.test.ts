@@ -1,7 +1,7 @@
 import { getTableName } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { alert } from "@mi-banquito/db/schema";
+import { alert, loan, loanSchedule } from "@mi-banquito/db/schema";
 
 type InsertRecord = {
   tableName: string;
@@ -27,6 +27,10 @@ class FakeSelectBuilder {
   }
 
   orderBy() {
+    return this;
+  }
+
+  limit() {
     return this;
   }
 
@@ -120,6 +124,10 @@ function insertedRows(fakeDb: FakeCronDb, table: unknown): Array<Record<string, 
     .flatMap((entry) => Array.isArray(entry.values) ? entry.values : [entry.values]);
 }
 
+function updatedRows(fakeDb: FakeCronDb, table: unknown): UpdateRecord[] {
+  return fakeDb.updates.filter((entry) => entry.tableName === tableNameOf(table));
+}
+
 const orgId = "11111111-1111-4111-8111-111111111111";
 const loanId = "22222222-2222-4222-8222-222222222222";
 const scheduleId = "33333333-3333-4333-8333-333333333333";
@@ -195,6 +203,7 @@ describe("accrue-interest cron A6 alerts", () => {
         [],
         [],
         [],
+        [{ id: scheduleId }],
       ],
       executeResults: [[{
         borrower_kind: "non_member",
@@ -262,6 +271,7 @@ describe("accrue-interest cron A6 alerts", () => {
         [],
         [],
         [],
+        [{ id: scheduleId }],
       ],
       executeResults: [[{
         borrower_kind: "member",
@@ -303,6 +313,7 @@ describe("accrue-interest cron A6 alerts", () => {
         [],
         [],
         [],
+        [{ id: scheduleId }],
       ],
       updateReturningResults: { loan: [[]] },
     });
@@ -313,6 +324,59 @@ describe("accrue-interest cron A6 alerts", () => {
     );
 
     expect(summary.transitionsToMora).toBe(1);
+    expect(updatedRows(fakeDb, loanSchedule)).toHaveLength(0);
+    expect(insertedRows(fakeDb, alert)).toHaveLength(0);
+  });
+
+  it("does not overwrite a stale paid or canceled loan plan into mora", async () => {
+    const rows = overdueCronRows("originated");
+    const fakeDb = new FakeCronDb({
+      selectResults: [
+        [rows.org],
+        [rows.config],
+        [rows.loan],
+        [rows.schedule],
+        [],
+        [],
+        [],
+        [{ id: scheduleId }],
+      ],
+      updateReturningResults: { loan: [[]] },
+    });
+    const { runAccrueInterestCron } = await importCronWithDb(fakeDb);
+
+    const summary = await runAccrueInterestCron(
+      new Request("http://localhost/api/cron/accrue-interest?from_date=2026-07-01&to_date=2026-07-01"),
+    );
+
+    expect(summary.transitionsToMora).toBe(1);
+    expect(updatedRows(fakeDb, loanSchedule)).toHaveLength(0);
+    expect(insertedRows(fakeDb, alert)).toHaveLength(0);
+  });
+
+  it("does not overwrite loan or schedule status when the planned overdue schedule is already paid", async () => {
+    const rows = overdueCronRows("originated");
+    const fakeDb = new FakeCronDb({
+      selectResults: [
+        [rows.org],
+        [rows.config],
+        [rows.loan],
+        [rows.schedule],
+        [],
+        [],
+        [],
+        [],
+      ],
+    });
+    const { runAccrueInterestCron } = await importCronWithDb(fakeDb);
+
+    const summary = await runAccrueInterestCron(
+      new Request("http://localhost/api/cron/accrue-interest?from_date=2026-07-01&to_date=2026-07-01"),
+    );
+
+    expect(summary.transitionsToMora).toBe(1);
+    expect(updatedRows(fakeDb, loan)).toHaveLength(0);
+    expect(updatedRows(fakeDb, loanSchedule)).toHaveLength(0);
     expect(insertedRows(fakeDb, alert)).toHaveLength(0);
   });
 });

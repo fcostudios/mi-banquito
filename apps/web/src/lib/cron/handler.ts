@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq, gte, lte, ne, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
 import {
   buildA6LoanPastDueAlert,
@@ -73,6 +73,8 @@ export type CronRunSummary = {
 
 const SYSTEM_ACTOR_ID = "00000000-0000-4000-8000-000000000000";
 const ACTIVE_LOAN_STATUSES = new Set(["originated", "activo", "en_mora"]);
+const MORA_TRANSITIONABLE_LOAN_STATUSES = ["originated", "activo"] as const;
+const MORA_TRANSITIONABLE_SCHEDULE_STATUSES = ["pendiente", "parcial", "atrasado"] as const;
 
 type A6LoanPastDueContextRow = {
   borrower_kind: "member" | "non_member" | string | null;
@@ -326,20 +328,57 @@ export async function runAccrueInterestCron(request: Request): Promise<CronRunSu
             }
 
             for (const transition of plan.transitionsToMora) {
+              const eligibleSchedules = await tx
+                .select({ id: loanSchedule.id })
+                .from(loanSchedule)
+                .where(and(
+                  eq(loanSchedule.orgId, org.id),
+                  eq(loanSchedule.id, transition.scheduleId),
+                  eq(loanSchedule.loanId, transition.loanId),
+                  lte(loanSchedule.dueOn, transition.accruedOn),
+                  inArray(loanSchedule.status, [...MORA_TRANSITIONABLE_SCHEDULE_STATUSES]),
+                  sql`(${loanSchedule.principalDue} + ${loanSchedule.interestDue} - ${loanSchedule.paidPrincipalToDate} - ${loanSchedule.paidInterestToDate}) > 0`,
+                ))
+                .limit(1);
+              if (eligibleSchedules.length === 0) {
+                continue;
+              }
+
               const transitioned = await tx.update(loan)
                 .set({ status: "en_mora", updatedAt: startedAt, updatedBy: SYSTEM_ACTOR_ID })
                 .where(and(
                   eq(loan.orgId, org.id),
                   eq(loan.id, transition.loanId),
-                  ne(loan.status, "en_mora"),
+                  inArray(loan.status, [...MORA_TRANSITIONABLE_LOAN_STATUSES]),
+                  sql`EXISTS (
+                    SELECT 1
+                    FROM ${loanSchedule}
+                    WHERE ${loanSchedule.orgId} = ${org.id}
+                      AND ${loanSchedule.id} = ${transition.scheduleId}
+                      AND ${loanSchedule.loanId} = ${transition.loanId}
+                      AND ${loanSchedule.dueOn} <= ${transition.accruedOn}
+                      AND ${loanSchedule.status} IN ('pendiente', 'parcial', 'atrasado')
+                      AND (${loanSchedule.principalDue} + ${loanSchedule.interestDue} - ${loanSchedule.paidPrincipalToDate} - ${loanSchedule.paidInterestToDate}) > 0
+                  )`,
                 ))
                 .returning();
               if (transitioned.length === 0) {
                 continue;
               }
-              await tx.update(loanSchedule)
+              const transitionedSchedules = await tx.update(loanSchedule)
                 .set({ status: "en_mora" })
-                .where(and(eq(loanSchedule.orgId, org.id), eq(loanSchedule.id, transition.scheduleId)));
+                .where(and(
+                  eq(loanSchedule.orgId, org.id),
+                  eq(loanSchedule.id, transition.scheduleId),
+                  eq(loanSchedule.loanId, transition.loanId),
+                  lte(loanSchedule.dueOn, transition.accruedOn),
+                  inArray(loanSchedule.status, [...MORA_TRANSITIONABLE_SCHEDULE_STATUSES]),
+                  sql`(${loanSchedule.principalDue} + ${loanSchedule.interestDue} - ${loanSchedule.paidPrincipalToDate} - ${loanSchedule.paidInterestToDate}) > 0`,
+                ))
+                .returning();
+              if (transitionedSchedules.length === 0) {
+                continue;
+              }
               const contextResult = await (tx as {
                 execute(query: unknown): Promise<{ rows?: A6LoanPastDueContextRow[] } | A6LoanPastDueContextRow[]>;
               }).execute(sql`
