@@ -77,9 +77,13 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const CONFIG_LABELS: Record<string, string> = {
   base_quota_amount: "cuota base",
+  contribution_amount: "aporte regular",
   interest_rate_pct: "tasa de interés",
+  late_threshold_days: "días de atraso",
+  loan_to_savings_cap_ratio: "tope préstamo / ahorro",
   mora_threshold_days: "días de mora",
   no_slip_consecutive_threshold: "aportes sin foto consecutivos",
+  reconciliation_tolerance_amount: "tolerancia de conciliación",
   safety_margin_amount: "margen de seguridad",
 };
 

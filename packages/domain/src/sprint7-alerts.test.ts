@@ -133,7 +133,7 @@ describe("Sprint 7 alert builders", () => {
     const alert = buildA9GroupConfigChangedAlert({
       orgId: "11111111-1111-4111-8111-111111111111",
       configId: "44444444-4444-4444-8444-444444444444",
-      changedKeys: ["base_quota_amount", "interest_rate_pct"],
+      changedKeys: ["base_quota_amount", "interest_rate_pct", "contribution_amount"],
       actorLabel: "Pancho",
       now: new Date("2026-07-06T10:00:00.000Z"),
     });
@@ -141,7 +141,7 @@ describe("Sprint 7 alert builders", () => {
     expect(alert.alertKind).toBe("A9");
     expect(alert.severity).toBe("low");
     expect(alert.dedupWindowEnd.toISOString()).toBe("2026-07-06T10:00:00.000Z");
-    expect(alert.payload.copy).toBe("Pancho cambió la configuración del grupo: cuota base, tasa de interés.");
+    expect(alert.payload.copy).toBe("Pancho cambió la configuración del grupo: cuota base, tasa de interés, aporte regular.");
   });
 
   it("builds A11 after N consecutive contributions without photo", () => {

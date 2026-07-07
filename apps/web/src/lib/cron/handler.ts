@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
-import { createAlertsService, createCollectionsService, createCompensationService, type DateOnlyString } from "@mi-banquito/domain";
+import {
+  buildA6LoanPastDueAlert,
+  createAlertsService,
+  createCollectionsService,
+  createCompensationService,
+  type DateOnlyString,
+} from "@mi-banquito/domain";
 import {
   alert,
+  auditLogEntry,
   cronRun,
   groupConfig,
   interestAccrual,
@@ -66,6 +73,13 @@ export type CronRunSummary = {
 
 const SYSTEM_ACTOR_ID = "00000000-0000-4000-8000-000000000000";
 const ACTIVE_LOAN_STATUSES = new Set(["originated", "activo", "en_mora"]);
+
+type A6LoanPastDueContextRow = {
+  borrower_kind: "member" | "non_member" | string | null;
+  borrower_name: string | null;
+  guarantor_name: string | null;
+  days_late: number | string | null;
+};
 
 function isoToday(): DateOnlyString {
   return new Date().toISOString().slice(0, 10) as DateOnlyString;
@@ -134,6 +148,10 @@ function normalizeSchedule(row: typeof loanSchedule.$inferSelect): AccrualSchedu
     paidInterestToDate: String(row.paidInterestToDate),
     status: row.status,
   };
+}
+
+function executeRows<T>(result: { rows?: T[] } | T[]): T[] {
+  return Array.isArray(result) ? result : result.rows ?? [];
 }
 
 async function refreshDerivedViews() {
@@ -314,23 +332,68 @@ export async function runAccrueInterestCron(request: Request): Promise<CronRunSu
               await tx.update(loanSchedule)
                 .set({ status: "en_mora" })
                 .where(and(eq(loanSchedule.orgId, org.id), eq(loanSchedule.id, transition.scheduleId)));
-              await tx.insert(alert).values({
+              const contextResult = await (tx as {
+                execute(query: unknown): Promise<{ rows?: A6LoanPastDueContextRow[] } | A6LoanPastDueContextRow[]>;
+              }).execute(sql`
+                SELECT
+                  l.borrower_kind::text AS borrower_kind,
+                  COALESCE(member_borrower.display_name, non_member_borrower.display_name, 'persona externa') AS borrower_name,
+                  guarantor.display_name AS guarantor_name,
+                  GREATEST(0, (${transition.accruedOn}::date - ls.due_on::date))::integer AS days_late
+                FROM loan l
+                JOIN loan_schedule ls
+                  ON ls.loan_id = l.id
+                 AND ls.org_id = l.org_id
+                 AND ls.id = ${transition.scheduleId}
+                LEFT JOIN member member_borrower
+                  ON member_borrower.org_id = l.org_id
+                 AND member_borrower.id = COALESCE(l.borrower_member_id, l.member_id)
+                LEFT JOIN non_member_borrower
+                  ON non_member_borrower.org_id = l.org_id
+                 AND non_member_borrower.id = l.borrower_non_member_id
+                LEFT JOIN loan_guarantor lg
+                  ON lg.org_id = l.org_id
+                 AND lg.loan_id = l.id
+                 AND lg.released_at IS NULL
+                LEFT JOIN member guarantor
+                  ON guarantor.org_id = l.org_id
+                 AND guarantor.id = lg.guarantor_member_id
+                WHERE l.org_id = ${org.id}
+                  AND l.id = ${transition.loanId}
+                ORDER BY lg.assumed_at DESC NULLS LAST
+                LIMIT 1
+              `);
+              const [context] = executeRows(contextResult);
+              const alertRow = buildA6LoanPastDueAlert({
                 orgId: org.id,
-                alertKind: "A6_PRESTAMO_EN_MORA",
-                severity: "high",
-                audience: "both",
-                subjectKind: "loan",
-                subjectId: transition.loanId,
-                payload: {
+                loanId: transition.loanId,
+                borrowerName: context?.borrower_name ?? "persona externa",
+                borrowerKind: context?.borrower_kind === "non_member" ? "non_member" : "member",
+                guarantorName: context?.guarantor_name ?? undefined,
+                daysLate: Math.max(0, Number(context?.days_late ?? 0)),
+                now: startedAt,
+              });
+              await tx.insert(alert).values(alertRow);
+              await tx.insert(auditLogEntry).values({
+                orgId: org.id,
+                actorKind: "system",
+                actorId: SYSTEM_ACTOR_ID,
+                actionKind: "alert.loan_past_due.emit",
+                subjectKind: "alert",
+                subjectId: alertRow.id,
+                payloadSnapshot: {
+                  alertKind: "A6",
                   loanId: transition.loanId,
                   scheduleId: transition.scheduleId,
                   accruedOn: transition.accruedOn,
+                  borrowerName: alertRow.payload.borrowerName,
+                  borrowerKind: alertRow.payload.borrowerKind,
+                  guarantorName: alertRow.payload.guarantorName,
+                  daysLate: alertRow.payload.daysLate,
                 },
-                dedupWindowEnd: new Date(startedAt.getTime() + 86_400_000),
-                dismissedAt: null,
-                dismissedBy: null,
-                snoozedUntil: null,
                 createdAt: startedAt,
+                at: startedAt,
+                reason: null,
               });
             }
           });

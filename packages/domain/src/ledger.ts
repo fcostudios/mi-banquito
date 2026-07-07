@@ -9,6 +9,7 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
 import { withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import {
+  alert,
   auditLogEntry,
   baseFundQuotaConfig,
   baseFundQuotaPayment,
@@ -34,6 +35,10 @@ import type {
 } from "@mi-banquito/contracts";
 import { type AuditWriter, writeWithAudit } from "./audit";
 import { createPlatformService } from "./platform";
+import {
+  buildA11ContributionMissingPhotoAlert,
+  buildA14NegativeMemberBalanceAlert,
+} from "./sprint7-alerts";
 
 // Row/input types are named for the ENTITY, not the context — a context owns
 // many entities, so the dev team's next method (e.g. listContributions) defines
@@ -137,6 +142,7 @@ export interface MemberStatusTransitionLedgerPlan {
 
 const MEMBER_ENTITY_KIND = "Member";
 const DEFAULT_ACTOR_KIND: LedgerActorKind = "member";
+const DEFAULT_NO_SLIP_CONSECUTIVE_THRESHOLD = 3;
 
 const normalizeNullableText = (value: string | null | undefined): string | null => {
   const trimmed = value?.trim();
@@ -159,6 +165,7 @@ const calendarMonthEnd = (label: string): string => {
   return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
 };
 const money2 = (value: string | number): string => Number(value).toFixed(2);
+const dateValue = (value: Date | string): Date => value instanceof Date ? value : new Date(value);
 
 export function nextWizardStep(input: { firstRunStep?: number | null; completedAt?: Date | null }): FirstRunStep {
   if (input.completedAt) return "complete";
@@ -457,6 +464,147 @@ export interface LedgerServiceOptions {
 const defaultAuditWriter: LedgerAuditWriter = async ({ tx, entry }) => {
   await tx.insert(auditLogEntry).values(entry);
 };
+
+function parsePositiveInteger(value: unknown, fallback: number): number {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function noSlipContributionThreshold(config: unknown): number {
+  const record = config && typeof config === "object" && !Array.isArray(config)
+    ? config as Record<string, unknown>
+    : {};
+  return parsePositiveInteger(record.no_slip_consecutive_threshold, DEFAULT_NO_SLIP_CONSECUTIVE_THRESHOLD);
+}
+
+function isNegativeMoney(value: unknown): boolean {
+  return Number(value) < 0;
+}
+
+async function hasActiveA11Alert(input: {
+  tx: any;
+  orgId: string;
+  memberId: string;
+  now: Date;
+}): Promise<boolean> {
+  const [existing] = await input.tx.select().from(alert)
+    .where(and(
+      eq(alert.orgId, input.orgId),
+      eq(alert.alertKind, "A11"),
+      eq(alert.subjectKind, "member"),
+      eq(alert.subjectId, input.memberId),
+    ))
+    .orderBy(desc(alert.createdAt))
+    .limit(1);
+  return Boolean(existing && dateValue(existing.dedupWindowEnd) > input.now);
+}
+
+async function emitPostContributionAlerts(input: {
+  tx: any;
+  orgId: string;
+  actorId: string;
+  memberId: string;
+  sourceEventId: string;
+  sourceEventKind: "contribution.create" | "contribution.reverse";
+  slipPhotoId: string | null;
+  now: Date;
+}): Promise<void> {
+  const [balance] = await input.tx.select({
+    memberId: memberComplianceState.memberId,
+    displayName: memberComplianceState.displayName,
+    currentBalance: memberComplianceState.currentBalance,
+  }).from(memberComplianceState)
+    .where(and(eq(memberComplianceState.orgId, input.orgId), eq(memberComplianceState.memberId, input.memberId)))
+    .limit(1);
+
+  if (balance && isNegativeMoney(balance.currentBalance)) {
+    const alertRow = buildA14NegativeMemberBalanceAlert({
+      orgId: input.orgId,
+      memberId: input.memberId,
+      memberName: balance.displayName,
+      balance: String(balance.currentBalance),
+      sourceEventId: input.sourceEventId,
+      now: input.now,
+    });
+    await input.tx.insert(alert).values(alertRow);
+    await input.tx.insert(auditLogEntry).values({
+      orgId: input.orgId,
+      actorKind: "system",
+      actorId: input.actorId,
+      actionKind: "alert.negative_member_balance.emit",
+      subjectKind: "alert",
+      subjectId: alertRow.id,
+      payloadSnapshot: {
+        alertKind: "A14",
+        memberId: input.memberId,
+        sourceEventId: input.sourceEventId,
+        sourceEventKind: input.sourceEventKind,
+        balance: String(balance.currentBalance),
+      },
+      reason: null,
+      at: input.now,
+      createdAt: input.now,
+    });
+  }
+
+  if (input.sourceEventKind !== "contribution.create" || input.slipPhotoId) {
+    return;
+  }
+
+  const [config] = await input.tx.select({ config: groupConfig.config }).from(groupConfig)
+    .where(and(eq(groupConfig.orgId, input.orgId), isNull(groupConfig.validTo)))
+    .orderBy(desc(groupConfig.version))
+    .limit(1);
+  const threshold = noSlipContributionThreshold(config?.config);
+  const recent = await input.tx.select({
+    id: contribution.id,
+    slipPhotoId: contribution.slipPhotoId,
+  }).from(contribution)
+    .where(and(eq(contribution.orgId, input.orgId), eq(contribution.memberId, input.memberId)))
+    .orderBy(desc(contribution.recordedAt), desc(contribution.createdAt))
+    .limit(threshold);
+
+  const consecutiveWithoutPhoto = recent.length >= threshold
+    ? recent.findIndex((row: { slipPhotoId: string | null }) => row.slipPhotoId !== null) === -1
+    : false;
+  if (!balance || !consecutiveWithoutPhoto || await hasActiveA11Alert({
+    tx: input.tx,
+    orgId: input.orgId,
+    memberId: input.memberId,
+    now: input.now,
+  })) {
+    return;
+  }
+
+  const alertRow = buildA11ContributionMissingPhotoAlert({
+    orgId: input.orgId,
+    memberId: input.memberId,
+    memberName: balance.displayName,
+    threshold,
+    consecutiveCount: recent.length,
+    now: input.now,
+  });
+  await input.tx.insert(alert).values(alertRow);
+  await input.tx.insert(auditLogEntry).values({
+    orgId: input.orgId,
+    actorKind: "system",
+    actorId: input.actorId,
+    actionKind: "alert.contribution_missing_photo.emit",
+    subjectKind: "alert",
+    subjectId: alertRow.id,
+    payloadSnapshot: {
+      alertKind: "A11",
+      memberId: input.memberId,
+      sourceEventId: input.sourceEventId,
+      sourceEventKind: input.sourceEventKind,
+      threshold,
+      consecutiveCount: recent.length,
+    },
+    reason: null,
+    at: input.now,
+    createdAt: input.now,
+  });
+}
 
 export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerService => {
   const auditWriter = options.auditWriter ?? defaultAuditWriter;
@@ -783,6 +931,16 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
         },
       });
       await tx.execute(sql`SELECT refresh_sprint1_read_models()`);
+      await emitPostContributionAlerts({
+        tx,
+        orgId,
+        actorId,
+        memberId: row.memberId,
+        sourceEventId: row.id,
+        sourceEventKind: "contribution.create",
+        slipPhotoId: row.slipPhotoId,
+        now,
+      });
       return row;
     });
   },
@@ -805,6 +963,7 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
     if (existingReversal) throw new Error("Contribution already reversed");
     await withWritableTenantTransaction(orgId, async (tx) => {
       let auditEntry: AuditLogEntryInsert | undefined;
+      let reversal: typeof contribution.$inferSelect | undefined;
       await writeWithAudit({
         write: async () => {
           const [row] = await tx.insert(contribution).values({
@@ -826,6 +985,7 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
             createdBy: actorId,
             createdByKind: "member",
           }).returning();
+          reversal = row;
           auditEntry = {
             orgId,
             actorKind: "member",
@@ -847,6 +1007,18 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
         },
       });
       await tx.execute(sql`SELECT refresh_sprint1_read_models()`);
+      if (reversal) {
+        await emitPostContributionAlerts({
+          tx,
+          orgId,
+          actorId,
+          memberId: reversal.memberId,
+          sourceEventId: reversal.id,
+          sourceEventKind: "contribution.reverse",
+          slipPhotoId: reversal.slipPhotoId,
+          now,
+        });
+      }
     });
   },
   async getBaseFundQuotaDefaults(orgId) {

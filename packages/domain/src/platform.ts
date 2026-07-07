@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
 import {
+  alert,
   auditLogEntry,
   baseFundQuotaConfig,
   entityVersion,
@@ -12,6 +13,7 @@ import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banqui
 import type { GroupConfigForm, OrganizationCreateForm } from "@mi-banquito/contracts";
 import { type AuditWriter, writeWithAudit } from "./audit";
 import { closeOverdueAlertState } from "./alerts";
+import { buildA9GroupConfigChangedAlert } from "./sprint7-alerts";
 
 export type CreateOrganizationInput = OrganizationCreateForm;
 export type OrganizationLifecycleStatus = "paused" | "archived";
@@ -147,6 +149,7 @@ type ConfigJson = {
   };
   opensOnDay?: number;
   close_overdue_threshold_days?: number | string;
+  no_slip_consecutive_threshold?: number | string;
 };
 
 const periodLabels: Record<string, string> = {
@@ -313,6 +316,44 @@ export function businessRuleRowsFromConfig(config: BusinessRuleConfig): Business
 
 function rowsByRule(rows: BusinessRuleRow[]): Map<string, string> {
   return new Map(rows.map((row) => [row.rule, row.newValue]));
+}
+
+function normalizedConfigValue(value: unknown, digits = 4): string | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  if (typeof value === "number" || typeof value === "string") {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric.toFixed(digits) : String(value);
+  }
+  return String(value);
+}
+
+function alertConfigValues(config: typeof groupConfig.$inferSelect): Record<string, string | null> {
+  const json = asConfigJson(config.config);
+  return {
+    contribution_amount: normalizedConfigValue(config.contributionAmount),
+    interest_rate_pct: normalizedConfigValue(config.loanRateValue),
+    loan_to_savings_cap_ratio: normalizedConfigValue(config.loanToSavingsCapRatio, 2),
+    late_threshold_days: normalizedConfigValue(config.lateThresholdDays, 0),
+    mora_threshold_days: normalizedConfigValue(config.moraThresholdDays, 0),
+    reconciliation_tolerance_amount: normalizedConfigValue(config.reconciliationToleranceAmount),
+    safety_margin_amount: normalizedConfigValue(config.safetyMarginAmount),
+    base_quota_amount: normalizedConfigValue(json.baseFundQuota?.perMemberAmount),
+    no_slip_consecutive_threshold: normalizedConfigValue(json.no_slip_consecutive_threshold, 0),
+  };
+}
+
+function changedAlertConfigKeys(input: {
+  previous: typeof groupConfig.$inferSelect | undefined;
+  next: typeof groupConfig.$inferSelect;
+}): string[] {
+  if (!input.previous) {
+    return [];
+  }
+  const previous = alertConfigValues(input.previous);
+  const next = alertConfigValues(input.next);
+  return Object.keys(next).filter((key) => previous[key] !== next[key]);
 }
 
 function isBusinessRuleConfig(value: unknown): value is BusinessRuleConfig {
@@ -653,6 +694,7 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
       return withWritableTenantTransaction(orgId, async (tx) => {
         const now = new Date();
         let auditEntry: PlatformAuditEntry | undefined;
+        let alertAuditEntry: PlatformAuditEntry | undefined;
         return writeWithAudit({
           write: async () => {
             const [current] = await tx.select().from(groupConfig)
@@ -717,6 +759,34 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
               createdByKind: actorKind === "platform_operator" ? "platform_operator" : "member",
             });
 
+            const changedKeys = changedAlertConfigKeys({ previous: current, next });
+            if (changedKeys.length > 0) {
+              const alertRow = buildA9GroupConfigChangedAlert({
+                orgId,
+                configId: next.id,
+                changedKeys,
+                actorLabel: `${actorKind}:${actorId}`,
+                now,
+              });
+              await tx.insert(alert).values(alertRow);
+              alertAuditEntry = {
+                orgId,
+                actorKind: "system",
+                actorId,
+                actionKind: "alert.group_config_changed.emit",
+                subjectKind: "alert",
+                subjectId: alertRow.id,
+                payloadSnapshot: {
+                  alertKind: "A9",
+                  configId: next.id,
+                  changedKeys,
+                },
+                reason: null,
+                at: now,
+                createdAt: now,
+              };
+            }
+
             auditEntry = {
               orgId,
               actorKind,
@@ -742,6 +812,9 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
               throw new Error("group config audit entry is missing");
             }
             await auditWriter({ tx, entry: auditEntry });
+            if (alertAuditEntry) {
+              await auditWriter({ tx, entry: alertAuditEntry });
+            }
           },
         });
       });
