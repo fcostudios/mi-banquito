@@ -54,6 +54,8 @@
       "language": "Idioma",
       "configLink": "Configurar reglas",
       "createdAt": "Creada",
+      "auth0OrgId": "Auth0 Org ID",
+      "auth0OrgMissing": "Sin Auth0 Org ID",
       "closeHealthTitle": "Cierre mensual",
       "lastClose": "Último cierre",
       "daysSinceClose": "Días desde cierre",
@@ -78,7 +80,9 @@
         "inviteSent": "Invitación enviada a Auth0.",
         "resetSent": "Magic link enviado por correo.",
         "whatsappCopyLabel": "Texto para WhatsApp",
+        "whatsappShare": "Compartir por WhatsApp",
         "resetWhatsappCopy": "Hola, te enviamos un enlace nuevo para ingresar a {{org}} con {{email}}. Revisa tu correo y usa el enlace más reciente.",
+        "cooldownRemaining": "Espera {{duration}} antes de reenviar.",
         "errors": {
           "invalid-input": "Revisa el correo y el nombre antes de continuar.",
           "organization-not-found": "No encontramos esa organización.",

@@ -168,6 +168,21 @@ describe("admin Auth0 access actions", () => {
       providerRequestId: "inv_123",
       status: "sent",
     }));
+    expect(repo.logAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      orgId,
+      actorKind: "platform_operator",
+      actorId,
+      actionKind: "treasurer_invite.sent",
+      subjectKind: "user_account",
+      subjectId: userAccountId,
+      payloadSnapshot: expect.objectContaining({
+        email: "tesorera@example.com",
+        auth0OrgId: "org_auth0",
+        providerRequestId: "inv_123",
+        userAccountId,
+        memberId,
+      }),
+    }));
     expect(revalidatePath).toHaveBeenCalledWith(`/admin/orgs/${orgId}`);
   });
 
@@ -217,10 +232,13 @@ describe("admin Auth0 access actions", () => {
 
   it("rate-limits repeated magic-link recovery for five minutes", async () => {
     const { resetTreasurerLoginAction } = await buildActions();
-    repo.findRecentSentAction.mockResolvedValue({ id: "act_123" });
+    repo.findRecentSentAction.mockResolvedValue({
+      id: "act_123",
+      createdAt: new Date("2026-07-07T13:58:00.000Z"),
+    });
 
     await expect(resetTreasurerLoginAction(resetForm()))
-      .rejects.toThrow(`NEXT_REDIRECT:/admin/orgs/${orgId}?authAccessError=reset-rate-limited`);
+      .rejects.toThrow(`NEXT_REDIRECT:/admin/orgs/${orgId}?authAccessError=reset-rate-limited&resetCooldownSeconds=180`);
 
     expect(sendPasswordlessLink).not.toHaveBeenCalled();
     expect(repo.logAuditEntry).toHaveBeenCalledWith(expect.objectContaining({

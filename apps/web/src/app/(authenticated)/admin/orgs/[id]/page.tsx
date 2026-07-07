@@ -21,6 +21,39 @@ function queryValue(
   return Array.isArray(value) ? value[0] : value;
 }
 
+function cooldownLabel(secondsValue: string | undefined): string | undefined {
+  const seconds = Number(secondsValue ?? "");
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return undefined;
+  }
+  const minutesPart = Math.floor(seconds / 60);
+  const secondsPart = seconds % 60;
+  if (minutesPart > 0 && secondsPart > 0) {
+    return `${minutesPart}m ${secondsPart}s`;
+  }
+  if (minutesPart > 0) {
+    return `${minutesPart}m`;
+  }
+  return `${secondsPart}s`;
+}
+
+function authAccessErrorMessage(
+  errorCode: string | undefined,
+  resetCooldownSeconds: string | undefined,
+): string | undefined {
+  if (!errorCode) {
+    return undefined;
+  }
+  const fallback = copy.treasuryAccess.errors["invalid-input"];
+  const message = copy.treasuryAccess.errors[errorCode as keyof typeof copy.treasuryAccess.errors] ?? fallback;
+  const cooldown = errorCode === "reset-rate-limited" ? cooldownLabel(resetCooldownSeconds) : undefined;
+  return cooldown ? `${message} ${copy.treasuryAccess.cooldownRemaining.replace("{{duration}}", cooldown)}` : message;
+}
+
+function whatsappShareUrl(copyText: string): string {
+  return `https://wa.me/?text=${encodeURIComponent(copyText)}`;
+}
+
 export default async function ScrAdminOrgDetailPage({
   params,
   searchParams,
@@ -33,7 +66,9 @@ export default async function ScrAdminOrgDetailPage({
   const query = await searchParams;
   const authAccess = query ? queryValue(query, "authAccess") : undefined;
   const authAccessError = query ? queryValue(query, "authAccessError") : undefined;
+  const resetCooldownSeconds = query ? queryValue(query, "resetCooldownSeconds") : undefined;
   const whatsappCopy = query ? queryValue(query, "whatsappCopy") : undefined;
+  const errorMessage = authAccessErrorMessage(authAccessError, resetCooldownSeconds);
   const platform = createPlatformService();
   const [org, closeSnapshot] = await Promise.all([
     platform.getOrganization(id),
@@ -83,6 +118,10 @@ export default async function ScrAdminOrgDetailPage({
           <dt className="text-sm text-text-secondary">{copy.createdAt}</dt>
           <dd className="mt-2 font-medium text-text-primary">{ecDate.format(org.createdAt)}</dd>
         </div>
+        <div className="rounded-md border border-border bg-surface p-4">
+          <dt className="text-sm text-text-secondary">{copy.auth0OrgId}</dt>
+          <dd className="mt-2 break-all font-medium text-text-primary">{org.auth0OrgId ?? copy.auth0OrgMissing}</dd>
+        </div>
       </dl>
 
       {closeSnapshot ? (
@@ -129,19 +168,29 @@ export default async function ScrAdminOrgDetailPage({
             {copy.treasuryAccess.resetSent}
           </p>
         ) : null}
-        {authAccessError ? (
+        {errorMessage ? (
           <p className="rounded-md border border-border bg-background px-4 py-3 text-sm font-medium text-accent">
-            {copy.treasuryAccess.errors[authAccessError as keyof typeof copy.treasuryAccess.errors] ?? copy.treasuryAccess.errors["invalid-input"]}
+            {errorMessage}
           </p>
         ) : null}
         {whatsappCopy ? (
-          <FormField labelKey={copy.treasuryAccess.whatsappCopyLabel}>
-            <textarea
-              className="min-h-20 w-full rounded-md border border-border bg-surface px-4 py-3 text-text-primary focus:border-primary"
-              readOnly
-              value={whatsappCopy}
-            />
-          </FormField>
+          <div className="grid gap-3">
+            <FormField labelKey={copy.treasuryAccess.whatsappCopyLabel}>
+              <textarea
+                className="min-h-20 w-full rounded-md border border-border bg-surface px-4 py-3 text-text-primary focus:border-primary"
+                readOnly
+                value={whatsappCopy}
+              />
+            </FormField>
+            <a
+              className="inline-flex min-h-12 items-center justify-center rounded-md border border-primary bg-surface px-4 text-primary"
+              href={whatsappShareUrl(whatsappCopy)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {copy.treasuryAccess.whatsappShare}
+            </a>
+          </div>
         ) : null}
 
         <div className="grid gap-4 md:grid-cols-2">

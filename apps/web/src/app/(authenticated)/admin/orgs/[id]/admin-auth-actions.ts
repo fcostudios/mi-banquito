@@ -73,7 +73,7 @@ type AdminAuthRepository = {
     email: string;
     actionKind: "treasurer_login_reset";
     since: Date;
-  }): Promise<{ id: string } | undefined>;
+  }): Promise<{ id: string; createdAt: Date } | undefined>;
   findActiveTreasurerByEmail(orgId: string, email: string): Promise<Omit<TreasurerAccess, "accepted"> | undefined>;
   logAction(input: AuthAdminActionInput): Promise<void>;
   logAuditEntry(input: AdminAuditInput): Promise<void>;
@@ -193,6 +193,22 @@ export function createAdminAuthActions(deps: AdminAuthActionDeps) {
           status: "sent",
           createdAt: now,
         });
+        await deps.repo.logAuditEntry({
+          orgId: parsed.data.orgId,
+          actorKind: "platform_operator",
+          actorId: session.actorId,
+          actionKind: "treasurer_invite.sent",
+          subjectKind: "user_account",
+          subjectId: access.userAccountId,
+          payloadSnapshot: {
+            email: parsed.data.email,
+            auth0OrgId: org.auth0OrgId,
+            providerRequestId: result.providerRequestId,
+            userAccountId: access.userAccountId,
+            memberId: access.memberId,
+          },
+          createdAt: now,
+        });
       } catch (error) {
         await deps.repo.logAction({
           orgId: parsed.data.orgId,
@@ -232,6 +248,10 @@ export function createAdminAuthActions(deps: AdminAuthActionDeps) {
         since: new Date(now.getTime() - 5 * 60 * 1000),
       });
       if (recent) {
+        const cooldownSeconds = Math.max(
+          1,
+          Math.ceil((recent.createdAt.getTime() + 5 * 60 * 1000 - now.getTime()) / 1000),
+        );
         await deps.repo.logAuditEntry({
           orgId: parsed.data.orgId,
           actorKind: "platform_operator",
@@ -244,10 +264,14 @@ export function createAdminAuthActions(deps: AdminAuthActionDeps) {
             action: "treasurer_login_reset",
             rateLimited: true,
             since: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
+            cooldownSeconds,
           },
           createdAt: now,
         });
-        redirectError(deps, parsed.data.orgId, "reset-rate-limited");
+        deps.redirect(orgRedirect(parsed.data.orgId, {
+          authAccessError: "reset-rate-limited",
+          resetCooldownSeconds: String(cooldownSeconds),
+        }));
       }
 
       const treasurer = await deps.repo.findActiveTreasurerByEmail(parsed.data.orgId, parsed.data.email);
@@ -432,7 +456,7 @@ export const adminAuthRepository: AdminAuthRepository = {
   async findRecentSentAction(input) {
     return withTenantTransaction(input.orgId, async (tx) => {
       const [row] = await tx
-        .select({ id: authAdminAction.id })
+        .select({ id: authAdminAction.id, createdAt: authAdminAction.createdAt })
         .from(authAdminAction)
         .where(and(
           eq(authAdminAction.orgId, input.orgId),
