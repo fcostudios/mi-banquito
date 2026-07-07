@@ -11,6 +11,7 @@ type InsertRecord = {
 type UpdateRecord = {
   tableName: string;
   values: Record<string, unknown>;
+  returnedRows?: unknown[];
 };
 
 const tableNameOf = (table: unknown): string => getTableName(table as Parameters<typeof getTableName>[0]);
@@ -59,6 +60,8 @@ class FakeInsertBuilder {
 }
 
 class FakeUpdateBuilder {
+  private updateRecord: UpdateRecord | null = null;
+
   constructor(
     private readonly table: unknown,
     private readonly updates: UpdateRecord[],
@@ -66,7 +69,8 @@ class FakeUpdateBuilder {
   ) {}
 
   set(values: Record<string, unknown>) {
-    this.updates.push({ tableName: tableNameOf(this.table), values });
+    this.updateRecord = { tableName: tableNameOf(this.table), values };
+    this.updates.push(this.updateRecord);
     return this;
   }
 
@@ -75,7 +79,11 @@ class FakeUpdateBuilder {
   }
 
   returning() {
-    return Promise.resolve(this.returningRows());
+    const rows = this.returningRows();
+    if (this.updateRecord) {
+      this.updateRecord.returnedRows = rows;
+    }
+    return Promise.resolve(rows);
   }
 }
 
@@ -126,6 +134,11 @@ function insertedRows(fakeDb: FakeCronDb, table: unknown): Array<Record<string, 
 
 function updatedRows(fakeDb: FakeCronDb, table: unknown): UpdateRecord[] {
   return fakeDb.updates.filter((entry) => entry.tableName === tableNameOf(table));
+}
+
+function successfulUpdatedRows(fakeDb: FakeCronDb, table: unknown): UpdateRecord[] {
+  return updatedRows(fakeDb, table)
+    .filter((entry) => entry.returnedRows === undefined || entry.returnedRows.length > 0);
 }
 
 const orgId = "11111111-1111-4111-8111-111111111111";
@@ -203,14 +216,16 @@ describe("accrue-interest cron A6 alerts", () => {
         [],
         [],
         [],
-        [{ id: scheduleId }],
       ],
-      executeResults: [[{
-        borrower_kind: "non_member",
-        borrower_name: "Ana externa",
-        guarantor_name: "Pancho",
-        days_late: 30,
-      }]],
+      executeResults: [
+        [{ loan_id: loanId, schedule_id: scheduleId, schedule_status: "atrasado" }],
+        [{
+          borrower_kind: "non_member",
+          borrower_name: "Ana externa",
+          guarantor_name: "Pancho",
+          days_late: 30,
+        }],
+      ],
     });
     const { runAccrueInterestCron } = await importCronWithDb(fakeDb);
 
@@ -271,14 +286,16 @@ describe("accrue-interest cron A6 alerts", () => {
         [],
         [],
         [],
-        [{ id: scheduleId }],
       ],
-      executeResults: [[{
-        borrower_kind: "member",
-        borrower_name: "Pancho",
-        guarantor_name: null,
-        days_late: 30,
-      }]],
+      executeResults: [
+        [{ loan_id: loanId, schedule_id: scheduleId, schedule_status: "atrasado" }],
+        [{
+          borrower_kind: "member",
+          borrower_name: "Pancho",
+          guarantor_name: null,
+          days_late: 30,
+        }],
+      ],
     });
     const { runAccrueInterestCron } = await importCronWithDb(fakeDb);
 
@@ -313,8 +330,8 @@ describe("accrue-interest cron A6 alerts", () => {
         [],
         [],
         [],
-        [{ id: scheduleId }],
       ],
+      executeResults: [[{ loan_id: loanId, schedule_id: scheduleId, schedule_status: "atrasado" }]],
       updateReturningResults: { loan: [[]] },
     });
     const { runAccrueInterestCron } = await importCronWithDb(fakeDb);
@@ -324,7 +341,8 @@ describe("accrue-interest cron A6 alerts", () => {
     );
 
     expect(summary.transitionsToMora).toBe(1);
-    expect(updatedRows(fakeDb, loanSchedule)).toHaveLength(0);
+    expect(successfulUpdatedRows(fakeDb, loan)).toHaveLength(0);
+    expect(updatedRows(fakeDb, loanSchedule).map((entry) => entry.values.status)).toEqual(["en_mora", "atrasado"]);
     expect(insertedRows(fakeDb, alert)).toHaveLength(0);
   });
 
@@ -339,7 +357,6 @@ describe("accrue-interest cron A6 alerts", () => {
         [],
         [],
         [],
-        [{ id: scheduleId }],
       ],
       updateReturningResults: { loan: [[]] },
     });
@@ -365,7 +382,6 @@ describe("accrue-interest cron A6 alerts", () => {
         [],
         [],
         [],
-        [],
       ],
     });
     const { runAccrueInterestCron } = await importCronWithDb(fakeDb);
@@ -377,6 +393,36 @@ describe("accrue-interest cron A6 alerts", () => {
     expect(summary.transitionsToMora).toBe(1);
     expect(updatedRows(fakeDb, loan)).toHaveLength(0);
     expect(updatedRows(fakeDb, loanSchedule)).toHaveLength(0);
+    expect(insertedRows(fakeDb, alert)).toHaveLength(0);
+  });
+
+  it("does not leave the loan in mora when the guarded schedule update loses eligibility", async () => {
+    const rows = overdueCronRows("originated");
+    const fakeDb = new FakeCronDb({
+      selectResults: [
+        [rows.org],
+        [rows.config],
+        [rows.loan],
+        [rows.schedule],
+        [],
+        [],
+        [],
+      ],
+      executeResults: [[{ loan_id: loanId, schedule_id: scheduleId, schedule_status: "atrasado" }]],
+      updateReturningResults: {
+        loan: [[{ id: loanId }]],
+        loan_schedule: [[]],
+      },
+    });
+    const { runAccrueInterestCron } = await importCronWithDb(fakeDb);
+
+    const summary = await runAccrueInterestCron(
+      new Request("http://localhost/api/cron/accrue-interest?from_date=2026-07-01&to_date=2026-07-01"),
+    );
+
+    expect(summary.transitionsToMora).toBe(1);
+    expect(successfulUpdatedRows(fakeDb, loan)).toHaveLength(0);
+    expect(successfulUpdatedRows(fakeDb, loanSchedule)).toHaveLength(0);
     expect(insertedRows(fakeDb, alert)).toHaveLength(0);
   });
 });
