@@ -9,15 +9,23 @@ const selectResponses: unknown[][] = [];
 const updateSet = vi.fn();
 const updateWhere = vi.fn();
 const insertValues = vi.fn();
+function consumeSelectResponse() {
+  return Promise.resolve(selectResponses.shift() ?? []);
+}
+function createSelectBuilder(): unknown {
+  const builder = {
+    from: vi.fn(() => builder),
+    innerJoin: vi.fn(() => builder),
+    where: vi.fn(() => builder),
+    orderBy: vi.fn(() => builder),
+    limit: vi.fn(() => consumeSelectResponse()),
+    then: (resolve: (value: unknown[]) => unknown, reject?: (reason: unknown) => unknown) =>
+      consumeSelectResponse().then(resolve, reject),
+  };
+  return builder;
+}
 const db = {
-  select: vi.fn(() => ({
-    from: () => ({
-      where: () => Promise.resolve(selectResponses.shift() ?? []),
-      innerJoin: () => ({
-        where: () => Promise.resolve(selectResponses.shift() ?? []),
-      }),
-    }),
-  })),
+  select: vi.fn(() => createSelectBuilder()),
   update: vi.fn(() => ({
     set: updateSet.mockReturnValue({
       where: updateWhere.mockResolvedValue(undefined),
@@ -40,6 +48,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("drizzle-orm", () => ({
   and: (...args: unknown[]) => ({ and: args }),
+  desc: (...args: unknown[]) => ({ desc: args }),
   eq: (...args: unknown[]) => ({ eq: args }),
 }));
 
@@ -56,8 +65,28 @@ vi.mock("@mi-banquito/db/schema", () => ({
     id: "organization.id",
     displayName: "organization.display_name",
     status: "organization.status",
+    platformOperatorId: "organization.platform_operator_id",
   },
-  auditLogEntry: "audit_log_entry",
+  authAdminAction: {
+    id: "auth_admin_action.id",
+    orgId: "auth_admin_action.org_id",
+    actionKind: "auth_admin_action.action_kind",
+    targetEmail: "auth_admin_action.target_email",
+    actorId: "auth_admin_action.actor_id",
+    providerRequestId: "auth_admin_action.provider_request_id",
+    status: "auth_admin_action.status",
+    createdAt: "auth_admin_action.created_at",
+  },
+  auditLogEntry: {
+    id: "audit_log_entry.id",
+    orgId: "audit_log_entry.org_id",
+    actorKind: "audit_log_entry.actor_kind",
+    actorId: "audit_log_entry.actor_id",
+    actionKind: "audit_log_entry.action_kind",
+    subjectKind: "audit_log_entry.subject_kind",
+    subjectId: "audit_log_entry.subject_id",
+    at: "audit_log_entry.at",
+  },
   member: {
     id: "member.id",
     authSubject: "member.auth_subject",
@@ -131,9 +160,14 @@ describe("requireRole", () => {
       },
     });
     selectResponses.push(
-      [{ status: "active" }],
+      [{ status: "active", platformOperatorId: "22222222-2222-4222-8222-222222222222" }],
       [],
       [{ memberId: "33333333-3333-4333-8333-333333333333", userAccountId: "44444444-4444-4444-8444-444444444444" }],
+      [{
+        id: "55555555-5555-4555-8555-555555555555",
+        actorId: "22222222-2222-4222-8222-222222222222",
+        providerRequestId: "invitation|123",
+      }],
     );
 
     await expect(requireTreasurer()).resolves.toMatchObject({
@@ -154,8 +188,8 @@ describe("requireRole", () => {
     expect(db.update).toHaveBeenCalledTimes(2);
     expect(insertValues).toHaveBeenCalledWith(expect.objectContaining({
       orgId: "11111111-1111-4111-8111-111111111111",
-      actorKind: "system",
-      actorId: "33333333-3333-4333-8333-333333333333",
+      actorKind: "platform_operator",
+      actorId: "22222222-2222-4222-8222-222222222222",
       actionKind: "auth.invite.accepted",
       subjectKind: "member",
       subjectId: "33333333-3333-4333-8333-333333333333",
@@ -163,6 +197,45 @@ describe("requireRole", () => {
         email: "pancho@fcostudios.io",
         authSubject: "auth0|real-user",
         userAccountId: "44444444-4444-4444-8444-444444444444",
+        inviteActionId: "55555555-5555-4555-8555-555555555555",
+        providerRequestId: "invitation|123",
+      }),
+    }));
+  });
+
+  it("uses the original invite audit actor when the admin action row is unavailable", async () => {
+    const { requireTreasurer } = await import("./require-session");
+    getSession.mockResolvedValueOnce({
+      user: {
+        sub: "auth0|real-user",
+        email: "AuditOnly@FcoStudios.io",
+        email_verified: true,
+        "https://mi-banquito.app/org_id": "11111111-1111-4111-8111-111111111111",
+        "https://mi-banquito.app/roles": ["TESORERA"],
+      },
+    });
+    selectResponses.push(
+      [{ status: "active", platformOperatorId: null }],
+      [],
+      [{ memberId: "33333333-3333-4333-8333-333333333333", userAccountId: "44444444-4444-4444-8444-444444444444" }],
+      [],
+      [{
+        id: "66666666-6666-4666-8666-666666666666",
+        actorId: "22222222-2222-4222-8222-222222222222",
+      }],
+    );
+
+    await expect(requireTreasurer()).resolves.toMatchObject({
+      userId: "auth0|real-user",
+      actorId: "33333333-3333-4333-8333-333333333333",
+    });
+    expect(insertValues).toHaveBeenCalledWith(expect.objectContaining({
+      actorKind: "platform_operator",
+      actorId: "22222222-2222-4222-8222-222222222222",
+      actionKind: "auth.invite.accepted",
+      payloadSnapshot: expect.objectContaining({
+        email: "auditonly@fcostudios.io",
+        inviteAuditId: "66666666-6666-4666-8666-666666666666",
       }),
     }));
   });
