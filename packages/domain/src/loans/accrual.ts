@@ -224,6 +224,7 @@ export function planLoanAccruals(input: {
   const interestAccruals: PlannedInterestAccrual[] = [];
   const moraFees: PlannedMoraFee[] = [];
   const transitionsToMora: Array<{ loanId: string; scheduleId: string; accruedOn: string }> = [];
+  let transitionToMoraPlanned = input.loan.status === "en_mora";
   const overdueSchedules = input.schedules
     .filter((schedule) => !PAID_SCHEDULE_STATUSES.has(schedule.status) && unpaidInstallmentAmount(schedule) > 0)
     .sort((a, b) => a.dueOn.localeCompare(b.dueOn));
@@ -287,8 +288,9 @@ export function planLoanAccruals(input: {
       groupConfigVersion: config.version,
       feedsSurplus: true,
     });
-    if (input.loan.status !== "en_mora") {
+    if (!transitionToMoraPlanned) {
       transitionsToMora.push({ loanId: input.loan.id, scheduleId: overdueSchedule.id, accruedOn });
+      transitionToMoraPlanned = true;
     }
   }
 

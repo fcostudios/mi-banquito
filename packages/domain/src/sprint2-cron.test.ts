@@ -163,4 +163,45 @@ describe("Sprint 2 cron accrual domain rules", () => {
       }),
     ]);
   });
+
+  it("plans one mora transition for a multi-day replay while preserving daily mora fees", () => {
+    const plan = planLoanAccruals({
+      loan: { ...loan, status: "activo" },
+      schedules: [{
+        id: "schedule-1",
+        dueOn: "2026-06-01",
+        principalDue: "10.0000",
+        interestDue: "2.0000",
+        paidPrincipalToDate: "0.0000",
+        paidInterestToDate: "0.0000",
+        status: "atrasado",
+      }],
+      configs: [{
+        version: 1,
+        validFrom: "2026-01-01T00:00:00.000Z",
+        validTo: null,
+        moraThresholdDays: 15,
+        config: {
+          mora: {
+            mechanic: "flat_per_day",
+            per_day_amount: "0.2500",
+            cap: "none",
+            scope: "loans",
+          },
+        },
+      }],
+      accrualDates: resolveDateRange("2026-07-01", "2026-07-03"),
+      existingAccrualDates: new Set(),
+      existingMoraFeeKeys: new Set(),
+    });
+
+    expect(plan.moraFees.map((row) => row.accruedOn)).toEqual([
+      "2026-07-01",
+      "2026-07-02",
+      "2026-07-03",
+    ]);
+    expect(plan.transitionsToMora).toEqual([
+      { loanId: "loan-1", scheduleId: "schedule-1", accruedOn: "2026-07-01" },
+    ]);
+  });
 });
