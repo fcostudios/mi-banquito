@@ -429,7 +429,12 @@ async function alertActionsForRows(input: {
   return actionsByAlert(actions);
 }
 
-async function hasActiveDedupedAlertForPayload(input: {
+type Sprint7DedupedAlertMatch = {
+  row: typeof alert.$inferSelect;
+  state: EffectiveAlertState;
+};
+
+async function findDedupedAlertForPayload(input: {
   tx: AlertReadTx;
   orgId: string;
   alertKind: string;
@@ -438,7 +443,7 @@ async function hasActiveDedupedAlertForPayload(input: {
   payloadKey: string;
   payloadValue: string | number;
   today: Date;
-}): Promise<boolean> {
+}): Promise<Sprint7DedupedAlertMatch | null> {
   const rows = await input.tx.select().from(alert)
     .where(and(
       eq(alert.orgId, input.orgId),
@@ -449,15 +454,62 @@ async function hasActiveDedupedAlertForPayload(input: {
     .orderBy(desc(alert.createdAt));
   const actions = await alertActionsForRows({ tx: input.tx, orgId: input.orgId, rows });
 
-  return rows.some((row: typeof alert.$inferSelect) => {
+  for (const row of rows) {
     const payload = payloadObject(row.payload);
-    return dateValue(row.dedupWindowEnd) > input.today
+    if (
+      dateValue(row.dedupWindowEnd) > input.today
       && String(payload[input.payloadKey]) === String(input.payloadValue)
-      && effectiveAlertState({
+    ) {
+      return {
+        row,
+        state: effectiveAlertState({
         alert: row,
         actions: actions.get(row.id) ?? [],
         now: input.today,
-      }).visible;
+        }),
+      };
+    }
+  }
+
+  return null;
+}
+
+async function reopenSprint7Alert(input: {
+  tx: AlertReadTx & { insert(table: unknown): any };
+  orgId: string;
+  alertId: string;
+  alertKind: "A4" | "A5";
+  payloadSnapshot: Record<string, unknown>;
+  today: Date;
+}): Promise<void> {
+  await input.tx.insert(alertAction).values({
+    orgId: input.orgId,
+    alertId: input.alertId,
+    actionKind: "system_reopen",
+    snoozedUntil: null,
+    actorId: SYSTEM_ACTOR_ID,
+    actorKind: "system",
+    reason: "Condición volvió a incumplirse",
+    createdAt: input.today,
+  });
+  await input.tx.insert(auditLogEntry).values({
+    orgId: input.orgId,
+    actorKind: "system",
+    actorId: SYSTEM_ACTOR_ID,
+    actionKind: input.alertKind === "A4"
+      ? "alert.liquidity_low_margin.reopen"
+      : "alert.shareout_commitment.reopen",
+    subjectKind: "alert",
+    subjectId: input.alertId,
+    payloadSnapshot: {
+      orgId: input.orgId,
+      alertKind: input.alertKind,
+      alertId: input.alertId,
+      ...input.payloadSnapshot,
+    },
+    reason: null,
+    at: input.today,
+    createdAt: input.today,
   });
 }
 
@@ -952,7 +1004,7 @@ export const createAlertsService = (): AlertsService => ({
               alertKind: "A4",
               naturalKey: month,
             });
-            const existing = await hasActiveDedupedAlertForPayload({
+            const existing = await findDedupedAlertForPayload({
               tx,
               orgId: org.id,
               alertKind: "A4",
@@ -962,8 +1014,24 @@ export const createAlertsService = (): AlertsService => ({
               payloadValue: month,
               today,
             });
-            if (existing) {
+            if (existing?.state.visible) {
               summary.a4AlertsSkippedExisting += 1;
+              continue;
+            }
+            if (existing?.state.dismissed) {
+              await reopenSprint7Alert({
+                tx,
+                orgId: org.id,
+                alertId: existing.row.id,
+                alertKind: "A4",
+                payloadSnapshot: {
+                  month,
+                  projectedBalance,
+                  safetyMarginAmount,
+                },
+                today,
+              });
+              summary.a4AlertsEmitted += 1;
               continue;
             }
 
@@ -1036,7 +1104,7 @@ export const createAlertsService = (): AlertsService => ({
               alertKind: "A5",
               naturalKey: year,
             });
-            const existing = await hasActiveDedupedAlertForPayload({
+            const existing = await findDedupedAlertForPayload({
               tx,
               orgId: org.id,
               alertKind: "A5",
@@ -1046,8 +1114,24 @@ export const createAlertsService = (): AlertsService => ({
               payloadValue: year,
               today,
             });
-            if (existing) {
+            if (existing?.state.visible) {
               summary.a5AlertsSkippedExisting += 1;
+              continue;
+            }
+            if (existing?.state.dismissed) {
+              await reopenSprint7Alert({
+                tx,
+                orgId: org.id,
+                alertId: existing.row.id,
+                alertKind: "A5",
+                payloadSnapshot: {
+                  year,
+                  commitment,
+                  projectedAvailable,
+                },
+                today,
+              });
+              summary.a5AlertsEmitted += 1;
               continue;
             }
 
