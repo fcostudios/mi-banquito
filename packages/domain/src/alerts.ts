@@ -127,6 +127,7 @@ type Sprint7ShareOutCommitmentRow = {
   source_kind?: "share_out" | "governance_decision" | string;
   status?: string | null;
   version?: number | string | null;
+  valid_to?: Date | string | null;
   committed_at?: Date | string | null;
 };
 
@@ -365,7 +366,7 @@ function isActiveShareOutCommitment(row: Sprint7ShareOutCommitmentRow, currentYe
     return row.status === "draft" || row.status === "approved";
   }
   if (row.source_kind === "governance_decision") {
-    return row.status === "approved";
+    return row.status === "approved" && !row.valid_to;
   }
   return row.status === undefined || row.status === null || row.status === "approved" || row.status === "draft";
 }
@@ -525,6 +526,7 @@ async function latestShareOutCommitmentRows(input: {
         COALESCE(total_approved, total_commitment, reparto_total) AS commitment,
         status::text AS status,
         0 AS version,
+        NULL::timestamp AS valid_to,
         COALESCE(approved_at, created_at) AS committed_at,
         'share_out' AS source_kind
       FROM year_end_share_out
@@ -539,12 +541,14 @@ async function latestShareOutCommitmentRows(input: {
         reparto_total AS commitment,
         status::text AS status,
         version,
+        valid_to,
         COALESCE(decided_at, valid_from, created_at) AS committed_at,
         'governance_decision' AS source_kind
       FROM surplus_governance_decision
       WHERE org_id = ${input.orgId}
         AND year >= ${input.currentYear}
         AND status = 'approved'
+        AND valid_to IS NULL
     )
     SELECT
       cc.year,
@@ -553,6 +557,7 @@ async function latestShareOutCommitmentRows(input: {
       cc.source_kind,
       cc.status,
       cc.version,
+      cc.valid_to,
       cc.committed_at
     FROM commitment_candidates cc
     LEFT JOIN LATERAL (
@@ -1014,10 +1019,6 @@ export const createAlertsService = (): AlertsService => ({
               payloadValue: month,
               today,
             });
-            if (existing?.state.visible) {
-              summary.a4AlertsSkippedExisting += 1;
-              continue;
-            }
             if (existing?.state.dismissed) {
               await reopenSprint7Alert({
                 tx,
@@ -1032,6 +1033,10 @@ export const createAlertsService = (): AlertsService => ({
                 today,
               });
               summary.a4AlertsEmitted += 1;
+              continue;
+            }
+            if (existing) {
+              summary.a4AlertsSkippedExisting += 1;
               continue;
             }
 
@@ -1114,10 +1119,6 @@ export const createAlertsService = (): AlertsService => ({
               payloadValue: year,
               today,
             });
-            if (existing?.state.visible) {
-              summary.a5AlertsSkippedExisting += 1;
-              continue;
-            }
             if (existing?.state.dismissed) {
               await reopenSprint7Alert({
                 tx,
@@ -1132,6 +1133,10 @@ export const createAlertsService = (): AlertsService => ({
                 today,
               });
               summary.a5AlertsEmitted += 1;
+              continue;
+            }
+            if (existing) {
+              summary.a5AlertsSkippedExisting += 1;
               continue;
             }
 

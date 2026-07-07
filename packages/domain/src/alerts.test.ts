@@ -564,6 +564,58 @@ describe("alerts", () => {
     ]);
   });
 
+  it("suppresses a snoozed A4 alert inside the dedup window", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const subjectId = buildA4LiquidityLowMarginAlert({
+      orgId,
+      month: "2026-08",
+      projectedBalance: "80.0000",
+      safetyMarginAmount: "100.0000",
+      now: new Date("2026-07-01T00:00:00.000Z"),
+    }).subjectId;
+    const alertId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [{ safetyMarginAmount: "100.0000", config: { safety_margin_amount: "100.0000" } }],
+      [{ monthOn: "2026-08-01", projectedBalance: "80.0000" }],
+      [{
+        id: alertId,
+        orgId,
+        alertKind: "A4",
+        severity: "high",
+        audience: "treasurer",
+        subjectKind: "liquidity_projection",
+        subjectId,
+        payload: { month: "2026-08" },
+        dedupWindowEnd: new Date("2026-07-13T00:00:00.000Z"),
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+      }],
+      [{
+        alertId,
+        actionKind: "snooze",
+        snoozedUntil: new Date("2026-07-10T00:00:00.000Z"),
+        createdAt: new Date("2026-07-03T00:00:00.000Z"),
+      }],
+      [],
+      [],
+    ], [[]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a4AlertsEmitted: 0,
+        a4AlertsSkippedExisting: 1,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toHaveLength(0);
+    expect(insertedRows(fakeDb, alertAction)).toHaveLength(0);
+    expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(0);
+  });
+
   it("does not clear already dismissed A4 and A5 alerts again", async () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
     const a4Id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -769,6 +821,60 @@ describe("alerts", () => {
     ]);
   });
 
+  it("suppresses a snoozed A5 alert inside the dedup window", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const subjectId = buildA5ShareOutCommitmentAlert({
+      orgId,
+      year: 2026,
+      commitment: "500.0000",
+      projectedAvailable: "300.0000",
+      now: new Date("2026-07-01T00:00:00.000Z"),
+    }).subjectId;
+    const alertId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [],
+      [],
+      [],
+      [{
+        id: alertId,
+        orgId,
+        alertKind: "A5",
+        severity: "high",
+        audience: "treasurer",
+        subjectKind: "year_end_share_out",
+        subjectId,
+        payload: { year: 2026 },
+        dedupWindowEnd: new Date("2026-07-13T00:00:00.000Z"),
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+      }],
+      [{
+        alertId,
+        actionKind: "snooze",
+        snoozedUntil: new Date("2026-07-10T00:00:00.000Z"),
+        createdAt: new Date("2026-07-03T00:00:00.000Z"),
+      }],
+      [],
+    ], [[
+      { year: 2026, commitment: "500.0000", projected_available: "300.0000" },
+    ]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a5AlertsEmitted: 0,
+        a5AlertsSkippedExisting: 1,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toHaveLength(0);
+    expect(insertedRows(fakeDb, alertAction)).toHaveLength(0);
+    expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(0);
+  });
+
   it("uses a newer approved governance decision over an older share-out for A5", async () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
     const fakeDb = new FakeDb([
@@ -823,6 +929,42 @@ describe("alerts", () => {
         }),
       }),
     ]);
+  });
+
+  it("ignores stale approved governance decisions for A5", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [],
+      [],
+      [],
+      [],
+    ], [[
+      {
+        year: 2026,
+        commitment: "900.0000",
+        projected_available: "300.0000",
+        source_kind: "governance_decision",
+        status: "approved",
+        version: 1,
+        valid_to: new Date("2026-06-30T00:00:00.000Z"),
+        committed_at: new Date("2026-06-01T00:00:00.000Z"),
+      },
+    ]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a5CommitmentsScanned: 0,
+        a5AlertsEmitted: 0,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toHaveLength(0);
+    expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(0);
   });
 
   it("emits separate A5 rows for separate active breached years", async () => {
