@@ -93,7 +93,7 @@ function dedupWindowEnd(now: Date, days: number): Date {
 
 export function deterministicAlertSubjectId(input: {
   orgId: string;
-  alertKind: "A4" | "A5";
+  alertKind: "A4" | "A5" | "A14";
   naturalKey: string | number;
 }): string {
   const bytes = createHash("sha256")
@@ -294,8 +294,12 @@ export function buildA14NegativeMemberBalanceAlert(input: BuildA14NegativeMember
     alertKind: "A14",
     severity: "critical",
     audience: "both",
-    subjectKind: "member",
-    subjectId: input.memberId,
+    subjectKind: "member_negative_balance_event",
+    subjectId: deterministicAlertSubjectId({
+      orgId: input.orgId,
+      alertKind: "A14",
+      naturalKey: `${input.memberId}:${input.sourceEventId}`,
+    }),
     payload: {
       title: "Saldo de miembro negativo",
       body: copy,

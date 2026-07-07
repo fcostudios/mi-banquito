@@ -394,8 +394,10 @@ const defaultAuditWriter: PlatformAuditWriter = async ({ tx, entry }) => {
   await tx.insert(auditLogEntry).values(entry);
 };
 
-function configJson(input: GroupConfigForm) {
+function configJson(input: GroupConfigForm, previousConfig?: unknown) {
+  const preserved = asConfigJson(previousConfig);
   return {
+    ...preserved,
     mora: { lateThresholdDays: input.lateThresholdDays, moraThresholdDays: input.moraThresholdDays },
     distribution: { formula: input.yearEndShareOutFormula },
     baseFundQuota: {
@@ -421,6 +423,7 @@ function groupConfigInsertFromForm(args: {
   actorKind: GroupConfigActorKind;
   version: number;
   now: Date;
+  previousConfig?: unknown;
 }): typeof groupConfig.$inferInsert {
   return {
     orgId: args.orgId,
@@ -446,7 +449,7 @@ function groupConfigInsertFromForm(args: {
     moraThresholdDays: args.input.moraThresholdDays,
     fiscalYearStartMonth: args.input.fiscalYearStartMonth,
     fiscalYearStartDay: args.input.fiscalYearStartDay,
-    config: configJson(args.input),
+    config: configJson(args.input, args.previousConfig),
     createdAt: args.now,
     createdBy: args.actorId,
     createdByKind: args.actorKind,
@@ -723,6 +726,7 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
               actorKind,
               version: nextVersion,
               now,
+              previousConfig: current?.config,
             })).returning();
 
             await tx.insert(baseFundQuotaConfig).values({

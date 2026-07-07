@@ -233,8 +233,8 @@ describe("Sprint 2 contribution source and partial state", () => {
           alertKind: "A14",
           severity: "critical",
           audience: "both",
-          subjectKind: "member",
-          subjectId: "44444444-4444-4444-8444-444444444444",
+          subjectKind: "member_negative_balance_event",
+          subjectId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
           payload: expect.objectContaining({
             memberName: "Pancho",
             balance: "-1.0000",
@@ -314,14 +314,15 @@ describe("Sprint 2 contribution source and partial state", () => {
       const alerts = insertedRows(fakeDb, alert);
       expect(alerts).toHaveLength(2);
       expect(alerts.map((row) => row.alertKind)).toEqual(["A14", "A14"]);
+      expect(alerts.map((row) => row.subjectKind)).toEqual([
+        "member_negative_balance_event",
+        "member_negative_balance_event",
+      ]);
       expect(alerts.map((row) => (row.payload as Record<string, unknown>).sourceEventId)).toEqual([
         "99999999-9999-4999-8999-999999999991",
         "99999999-9999-4999-8999-999999999992",
       ]);
-      expect(alerts.map((row) => row.subjectId)).toEqual([
-        "44444444-4444-4444-8444-444444444444",
-        "44444444-4444-4444-8444-444444444444",
-      ]);
+      expect(alerts[0]?.subjectId).not.toBe(alerts[1]?.subjectId);
     } finally {
       vi.doUnmock("@mi-banquito/db");
       vi.doUnmock("@mi-banquito/db/tenant");
@@ -341,9 +342,9 @@ describe("Sprint 2 contribution source and partial state", () => {
       }],
       [{ config: { no_slip_consecutive_threshold: 3 } }],
       [
-        { id: "99999999-9999-4999-8999-999999999999", slipPhotoId: null },
-        { id: "77777777-7777-4777-8777-777777777777", slipPhotoId: null },
-        { id: "88888888-8888-4888-8888-888888888888", slipPhotoId: null },
+        { id: "99999999-9999-4999-8999-999999999999", amount: "10.0000", reversesId: null, slipPhotoId: null },
+        { id: "77777777-7777-4777-8777-777777777777", amount: "10.0000", reversesId: null, slipPhotoId: null },
+        { id: "88888888-8888-4888-8888-888888888888", amount: "10.0000", reversesId: null, slipPhotoId: null },
       ],
       [],
     ]);
@@ -406,9 +407,57 @@ describe("Sprint 2 contribution source and partial state", () => {
       }],
       [{ config: { no_slip_consecutive_threshold: 3 } }],
       [
-        { id: "99999999-9999-4999-8999-999999999999", slipPhotoId: null },
-        { id: "77777777-7777-4777-8777-777777777777", slipPhotoId: "55555555-5555-4555-8555-555555555555" },
-        { id: "88888888-8888-4888-8888-888888888888", slipPhotoId: null },
+        { id: "99999999-9999-4999-8999-999999999999", amount: "10.0000", reversesId: null, slipPhotoId: null },
+        { id: "77777777-7777-4777-8777-777777777777", amount: "10.0000", reversesId: null, slipPhotoId: "55555555-5555-4555-8555-555555555555" },
+        { id: "88888888-8888-4888-8888-888888888888", amount: "10.0000", reversesId: null, slipPhotoId: null },
+      ],
+    ]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+    vi.doMock("@mi-banquito/db/tenant", () => ({
+      withTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => fakeDb.transaction(() => run(fakeDb)),
+      withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => fakeDb.transaction(() => run(fakeDb)),
+    }));
+
+    try {
+      const { createLedgerService } = await import("./ledger");
+      await createLedgerService().recordContribution(
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+        {
+          clientRequestId: "33333333-3333-4333-8333-333333333333",
+          memberId: "44444444-4444-4444-8444-444444444444",
+          amount: "10.0000",
+          datedOn: "2026-07-01",
+          paymentSource: "cash_in_meeting",
+          kind: "regular",
+          slipPhotoId: "",
+        },
+      );
+
+      expect(insertedRows(fakeDb, alert)).toHaveLength(0);
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.doUnmock("@mi-banquito/db/tenant");
+      vi.resetModules();
+    }
+  });
+
+  it("does not count reversal rows toward the A11 missing-photo streak", async () => {
+    const fakeDb = new FakeDb([
+      [],
+      [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }],
+      [{
+        memberId: "44444444-4444-4444-8444-444444444444",
+        displayName: "Pancho",
+        currentBalance: "20.0000",
+        state: "al_dia",
+      }],
+      [{ config: { no_slip_consecutive_threshold: 3 } }],
+      [
+        { id: "99999999-9999-4999-8999-999999999999", amount: "10.0000", reversesId: null, slipPhotoId: null },
+        { id: "77777777-7777-4777-8777-777777777777", amount: "-10.0000", reversesId: "66666666-6666-4666-8666-666666666666", slipPhotoId: null },
+        { id: "88888888-8888-4888-8888-888888888888", amount: "10.0000", reversesId: null, slipPhotoId: null },
       ],
     ]);
     vi.resetModules();
@@ -454,9 +503,9 @@ describe("Sprint 2 contribution source and partial state", () => {
       }],
       [{ config: { no_slip_consecutive_threshold: 3 } }],
       [
-        { id: "99999999-9999-4999-8999-999999999999", slipPhotoId: null },
-        { id: "77777777-7777-4777-8777-777777777777", slipPhotoId: null },
-        { id: "88888888-8888-4888-8888-888888888888", slipPhotoId: null },
+        { id: "99999999-9999-4999-8999-999999999999", amount: "10.0000", reversesId: null, slipPhotoId: null },
+        { id: "77777777-7777-4777-8777-777777777777", amount: "10.0000", reversesId: null, slipPhotoId: null },
+        { id: "88888888-8888-4888-8888-888888888888", amount: "10.0000", reversesId: null, slipPhotoId: null },
       ],
       [{
         id: "66666666-6666-4666-8666-666666666666",

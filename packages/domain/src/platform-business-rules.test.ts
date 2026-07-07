@@ -621,6 +621,75 @@ describe("US-024 business-rules projection", () => {
     }
   });
 
+  it("preserves config-only alert thresholds without emitting false A9 changes", async () => {
+    const defaultConfig = buildDefaultGroupConfigValues({
+      orgId: "11111111-1111-4111-8111-111111111111",
+      currencyCode: "USD",
+      actorId: "22222222-2222-4222-8222-222222222222",
+      now: new Date("2026-06-01T00:00:00Z"),
+    });
+    const previousConfig = {
+      ...defaultConfig,
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      config: {
+        ...(defaultConfig.config as Record<string, unknown>),
+        no_slip_consecutive_threshold: 4,
+      },
+    };
+    const fakeDb = new FakeWriteDb([[previousConfig]]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+    vi.doMock("@mi-banquito/db/tenant", () => ({
+      withTenantTransaction: async (_orgId: string, run: (tx: FakeWriteDb) => Promise<unknown>) =>
+        fakeDb.transaction(run),
+      withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeWriteDb) => Promise<unknown>) =>
+        fakeDb.transaction(run),
+    }));
+
+    try {
+      const { createPlatformService } = await import("./platform");
+      await createPlatformService().saveGroupConfig(
+        "11111111-1111-4111-8111-111111111111",
+        {
+          contributionCycleKind: "monthly",
+          contributionAmount: "20.0000",
+          memberLoanRateValue: "4.0000",
+          nonMemberLoanRateValue: "5.0000",
+          loanRateModel: "declining_balance",
+          loanRatePeriodUnit: "monthly",
+          loanGracePeriods: 0,
+          loanToSavingsCapRatio: "2.00",
+          yearEndShareOutFormula: "proportional_time_weighted",
+          reconciliationToleranceAmount: "1.0000",
+          lateThresholdDays: 3,
+          moraThresholdDays: 15,
+          fiscalYearStartMonth: 1,
+          fiscalYearStartDay: 1,
+          baseFundQuotaFiscalYear: 2026,
+          baseFundQuotaAmount: "25.0000",
+          adminFeePct: "1.0000",
+          referralCommissionAmount: "5.0000",
+          treasurerCompensationKind: "fixed",
+          treasurerCompensationAmount: "10.0000",
+          treasurerCompensationPeriod: "monthly",
+          opensOnDay: 1,
+        },
+        "33333333-3333-4333-8333-333333333333",
+        "member",
+      );
+
+      const [savedConfig] = insertedRows(fakeDb, groupConfig);
+      expect(savedConfig.config).toEqual(expect.objectContaining({
+        no_slip_consecutive_threshold: 4,
+      }));
+      expect(insertedRows(fakeDb, alert)).toHaveLength(0);
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.doUnmock("@mi-banquito/db/tenant");
+      vi.resetModules();
+    }
+  });
+
   it("pauses or archives an organization with a required audit reason", async () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
     const fakeDb = new FakeWriteDb([[

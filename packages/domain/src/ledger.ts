@@ -558,14 +558,23 @@ async function emitPostContributionAlerts(input: {
   const threshold = noSlipContributionThreshold(config?.config);
   const recent = await input.tx.select({
     id: contribution.id,
+    amount: contribution.amount,
+    reversesId: contribution.reversesId,
     slipPhotoId: contribution.slipPhotoId,
   }).from(contribution)
-    .where(and(eq(contribution.orgId, input.orgId), eq(contribution.memberId, input.memberId)))
+    .where(and(
+      eq(contribution.orgId, input.orgId),
+      eq(contribution.memberId, input.memberId),
+      isNull(contribution.reversesId),
+      sql`${contribution.amount} > 0`,
+    ))
     .orderBy(desc(contribution.recordedAt), desc(contribution.createdAt))
     .limit(threshold);
 
-  const consecutiveWithoutPhoto = recent.length >= threshold
-    ? recent.findIndex((row: { slipPhotoId: string | null }) => row.slipPhotoId !== null) === -1
+  const realContributions = recent.filter((row: { amount?: unknown; reversesId?: string | null }) =>
+    row.reversesId === null && Number(row.amount ?? 0) > 0);
+  const consecutiveWithoutPhoto = realContributions.length >= threshold
+    ? realContributions.findIndex((row: { slipPhotoId: string | null }) => row.slipPhotoId !== null) === -1
     : false;
   if (!balance || !consecutiveWithoutPhoto || await hasActiveA11Alert({
     tx: input.tx,
@@ -581,7 +590,7 @@ async function emitPostContributionAlerts(input: {
     memberId: input.memberId,
     memberName: balance.displayName,
     threshold,
-    consecutiveCount: recent.length,
+    consecutiveCount: realContributions.length,
     now: input.now,
   });
   await input.tx.insert(alert).values(alertRow);
@@ -598,7 +607,7 @@ async function emitPostContributionAlerts(input: {
       sourceEventId: input.sourceEventId,
       sourceEventKind: input.sourceEventKind,
       threshold,
-      consecutiveCount: recent.length,
+      consecutiveCount: realContributions.length,
     },
     reason: null,
     at: input.now,

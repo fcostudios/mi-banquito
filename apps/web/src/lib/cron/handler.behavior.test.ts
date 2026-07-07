@@ -58,6 +58,7 @@ class FakeUpdateBuilder {
   constructor(
     private readonly table: unknown,
     private readonly updates: UpdateRecord[],
+    private readonly returningRows: () => unknown[],
   ) {}
 
   set(values: Record<string, unknown>) {
@@ -68,6 +69,10 @@ class FakeUpdateBuilder {
   where() {
     return this;
   }
+
+  returning() {
+    return Promise.resolve(this.returningRows());
+  }
 }
 
 class FakeCronDb {
@@ -76,10 +81,14 @@ class FakeCronDb {
   readonly executedQueries: unknown[] = [];
   private readonly selectResults: unknown[][];
   private readonly executeResults: unknown[][];
+  private readonly updateReturningResults: Record<string, unknown[][]>;
 
-  constructor(args: { selectResults: unknown[][]; executeResults?: unknown[][] }) {
+  constructor(args: { selectResults: unknown[][]; executeResults?: unknown[][]; updateReturningResults?: Record<string, unknown[][]> }) {
     this.selectResults = [...args.selectResults];
     this.executeResults = [...(args.executeResults ?? [])];
+    this.updateReturningResults = Object.fromEntries(
+      Object.entries(args.updateReturningResults ?? {}).map(([tableName, rows]) => [tableName, [...rows]]),
+    );
   }
 
   select() {
@@ -91,7 +100,8 @@ class FakeCronDb {
   }
 
   update(table: unknown) {
-    return new FakeUpdateBuilder(table, this.updates);
+    const tableName = tableNameOf(table);
+    return new FakeUpdateBuilder(table, this.updates, () => this.updateReturningResults[tableName]?.shift() ?? [{}]);
   }
 
   execute(query: unknown) {
@@ -280,5 +290,29 @@ describe("accrue-interest cron A6 alerts", () => {
         }),
       }),
     ]);
+  });
+
+  it("does not insert A6 when the atomic loan status update did not transition a row", async () => {
+    const rows = overdueCronRows("originated");
+    const fakeDb = new FakeCronDb({
+      selectResults: [
+        [rows.org],
+        [rows.config],
+        [rows.loan],
+        [rows.schedule],
+        [],
+        [],
+        [],
+      ],
+      updateReturningResults: { loan: [[]] },
+    });
+    const { runAccrueInterestCron } = await importCronWithDb(fakeDb);
+
+    const summary = await runAccrueInterestCron(
+      new Request("http://localhost/api/cron/accrue-interest?from_date=2026-07-01&to_date=2026-07-01"),
+    );
+
+    expect(summary.transitionsToMora).toBe(1);
+    expect(insertedRows(fakeDb, alert)).toHaveLength(0);
   });
 });
