@@ -500,7 +500,7 @@ describe("alerts", () => {
     ]);
   });
 
-  it("does not let a dismissed A4 alert suppress a re-breached month", async () => {
+  it("reopens a dismissed A4 alert instead of inserting a duplicate row when the month re-breaches", async () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
     const subjectId = buildA4LiquidityLowMarginAlert({
       orgId,
@@ -534,6 +534,7 @@ describe("alerts", () => {
       }],
       [],
       [],
+      [],
     ], [[]]);
 
     await withMockedDb(fakeDb, async () => {
@@ -547,14 +548,20 @@ describe("alerts", () => {
       });
     });
 
-    expect(insertedRows(fakeDb, alert)).toEqual([
+    expect(insertedRows(fakeDb, alert)).toHaveLength(0);
+    expect(insertedRows(fakeDb, alertAction)).toEqual([
       expect.objectContaining({
-        alertKind: "A4",
-        subjectId,
-        payload: expect.objectContaining({ month: "2026-08" }),
+        alertId,
+        actionKind: "system_reopen",
+        actorKind: "system",
       }),
     ]);
-    expect(insertedRows(fakeDb, alertAction)).toHaveLength(0);
+    expect(insertedRows(fakeDb, auditLogEntry)).toEqual([
+      expect.objectContaining({
+        actionKind: "alert.liquidity_low_margin.reopen",
+        subjectId: alertId,
+      }),
+    ]);
   });
 
   it("does not clear already dismissed A4 and A5 alerts again", async () => {
@@ -694,6 +701,71 @@ describe("alerts", () => {
     ]);
     expect(insertedRows(fakeDb, auditLogEntry)).toEqual([
       expect.objectContaining({ actionKind: "alert.shareout_commitment.emit" }),
+    ]);
+  });
+
+  it("reopens a dismissed A5 alert instead of inserting a duplicate row when the year re-breaches", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const subjectId = buildA5ShareOutCommitmentAlert({
+      orgId,
+      year: 2026,
+      commitment: "500.0000",
+      projectedAvailable: "300.0000",
+      now: new Date("2026-07-01T00:00:00.000Z"),
+    }).subjectId;
+    const alertId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const fakeDb = new FakeDb([
+      [{ id: orgId }],
+      [],
+      [],
+      [],
+      [{
+        id: alertId,
+        orgId,
+        alertKind: "A5",
+        severity: "high",
+        audience: "treasurer",
+        subjectKind: "year_end_share_out",
+        subjectId,
+        payload: { year: 2026 },
+        dedupWindowEnd: new Date("2026-07-13T00:00:00.000Z"),
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+      }],
+      [{
+        alertId,
+        actionKind: "dismiss",
+        snoozedUntil: null,
+        createdAt: new Date("2026-07-03T00:00:00.000Z"),
+      }],
+      [],
+    ], [[
+      { year: 2026, commitment: "500.0000", projected_available: "300.0000" },
+    ]]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAlertsService: createDynamicAlertsService } = await import("./alerts");
+      await expect(createDynamicAlertsService().emitSprint7DailyAlerts({
+        today: new Date("2026-07-06T12:00:00.000Z"),
+      })).resolves.toMatchObject({
+        a5AlertsEmitted: 1,
+        a5AlertsSkippedExisting: 0,
+        failures: [],
+      });
+    });
+
+    expect(insertedRows(fakeDb, alert)).toHaveLength(0);
+    expect(insertedRows(fakeDb, alertAction)).toEqual([
+      expect.objectContaining({
+        alertId,
+        actionKind: "system_reopen",
+        actorKind: "system",
+      }),
+    ]);
+    expect(insertedRows(fakeDb, auditLogEntry)).toEqual([
+      expect.objectContaining({
+        actionKind: "alert.shareout_commitment.reopen",
+        subjectId: alertId,
+      }),
     ]);
   });
 
