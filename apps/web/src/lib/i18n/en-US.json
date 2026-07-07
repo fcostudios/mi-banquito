@@ -310,6 +310,7 @@
     "reversalWindowClosedError": "La ventana para reversar este reparto ya cerró.",
     "reversalReasonMinError": "Escribe una razón de al menos 10 caracteres para reversar el reparto.",
     "reversalNotAllowedError": "Este reparto no se puede reversar en su estado actual.",
+    "reversalInvalidShareOutError": "No encontramos el reparto seleccionado para reversar.",
     "reversalFailedError": "No se pudo reversar el reparto. Intenta nuevamente.",
     "reversalSuccess": "Reparto reversado.",
     "reversalAlreadyDone": "El reparto ya tenía un reverso registrado.",

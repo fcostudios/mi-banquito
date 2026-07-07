@@ -7,6 +7,8 @@ import { createShareOutService } from "@mi-banquito/domain";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import { uploadYearEndArtifact } from "@/lib/year-end-artifact";
 
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function redirectKnownDraftError(error: unknown): never {
   const message = error instanceof Error ? error.message : String(error);
   if (message === "surplus_governance_decision_required") {
@@ -72,12 +74,16 @@ export async function approveShareOutAction(formData: FormData) {
 
 export async function reverseShareOutAction(formData: FormData) {
   const session = await requireTreasurer();
+  const shareOutId = String(formData.get("shareOutId") ?? "");
+  if (!uuidPattern.test(shareOutId)) {
+    redirect("/reparto?error=reversal-invalid-share-out");
+  }
   let reversed = false;
   try {
     const result = await createShareOutService().reverseApprovedShareOut({
       orgId: session.orgId,
       actorId: session.actorId,
-      shareOutId: String(formData.get("shareOutId") ?? ""),
+      shareOutId,
       reason: String(formData.get("reason") ?? ""),
     });
     reversed = result.reversed;

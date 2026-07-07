@@ -59,6 +59,7 @@ describe("ScrYearEndShareOutPage", () => {
         draftShareAmount: "26.5000",
         overrideReason: null,
         finalShareAmount: "26.5000",
+        withdrawalId: "withdrawal-1",
       }],
     });
 
@@ -103,6 +104,7 @@ describe("ScrYearEndShareOutPage", () => {
         draftShareAmount: "26.5000",
         overrideReason: null,
         finalShareAmount: "26.5000",
+        withdrawalId: "withdrawal-1",
       }],
     });
 
@@ -111,6 +113,75 @@ describe("ScrYearEndShareOutPage", () => {
     expect(screen.getByText("Reversar reparto")).toBeInTheDocument();
     expect(screen.getByLabelText("Razón de reverso")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reversar reparto" })).toBeInTheDocument();
+  });
+
+  it("does not show the reversal panel when there are no linked nonzero withdrawals", async () => {
+    getLatestDraft.mockResolvedValueOnce({
+      id: "shareout-1",
+      year: 2026,
+      status: "distributed",
+      approvedAt: new Date("2026-07-01T12:00:00.000Z"),
+      repartoTotal: "100.0000",
+      loanPoolAmount: "30.0000",
+      savingsPoolAmount: "70.0000",
+      ajusteAmount: "0.0000",
+      lines: [{
+        id: "line-1",
+        memberName: "Ana Mora",
+        accumulatedSavingsAtRun: "100.0000",
+        loanActivityBasis: "300.0000",
+        loanBonusC: "9.0000",
+        savingsInterest: "17.5000",
+        draftShareAmount: "26.5000",
+        overrideReason: null,
+        finalShareAmount: "26.5000",
+        withdrawalId: null,
+      }, {
+        id: "line-2",
+        memberName: "Bea Paz",
+        accumulatedSavingsAtRun: "100.0000",
+        loanActivityBasis: "0.0000",
+        loanBonusC: "0.0000",
+        savingsInterest: "0.0000",
+        draftShareAmount: "0.0000",
+        overrideReason: null,
+        finalShareAmount: "0.0000",
+        withdrawalId: "withdrawal-2",
+      }],
+    });
+
+    render(await ScrYearEndShareOutPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.queryByText("Reversar reparto")).not.toBeInTheDocument();
+  });
+
+  it("does not show the reversal panel for already reversed share-outs", async () => {
+    getLatestDraft.mockResolvedValueOnce({
+      id: "shareout-1",
+      year: 2026,
+      status: "reversed",
+      approvedAt: new Date("2026-07-01T12:00:00.000Z"),
+      repartoTotal: "100.0000",
+      loanPoolAmount: "30.0000",
+      savingsPoolAmount: "70.0000",
+      ajusteAmount: "0.0000",
+      lines: [{
+        id: "line-1",
+        memberName: "Ana Mora",
+        accumulatedSavingsAtRun: "100.0000",
+        loanActivityBasis: "300.0000",
+        loanBonusC: "9.0000",
+        savingsInterest: "17.5000",
+        draftShareAmount: "26.5000",
+        overrideReason: null,
+        finalShareAmount: "26.5000",
+        withdrawalId: "withdrawal-1",
+      }],
+    });
+
+    render(await ScrYearEndShareOutPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.queryByText("Reversar reparto")).not.toBeInTheDocument();
   });
 
   it("does not show the reversal panel after the grace window", async () => {

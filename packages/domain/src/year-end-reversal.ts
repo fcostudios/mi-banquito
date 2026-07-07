@@ -40,6 +40,27 @@ export function assertShareOutReversalAllowed(input: {
   }
 }
 
+export function hasLinkedNonzeroShareOutWithdrawal(input: {
+  lines: Array<{ finalShareAmount: string; withdrawalId: string | null }>;
+}) {
+  return input.lines.some((line) => line.withdrawalId && money4ToUnits(line.finalShareAmount) > ZERO);
+}
+
+export function isShareOutReversalEligibleForView(input: {
+  status: string;
+  approvedAt: Date | string | null;
+  now: Date;
+  graceDays: number;
+  lines: Array<{ finalShareAmount: string; withdrawalId: string | null }>;
+}) {
+  try {
+    assertShareOutReversalAllowed(input);
+  } catch {
+    return false;
+  }
+  return hasLinkedNonzeroShareOutWithdrawal({ lines: input.lines });
+}
+
 export type ShareOutReversalLineInput = {
   id: string;
   memberId: string;
