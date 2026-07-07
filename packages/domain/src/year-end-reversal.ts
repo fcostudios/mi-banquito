@@ -43,7 +43,11 @@ export function assertShareOutReversalAllowed(input: {
 export function hasLinkedNonzeroShareOutWithdrawal(input: {
   lines: Array<{ finalShareAmount: string; withdrawalId: string | null }>;
 }) {
-  return input.lines.some((line) => line.withdrawalId && money4ToUnits(line.finalShareAmount) > ZERO);
+  return input.lines.some((line) => line.withdrawalId && isPositiveMoney4(line.finalShareAmount));
+}
+
+export function isPositiveMoney4(value: string) {
+  return money4ToUnits(value) > ZERO;
 }
 
 export function isShareOutReversalEligibleForView(input: {
