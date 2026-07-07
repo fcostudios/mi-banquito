@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lte, ne, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
 import {
   buildA6LoanPastDueAlert,
@@ -326,9 +326,17 @@ export async function runAccrueInterestCron(request: Request): Promise<CronRunSu
             }
 
             for (const transition of plan.transitionsToMora) {
-              await tx.update(loan)
+              const transitioned = await tx.update(loan)
                 .set({ status: "en_mora", updatedAt: startedAt, updatedBy: SYSTEM_ACTOR_ID })
-                .where(and(eq(loan.orgId, org.id), eq(loan.id, transition.loanId)));
+                .where(and(
+                  eq(loan.orgId, org.id),
+                  eq(loan.id, transition.loanId),
+                  ne(loan.status, "en_mora"),
+                ))
+                .returning();
+              if (transitioned.length === 0) {
+                continue;
+              }
               await tx.update(loanSchedule)
                 .set({ status: "en_mora" })
                 .where(and(eq(loanSchedule.orgId, org.id), eq(loanSchedule.id, transition.scheduleId)));

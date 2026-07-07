@@ -166,15 +166,41 @@ describe("Sprint 7 alert builders", () => {
       memberId: "55555555-5555-4555-8555-555555555555",
       memberName: "Pancho",
       balance: "-12.5000",
-      sourceEventId: "event-1",
+      sourceEventId: "66666666-6666-4666-8666-666666666666",
       now: new Date("2026-07-06T10:00:00.000Z"),
     });
 
     expect(alert.alertKind).toBe("A14");
     expect(alert.severity).toBe("critical");
     expect(alert.audience).toBe("both");
+    expect(alert.subjectKind).toBe("member_negative_balance_event");
+    expect(alert.subjectId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(alert.dedupWindowEnd.toISOString()).toBe("2026-07-06T10:00:00.000Z");
     expect(alert.payload.copy).toBe("Pancho tiene saldo negativo de -$12,50.");
+  });
+
+  it("builds A14 with distinct subjects for distinct source events at the same time", () => {
+    const now = new Date("2026-07-06T10:00:00.000Z");
+    const first = buildA14NegativeMemberBalanceAlert({
+      orgId: "11111111-1111-4111-8111-111111111111",
+      memberId: "55555555-5555-4555-8555-555555555555",
+      memberName: "Pancho",
+      balance: "-12.5000",
+      sourceEventId: "66666666-6666-4666-8666-666666666666",
+      now,
+    });
+    const second = buildA14NegativeMemberBalanceAlert({
+      orgId: "11111111-1111-4111-8111-111111111111",
+      memberId: "55555555-5555-4555-8555-555555555555",
+      memberName: "Pancho",
+      balance: "-14.5000",
+      sourceEventId: "77777777-7777-4777-8777-777777777777",
+      now,
+    });
+
+    expect(first.dedupWindowEnd.getTime()).toBe(second.dedupWindowEnd.getTime());
+    expect(first.subjectKind).toBe(second.subjectKind);
+    expect(first.subjectId).not.toBe(second.subjectId);
   });
 
   it("builds DB/display-compatible alert inserts", () => {
@@ -222,7 +248,7 @@ describe("Sprint 7 alert builders", () => {
         memberId: "55555555-5555-4555-8555-555555555555",
         memberName: "Pancho",
         balance: "-12.5000",
-        sourceEventId: "event-1",
+        sourceEventId: "66666666-6666-4666-8666-666666666666",
         now,
       }),
     ];
