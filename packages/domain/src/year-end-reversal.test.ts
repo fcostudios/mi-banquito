@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertShareOutReversalAllowed,
   buildShareOutReversalPlan,
+  isShareOutReversalEligibleForView,
 } from "./year-end-reversal";
 
 describe("year-end share-out reversal helpers", () => {
@@ -89,5 +90,32 @@ describe("year-end share-out reversal helpers", () => {
         withdrawalId: "withdrawal-1",
       }],
     })).toThrow("share_out_reversal_reason_min_length");
+  });
+
+  it("only marks share-outs view-eligible when status/date and paid linked lines match", () => {
+    const base = {
+      status: "distributed",
+      approvedAt: new Date("2026-07-01T12:00:00.000Z"),
+      now: new Date("2026-07-05T12:00:00.000Z"),
+      graceDays: 10,
+    };
+
+    expect(isShareOutReversalEligibleForView({
+      ...base,
+      lines: [{ finalShareAmount: "26.5000", withdrawalId: "withdrawal-1" }],
+    })).toBe(true);
+    expect(isShareOutReversalEligibleForView({
+      ...base,
+      lines: [{ finalShareAmount: "0.0000", withdrawalId: "withdrawal-1" }],
+    })).toBe(false);
+    expect(isShareOutReversalEligibleForView({
+      ...base,
+      lines: [{ finalShareAmount: "26.5000", withdrawalId: null }],
+    })).toBe(false);
+    expect(isShareOutReversalEligibleForView({
+      ...base,
+      status: "reversed",
+      lines: [{ finalShareAmount: "26.5000", withdrawalId: "withdrawal-1" }],
+    })).toBe(false);
   });
 });

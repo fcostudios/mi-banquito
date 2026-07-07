@@ -27,7 +27,7 @@ vi.mock("@/lib/auth/require-session", () => ({
 
 function reversalFormData() {
   const formData = new FormData();
-  formData.set("shareOutId", "shareout-1");
+  formData.set("shareOutId", "11111111-1111-4111-8111-111111111111");
   formData.set("reason", "Acta corrigió reparto anual");
   return formData;
 }
@@ -53,7 +53,7 @@ describe("reverseShareOutAction", () => {
     expect(reverseApprovedShareOut).toHaveBeenCalledWith({
       orgId: "11111111-1111-4111-8111-111111111111",
       actorId: "33333333-3333-4333-8333-333333333333",
-      shareOutId: "shareout-1",
+      shareOutId: "11111111-1111-4111-8111-111111111111",
       reason: "Acta corrigió reparto anual",
     });
     expect(revalidatePath).toHaveBeenCalledWith("/reparto");
@@ -66,5 +66,17 @@ describe("reverseShareOutAction", () => {
 
     await expect(reverseShareOutAction(reversalFormData()))
       .rejects.toThrow("NEXT_REDIRECT:/reparto?error=reversal-window-closed");
+  });
+
+  it("redirects invalid shareOutId without calling the service", async () => {
+    const { reverseShareOutAction } = await import("./actions");
+    const formData = reversalFormData();
+    formData.set("shareOutId", "");
+
+    await expect(reverseShareOutAction(formData))
+      .rejects.toThrow("NEXT_REDIRECT:/reparto?error=reversal-invalid-share-out");
+
+    expect(reverseApprovedShareOut).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 });

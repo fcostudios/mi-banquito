@@ -1,5 +1,5 @@
 import { ButtonPrimary, YearEndShareOutEditor } from "@mi-banquito/ui";
-import { assertShareOutReversalAllowed, createShareOutService } from "@mi-banquito/domain";
+import { createShareOutService, isShareOutReversalEligibleForView } from "@mi-banquito/domain";
 
 import { requireTreasurer } from "@/lib/auth/require-session";
 import messages from "@/lib/i18n/en-US.json";
@@ -17,6 +17,7 @@ function shareOutErrorMessage(error?: string) {
   if (error === "reversal-window-closed") return shareOutCopy.reversalWindowClosedError;
   if (error === "reversal-reason-min") return shareOutCopy.reversalReasonMinError;
   if (error === "reversal-not-allowed") return shareOutCopy.reversalNotAllowedError;
+  if (error === "reversal-invalid-share-out") return shareOutCopy.reversalInvalidShareOutError;
   if (error === "reversal-failed") return shareOutCopy.reversalFailedError;
   return null;
 }
@@ -25,20 +26,6 @@ function shareOutSuccessMessage(reversed?: string) {
   if (reversed === "1") return shareOutCopy.reversalSuccess;
   if (reversed === "already") return shareOutCopy.reversalAlreadyDone;
   return null;
-}
-
-function canReverseShareOut(input: { status: string; approvedAt: Date | string | null }) {
-  try {
-    assertShareOutReversalAllowed({
-      status: input.status,
-      approvedAt: input.approvedAt,
-      now: new Date(),
-      graceDays: 10,
-    });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export default async function ScrYearEndShareOutPage({
@@ -52,7 +39,16 @@ export default async function ScrYearEndShareOutPage({
   const errorMessage = shareOutErrorMessage(error);
   const successMessage = shareOutSuccessMessage(reversed);
   const shareOut = await createShareOutService().getLatestDraft({ orgId: session.orgId, year });
-  const showReversalPanel = shareOut ? canReverseShareOut({ status: shareOut.status, approvedAt: shareOut.approvedAt }) : false;
+  const showReversalPanel = shareOut ? isShareOutReversalEligibleForView({
+    status: shareOut.status,
+    approvedAt: shareOut.approvedAt,
+    now: new Date(),
+    graceDays: 10,
+    lines: shareOut.lines.map((line) => ({
+      finalShareAmount: line.finalShareAmount,
+      withdrawalId: line.withdrawalId,
+    })),
+  }) : false;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6" data-screen="SCR-year-end-share-out">
