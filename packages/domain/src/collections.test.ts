@@ -26,6 +26,7 @@ type SelectRecord = {
 type UpdateRecord = {
   tableName: string;
   values: Record<string, unknown>;
+  condition: unknown;
 };
 
 const tableNameOf = (table: unknown): string => {
@@ -96,18 +97,35 @@ class FakeInsertBuilder {
 }
 
 class FakeUpdateBuilder {
+  private values: Record<string, unknown> | null = null;
+
   constructor(
     private readonly table: unknown,
     private readonly updates: UpdateRecord[],
+    private readonly nextReturning: (tableName: string) => unknown[],
   ) {}
 
   set(values: Record<string, unknown>) {
-    this.updates.push({ tableName: tableNameOf(this.table), values });
+    this.values = values;
     return this;
   }
 
-  where() {
-    return Promise.resolve([]);
+  where(condition?: unknown) {
+    if (this.values) {
+      this.updates.push({ tableName: tableNameOf(this.table), values: this.values, condition });
+    }
+    return this;
+  }
+
+  returning() {
+    return Promise.resolve(this.nextReturning(tableNameOf(this.table)));
+  }
+
+  then<TResult1 = unknown[], TResult2 = never>(
+    onfulfilled?: ((value: unknown[]) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2> {
+    return Promise.resolve([]).then(onfulfilled, onrejected);
   }
 }
 
@@ -116,15 +134,18 @@ class FakeDb {
   readonly selects: SelectRecord[] = [];
   readonly updates: UpdateRecord[] = [];
   private readonly insertReturningByTableName: Record<string, unknown[][]>;
+  private readonly updateReturningByTableName: Record<string, unknown[][]>;
   private readonly selectResultsByTableName: Record<string, unknown[][]>;
 
   constructor(
     readonly context: string,
     selectResultsByTableName: Record<string, unknown[][]> = {},
     insertReturningByTableName: Record<string, unknown[][]> = {},
+    updateReturningByTableName: Record<string, unknown[][]> = {},
   ) {
     this.selectResultsByTableName = { ...selectResultsByTableName };
     this.insertReturningByTableName = { ...insertReturningByTableName };
+    this.updateReturningByTableName = { ...updateReturningByTableName };
   }
 
   select() {
@@ -140,7 +161,9 @@ class FakeDb {
   }
 
   update(table: unknown) {
-    return new FakeUpdateBuilder(table, this.updates);
+    return new FakeUpdateBuilder(table, this.updates, (tableName) => (
+      this.updateReturningByTableName[tableName]?.shift() ?? []
+    ));
   }
 }
 
@@ -156,6 +179,20 @@ function updatedRows(fakeDbs: FakeDb | FakeDb[], table: unknown): Array<Record<s
     .flatMap((fakeDb) => fakeDb.updates)
     .filter((entry) => entry.tableName === tableNameOf(table))
     .map((entry) => entry.values);
+}
+
+function conditionColumnNames(value: unknown, seen = new Set<object>()): string[] {
+  if (typeof value !== "object" || value === null || seen.has(value)) {
+    return [];
+  }
+  seen.add(value);
+  const record = value as { name?: unknown; queryChunks?: unknown[] };
+  return [
+    typeof record.name === "string" ? record.name : null,
+    ...(Array.isArray(record.queryChunks)
+      ? record.queryChunks.flatMap((chunk) => conditionColumnNames(chunk, seen))
+      : []),
+  ].filter((name): name is string => name !== null);
 }
 
 async function withMockedCollectionsDb<T>(
@@ -430,6 +467,8 @@ describe("collections", () => {
         promisedOn: "2026-07-04",
         status: "open",
       }]],
+    }, {}, {
+      [tableNameOf(promise)]: [[{ id: "promise-1" }]],
     });
     const tenantCalls: string[] = [];
 
@@ -447,6 +486,7 @@ describe("collections", () => {
 
     expect(tenantCalls).toEqual(["org-1"]);
     expect(updatedRows(tenantDb, promise)).toEqual([{ status: "kept" }]);
+    expect(conditionColumnNames(tenantDb.updates[0]?.condition)).toContain("status");
     expect(insertedRows(tenantDb, auditLogEntry)).toEqual([
       expect.objectContaining({
         orgId: "org-1",
@@ -476,6 +516,8 @@ describe("collections", () => {
         promisedOn: "2026-07-04",
         status: "open",
       }]],
+    }, {}, {
+      [tableNameOf(promise)]: [[{ id: "promise-1" }]],
     });
 
     await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
@@ -503,6 +545,116 @@ describe("collections", () => {
     ]);
   });
 
+  it("treats a duplicate same-outcome promise submission as idempotent success without a second audit", async () => {
+    const systemDb = new FakeDb("system");
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(promise)]: [
+        [{
+          id: "promise-1",
+          orgId: "org-1",
+          memberId: "member-1",
+          loanId: "loan-1",
+          cycleId: null,
+          promisedOn: "2026-07-04",
+          status: "kept",
+        }],
+      ],
+    }, {}, {
+      [tableNameOf(promise)]: [[]],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().markPromiseOutcome({
+        orgId: "org-1",
+        actorId: "actor-1",
+        promiseId: "promise-1",
+        outcome: "kept",
+        todayIso: "2026-07-05",
+      })).resolves.toBeUndefined();
+    });
+
+    expect(updatedRows(tenantDb, promise)).toEqual([{ status: "kept" }]);
+    expect(insertedRows(tenantDb, auditLogEntry)).toHaveLength(0);
+  });
+
+  it("emits only one audit row when the same promise outcome is submitted twice", async () => {
+    const systemDb = new FakeDb("system");
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(promise)]: [
+        [{
+          id: "promise-1",
+          orgId: "org-1",
+          memberId: "member-1",
+          loanId: "loan-1",
+          cycleId: null,
+          promisedOn: "2026-07-04",
+          status: "kept",
+        }],
+      ],
+    }, {}, {
+      [tableNameOf(promise)]: [[{ id: "promise-1" }], []],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+      const service = createDynamicCollectionsService();
+
+      await expect(service.markPromiseOutcome({
+        orgId: "org-1",
+        actorId: "actor-1",
+        promiseId: "promise-1",
+        outcome: "kept",
+        todayIso: "2026-07-05",
+      })).resolves.toBeUndefined();
+      await expect(service.markPromiseOutcome({
+        orgId: "org-1",
+        actorId: "actor-1",
+        promiseId: "promise-1",
+        outcome: "kept",
+        todayIso: "2026-07-05",
+      })).resolves.toBeUndefined();
+    });
+
+    expect(updatedRows(tenantDb, promise)).toEqual([{ status: "kept" }, { status: "kept" }]);
+    expect(insertedRows(tenantDb, auditLogEntry)).toHaveLength(1);
+  });
+
+  it("rejects a conflicting promise outcome after the conditional open transition loses", async () => {
+    const systemDb = new FakeDb("system");
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(promise)]: [
+        [{
+          id: "promise-1",
+          orgId: "org-1",
+          memberId: "member-1",
+          loanId: "loan-1",
+          cycleId: null,
+          promisedOn: "2026-07-04",
+          status: "broken",
+        }],
+      ],
+    }, {}, {
+      [tableNameOf(promise)]: [[]],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().markPromiseOutcome({
+        orgId: "org-1",
+        actorId: "actor-1",
+        promiseId: "promise-1",
+        outcome: "kept",
+        todayIso: "2026-07-05",
+      })).rejects.toThrow("promise_not_open");
+    });
+
+    expect(updatedRows(tenantDb, promise)).toEqual([{ status: "kept" }]);
+    expect(insertedRows(tenantDb, auditLogEntry)).toHaveLength(0);
+  });
+
   it("rejects marking a missing promise outcome", async () => {
     const systemDb = new FakeDb("system");
     const tenantDb = new FakeDb("tenant:org-1", {
@@ -521,7 +673,8 @@ describe("collections", () => {
       })).rejects.toThrow("promise_not_found");
     });
 
-    expect(updatedRows(tenantDb, promise)).toHaveLength(0);
+    expect(updatedRows(tenantDb, promise)).toEqual([{ status: "kept" }]);
+    expect(conditionColumnNames(tenantDb.updates[0]?.condition)).toContain("status");
     expect(insertedRows(tenantDb, auditLogEntry)).toHaveLength(0);
   });
 
@@ -551,7 +704,8 @@ describe("collections", () => {
       })).rejects.toThrow("promise_not_open");
     });
 
-    expect(updatedRows(tenantDb, promise)).toHaveLength(0);
+    expect(updatedRows(tenantDb, promise)).toEqual([{ status: "broken" }]);
+    expect(conditionColumnNames(tenantDb.updates[0]?.condition)).toContain("status");
     expect(insertedRows(tenantDb, auditLogEntry)).toHaveLength(0);
   });
 

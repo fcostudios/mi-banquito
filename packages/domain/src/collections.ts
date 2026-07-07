@@ -429,25 +429,30 @@ export function createCollectionsService(): CollectionsService {
       const now = new Date();
 
       await withWritableTenantTransaction(input.orgId, async (tx) => {
-        const [row] = await tx.select().from(promise)
-          .where(and(
-            eq(promise.orgId, input.orgId),
-            eq(promise.id, input.promiseId),
-          ));
-
-        if (!row) {
-          throw new Error("promise_not_found");
-        }
-        if (row.status !== "open") {
-          throw new Error("promise_not_open");
-        }
-
-        await tx.update(promise)
+        const [updated] = await tx.update(promise)
           .set({ status: input.outcome })
           .where(and(
             eq(promise.orgId, input.orgId),
             eq(promise.id, input.promiseId),
-          ));
+            eq(promise.status, "open"),
+          ))
+          .returning();
+
+        if (!updated) {
+          const [current] = await tx.select().from(promise)
+            .where(and(
+              eq(promise.orgId, input.orgId),
+              eq(promise.id, input.promiseId),
+            ));
+
+          if (!current) {
+            throw new Error("promise_not_found");
+          }
+          if (current.status === input.outcome) {
+            return;
+          }
+          throw new Error("promise_not_open");
+        }
 
         await tx.insert(auditLogEntry).values({
           orgId: input.orgId,
