@@ -11,6 +11,7 @@ export * from "./platform";
 export * from "./reconciliation";
 export * from "./reporting";
 export * from "./sprint7-alerts";
+export * from "./year-end-reversal";
 export * from "./rules/loans/declining-balance";
 export {
   applyShareOutOverride,
