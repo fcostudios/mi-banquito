@@ -23,6 +23,11 @@ type SelectRecord = {
   tableName: string;
 };
 
+type UpdateRecord = {
+  tableName: string;
+  values: Record<string, unknown>;
+};
+
 const tableNameOf = (table: unknown): string => {
   const tableName = getTableName(table as Parameters<typeof getTableName>[0]);
   if (tableName) {
@@ -91,7 +96,13 @@ class FakeInsertBuilder {
 }
 
 class FakeUpdateBuilder {
-  set() {
+  constructor(
+    private readonly table: unknown,
+    private readonly updates: UpdateRecord[],
+  ) {}
+
+  set(values: Record<string, unknown>) {
+    this.updates.push({ tableName: tableNameOf(this.table), values });
     return this;
   }
 
@@ -103,6 +114,7 @@ class FakeUpdateBuilder {
 class FakeDb {
   readonly inserts: InsertRecord[] = [];
   readonly selects: SelectRecord[] = [];
+  readonly updates: UpdateRecord[] = [];
   private readonly insertReturningByTableName: Record<string, unknown[][]>;
   private readonly selectResultsByTableName: Record<string, unknown[][]>;
 
@@ -127,8 +139,8 @@ class FakeDb {
     ));
   }
 
-  update() {
-    return new FakeUpdateBuilder();
+  update(table: unknown) {
+    return new FakeUpdateBuilder(table, this.updates);
   }
 }
 
@@ -137,6 +149,13 @@ function insertedRows(fakeDbs: FakeDb | FakeDb[], table: unknown): Array<Record<
     .flatMap((fakeDb) => fakeDb.inserts)
     .filter((entry) => entry.tableName === tableNameOf(table))
     .flatMap((entry) => Array.isArray(entry.values) ? entry.values : [entry.values]);
+}
+
+function updatedRows(fakeDbs: FakeDb | FakeDb[], table: unknown): Array<Record<string, unknown>> {
+  return [fakeDbs].flat()
+    .flatMap((fakeDb) => fakeDb.updates)
+    .filter((entry) => entry.tableName === tableNameOf(table))
+    .map((entry) => entry.values);
 }
 
 async function withMockedCollectionsDb<T>(
@@ -307,6 +326,7 @@ describe("collections", () => {
     expect(service.context).toBe("collections");
     expect(service.listAgingRows).toEqual(expect.any(Function));
     expect(service.markPromise).toEqual(expect.any(Function));
+    expect(service.markPromiseOutcome).toEqual(expect.any(Function));
     expect(service.buildChaseAttempt).toEqual(expect.any(Function));
     expect(service.recordChaseAttempt).toEqual(expect.any(Function));
     expect(service.emitPromiseReminders).toEqual(expect.any(Function));
@@ -396,6 +416,143 @@ describe("collections", () => {
         }),
       }),
     ]);
+  });
+
+  it("marks an open promise as kept and audits the outcome", async () => {
+    const systemDb = new FakeDb("system");
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(promise)]: [[{
+        id: "promise-1",
+        orgId: "org-1",
+        memberId: "member-1",
+        loanId: "loan-1",
+        cycleId: null,
+        promisedOn: "2026-07-04",
+        status: "open",
+      }]],
+    });
+    const tenantCalls: string[] = [];
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb }, tenantCalls }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().markPromiseOutcome({
+        orgId: "org-1",
+        actorId: "actor-1",
+        promiseId: "promise-1",
+        outcome: "kept",
+        todayIso: "2026-07-05",
+      })).resolves.toBeUndefined();
+    });
+
+    expect(tenantCalls).toEqual(["org-1"]);
+    expect(updatedRows(tenantDb, promise)).toEqual([{ status: "kept" }]);
+    expect(insertedRows(tenantDb, auditLogEntry)).toEqual([
+      expect.objectContaining({
+        orgId: "org-1",
+        actorKind: "member",
+        actorId: "actor-1",
+        actionKind: "collections.promise.kept",
+        subjectKind: "promise",
+        subjectId: "promise-1",
+        payloadSnapshot: {
+          promiseId: "promise-1",
+          outcome: "kept",
+          outcomeDate: "2026-07-05",
+        },
+      }),
+    ]);
+  });
+
+  it("marks an open promise as broken", async () => {
+    const systemDb = new FakeDb("system");
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(promise)]: [[{
+        id: "promise-1",
+        orgId: "org-1",
+        memberId: "member-1",
+        loanId: "loan-1",
+        cycleId: null,
+        promisedOn: "2026-07-04",
+        status: "open",
+      }]],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().markPromiseOutcome({
+        orgId: "org-1",
+        actorId: "actor-1",
+        promiseId: "promise-1",
+        outcome: "broken",
+        todayIso: "2026-07-05",
+      })).resolves.toBeUndefined();
+    });
+
+    expect(updatedRows(tenantDb, promise)).toEqual([{ status: "broken" }]);
+    expect(insertedRows(tenantDb, auditLogEntry)).toEqual([
+      expect.objectContaining({
+        actionKind: "collections.promise.broken",
+        payloadSnapshot: expect.objectContaining({
+          promiseId: "promise-1",
+          outcome: "broken",
+          outcomeDate: "2026-07-05",
+        }),
+      }),
+    ]);
+  });
+
+  it("rejects marking a missing promise outcome", async () => {
+    const systemDb = new FakeDb("system");
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(promise)]: [[]],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().markPromiseOutcome({
+        orgId: "org-1",
+        actorId: "actor-1",
+        promiseId: "missing-promise",
+        outcome: "kept",
+        todayIso: "2026-07-05",
+      })).rejects.toThrow("promise_not_found");
+    });
+
+    expect(updatedRows(tenantDb, promise)).toHaveLength(0);
+    expect(insertedRows(tenantDb, auditLogEntry)).toHaveLength(0);
+  });
+
+  it("rejects marking a non-open promise outcome", async () => {
+    const systemDb = new FakeDb("system");
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(promise)]: [[{
+        id: "promise-1",
+        orgId: "org-1",
+        memberId: "member-1",
+        loanId: "loan-1",
+        cycleId: null,
+        promisedOn: "2026-07-04",
+        status: "kept",
+      }]],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().markPromiseOutcome({
+        orgId: "org-1",
+        actorId: "actor-1",
+        promiseId: "promise-1",
+        outcome: "broken",
+        todayIso: "2026-07-05",
+      })).rejects.toThrow("promise_not_open");
+    });
+
+    expect(updatedRows(tenantDb, promise)).toHaveLength(0);
+    expect(insertedRows(tenantDb, auditLogEntry)).toHaveLength(0);
   });
 
   it("audits WhatsApp chase attempts for the selected overdue period only", async () => {
@@ -517,6 +674,75 @@ describe("collections", () => {
     });
 
     expect(insertedRows(tenantDb, promiseReminder)).toHaveLength(1);
+    expect(insertedRows(tenantDb, alert)).toHaveLength(0);
+    expect(insertedRows(tenantDb, auditLogEntry)).toHaveLength(0);
+  });
+
+  it("emits overdue open promise reminders once per day and reappears the next day", async () => {
+    const duePromise = {
+      id: "promise-1",
+      orgId: "org-1",
+      memberId: "member-1",
+      loanId: "loan-1",
+      cycleId: null,
+      promisedOn: "2026-07-04",
+      status: "open",
+    };
+    const systemDb = new FakeDb("system", {
+      [tableNameOf(organization)]: [[{ id: "org-1" }], [{ id: "org-1" }], [{ id: "org-1" }]],
+    });
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(promise)]: [[duePromise], [duePromise], [duePromise]],
+    }, {
+      [tableNameOf(promiseReminder)]: [[{ id: "reminder-1" }], [], [{ id: "reminder-2" }]],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+      const service = createDynamicCollectionsService();
+
+      await expect(service.emitPromiseReminders("2026-07-05"))
+        .resolves.toEqual({ promisesScanned: 1, remindersEmitted: 1 });
+      await expect(service.emitPromiseReminders("2026-07-05"))
+        .resolves.toEqual({ promisesScanned: 1, remindersEmitted: 0 });
+      await expect(service.emitPromiseReminders("2026-07-06"))
+        .resolves.toEqual({ promisesScanned: 1, remindersEmitted: 1 });
+    });
+
+    expect(insertedRows(tenantDb, promiseReminder)).toEqual([
+      expect.objectContaining({ promiseId: "promise-1", reminderDate: "2026-07-05" }),
+      expect.objectContaining({ promiseId: "promise-1", reminderDate: "2026-07-05" }),
+      expect.objectContaining({ promiseId: "promise-1", reminderDate: "2026-07-06" }),
+    ]);
+    expect(insertedRows(tenantDb, alert)).toHaveLength(2);
+    expect(insertedRows(tenantDb, auditLogEntry)).toHaveLength(2);
+  });
+
+  it("skips kept promises so marking kept stops future reminders", async () => {
+    const keptPromise = {
+      id: "promise-1",
+      orgId: "org-1",
+      memberId: "member-1",
+      loanId: "loan-1",
+      cycleId: null,
+      promisedOn: "2026-07-04",
+      status: "kept",
+    };
+    const systemDb = new FakeDb("system", {
+      [tableNameOf(organization)]: [[{ id: "org-1" }]],
+    });
+    const tenantDb = new FakeDb("tenant:org-1", {
+      [tableNameOf(promise)]: [[keptPromise]],
+    });
+
+    await withMockedCollectionsDb({ systemDb, tenantDbs: { "org-1": tenantDb } }, async () => {
+      const { createCollectionsService: createDynamicCollectionsService } = await import("./collections");
+
+      await expect(createDynamicCollectionsService().emitPromiseReminders("2026-07-05"))
+        .resolves.toEqual({ promisesScanned: 0, remindersEmitted: 0 });
+    });
+
+    expect(insertedRows(tenantDb, promiseReminder)).toHaveLength(0);
     expect(insertedRows(tenantDb, alert)).toHaveLength(0);
     expect(insertedRows(tenantDb, auditLogEntry)).toHaveLength(0);
   });

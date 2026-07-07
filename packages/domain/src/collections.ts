@@ -28,6 +28,7 @@ export type ChaseMessageInput =
   | { member: string; obligationKind: ChaseObligationKind; period: string };
 
 export type PromiseStatus = "open" | "kept" | "broken" | "closed";
+export type PromiseOutcome = "kept" | "broken";
 
 export type PromiseReminderRow = {
   status: PromiseStatus | string;
@@ -39,6 +40,8 @@ export type CollectionsAgingReasonKind = ChaseObligationKind;
 export type CollectionsAgingRow = typeof arAging.$inferSelect & {
   id: string;
   reasonKind: CollectionsAgingReasonKind | string;
+  openPromiseId?: string | null;
+  openPromisePromisedOn?: DateOnlyString | null;
 };
 
 export type MarkPromiseInput = PromiseSourceInput & {
@@ -49,6 +52,14 @@ export type MarkPromiseInput = PromiseSourceInput & {
   periodLabel: string;
   note?: string | null;
   todayIso?: DateOnlyString;
+};
+
+export type MarkPromiseOutcomeInput = {
+  orgId: string;
+  actorId: string;
+  promiseId: string;
+  outcome: PromiseOutcome;
+  todayIso: DateOnlyString;
 };
 
 export type RecordChaseAttemptInput = PromiseSourceInput & {
@@ -79,6 +90,7 @@ export interface CollectionsService {
   readonly context: "collections";
   listAgingRows(orgId: string, reasonKind?: CollectionsAgingReasonKind): Promise<CollectionsAgingRow[]>;
   markPromise(input: MarkPromiseInput): Promise<{ promiseId: string }>;
+  markPromiseOutcome(input: MarkPromiseOutcomeInput): Promise<void>;
   buildChaseAttempt(input: BuildChaseAttemptInput): Promise<ChaseAttemptTarget>;
   recordChaseAttempt(input: RecordChaseAttemptInput): Promise<void>;
   emitPromiseReminders(todayIso: DateOnlyString): Promise<EmitPromiseRemindersResult>;
@@ -237,6 +249,20 @@ function agingRowId(row: typeof arAging.$inferSelect): string {
   ].join(":");
 }
 
+function promiseRowKey(input: {
+  memberId: string | null;
+  loanId: string | null;
+  cycleId: string | null;
+  periodLabel: string;
+}): string {
+  return [
+    input.memberId ?? "no-member",
+    input.loanId ?? "no-loan",
+    input.cycleId ?? "no-cycle",
+    input.periodLabel,
+  ].join(":");
+}
+
 function assertNotPast(input: { promisedOn: DateOnlyString; todayIso: DateOnlyString }): void {
   dateParts(input.promisedOn);
   dateParts(input.todayIso);
@@ -290,11 +316,36 @@ export function createCollectionsService(): CollectionsService {
   return {
     context: "collections",
     async listAgingRows(orgId, reasonKind) {
-      const rows = await withTenantTransaction(orgId, async (tx) => tx.select().from(arAging)
-        .where(reasonKind
-          ? and(eq(arAging.orgId, orgId), eq(arAging.reasonKind, reasonKind))
-          : eq(arAging.orgId, orgId))
-        .orderBy(desc(arAging.daysLate), arAging.memberName, arAging.dueDate));
+      const rows = await withTenantTransaction(orgId, async (tx) => {
+        const agingRows = await tx.select().from(arAging)
+          .where(reasonKind
+            ? and(eq(arAging.orgId, orgId), eq(arAging.reasonKind, reasonKind))
+            : eq(arAging.orgId, orgId))
+          .orderBy(desc(arAging.daysLate), arAging.memberName, arAging.dueDate);
+
+        const openPromises = await tx.select().from(promise)
+          .where(and(
+            eq(promise.orgId, orgId),
+            eq(promise.status, "open"),
+          ))
+          .orderBy(desc(promise.createdAt));
+        const openPromiseByRow = new Map<string, typeof openPromises[number]>();
+        for (const row of openPromises) {
+          const key = promiseRowKey(row);
+          if (!openPromiseByRow.has(key)) {
+            openPromiseByRow.set(key, row);
+          }
+        }
+
+        return agingRows.map((row) => {
+          const openPromise = openPromiseByRow.get(promiseRowKey(row));
+          return {
+            ...row,
+            openPromiseId: openPromise?.id ?? null,
+            openPromisePromisedOn: (openPromise?.promisedOn ?? null) as DateOnlyString | null,
+          };
+        });
+      });
 
       return sortAgingRows(rows.map((row) => ({
         ...row,
@@ -373,6 +424,49 @@ export function createCollectionsService(): CollectionsService {
 
       return { promiseId };
     },
+    async markPromiseOutcome(input) {
+      dateParts(input.todayIso);
+      const now = new Date();
+
+      await withWritableTenantTransaction(input.orgId, async (tx) => {
+        const [row] = await tx.select().from(promise)
+          .where(and(
+            eq(promise.orgId, input.orgId),
+            eq(promise.id, input.promiseId),
+          ));
+
+        if (!row) {
+          throw new Error("promise_not_found");
+        }
+        if (row.status !== "open") {
+          throw new Error("promise_not_open");
+        }
+
+        await tx.update(promise)
+          .set({ status: input.outcome })
+          .where(and(
+            eq(promise.orgId, input.orgId),
+            eq(promise.id, input.promiseId),
+          ));
+
+        await tx.insert(auditLogEntry).values({
+          orgId: input.orgId,
+          actorKind: "member",
+          actorId: input.actorId,
+          actionKind: `collections.promise.${input.outcome}`,
+          subjectKind: "promise",
+          subjectId: input.promiseId,
+          payloadSnapshot: {
+            promiseId: input.promiseId,
+            outcome: input.outcome,
+            outcomeDate: input.todayIso,
+          },
+          reason: null,
+          at: now,
+          createdAt: now,
+        });
+      });
+    },
     async buildChaseAttempt(input) {
       const source = normalizePromiseSourceRef(input);
 
@@ -436,12 +530,16 @@ export function createCollectionsService(): CollectionsService {
 
       for (const orgId of orgIds) {
         const result = await withTenantTransaction(orgId, async (tx) => {
-          const duePromises = await tx.select().from(promise)
+          const duePromiseRows = await tx.select().from(promise)
             .where(and(
               eq(promise.orgId, orgId),
               eq(promise.status, "open"),
               lte(promise.promisedOn, todayIso),
             ));
+          const duePromises = promiseReminderCandidates(duePromiseRows.map((row) => ({
+            ...row,
+            promisedOn: row.promisedOn as DateOnlyString,
+          })), todayIso);
           let orgRemindersEmitted = 0;
 
           for (const row of duePromises) {
