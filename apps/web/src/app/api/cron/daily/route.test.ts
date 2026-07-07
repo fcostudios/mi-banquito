@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -7,12 +9,14 @@ const mocks = vi.hoisted(() => ({
   emitSprint7DailyAlerts: vi.fn(),
   createCompensationService: vi.fn(),
   awardDueTreasurerCompensation: vi.fn(),
+  buildA6LoanPastDueAlert: vi.fn(),
   insert: vi.fn(),
   values: vi.fn(),
   execute: vi.fn(),
 }));
 
 vi.mock("@mi-banquito/domain", () => ({
+  buildA6LoanPastDueAlert: mocks.buildA6LoanPastDueAlert,
   createCollectionsService: vi.fn(),
   createAlertsService: mocks.createAlertsService,
   createCompensationService: mocks.createCompensationService,
@@ -95,6 +99,13 @@ afterEach(() => {
 });
 
 describe("daily cron route", () => {
+  it("uses the Sprint 7 A6 builder instead of the legacy mora alert kind", () => {
+    const source = readFileSync(join(process.cwd(), "src/lib/cron/handler.ts"), "utf8");
+
+    expect(source).toContain("buildA6LoanPastDueAlert");
+    expect(source).not.toContain("A6_PRESTAMO_EN_MORA");
+  });
+
   it("rejects requests without CRON_SECRET configured", async () => {
     delete process.env.CRON_SECRET;
 

@@ -3,7 +3,7 @@ import { getTableName } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ContributionForm } from "@mi-banquito/contracts";
-import { auditLogEntry, baseFundQuotaPayment, contribution, contributionCycle } from "@mi-banquito/db/schema";
+import { alert, auditLogEntry, baseFundQuotaPayment, contribution, contributionCycle } from "@mi-banquito/db/schema";
 import {
   deriveComplianceState,
   isSlipRequiredForContribution,
@@ -29,6 +29,10 @@ class FakeSelectBuilder {
   }
 
   orderBy() {
+    return this;
+  }
+
+  limit() {
     return this;
   }
 
@@ -180,6 +184,129 @@ describe("Sprint 2 contribution source and partial state", () => {
         paymentSource: "cash_in_meeting",
       });
       expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(1);
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.doUnmock("@mi-banquito/db/tenant");
+      vi.resetModules();
+    }
+  });
+
+  it("emits A14 when a contribution event leaves the member balance negative", async () => {
+    const fakeDb = new FakeDb([
+      [],
+      [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }],
+      [{
+        memberId: "44444444-4444-4444-8444-444444444444",
+        displayName: "Pancho",
+        currentBalance: "-1.0000",
+        state: "atrasado",
+      }],
+    ]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+    vi.doMock("@mi-banquito/db/tenant", () => ({
+      withTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => fakeDb.transaction(() => run(fakeDb)),
+      withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => fakeDb.transaction(() => run(fakeDb)),
+    }));
+
+    try {
+      const { createLedgerService } = await import("./ledger");
+      await createLedgerService().recordContribution(
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+        {
+          clientRequestId: "33333333-3333-4333-8333-333333333333",
+          memberId: "44444444-4444-4444-8444-444444444444",
+          amount: "10.0000",
+          datedOn: "2026-07-01",
+          paymentSource: "bank_transfer",
+          kind: "regular",
+          slipPhotoId: "55555555-5555-4555-8555-555555555555",
+        },
+      );
+
+      expect(insertedRows(fakeDb, alert)).toEqual([
+        expect.objectContaining({
+          alertKind: "A14",
+          severity: "critical",
+          audience: "both",
+          subjectKind: "member",
+          subjectId: "44444444-4444-4444-8444-444444444444",
+          payload: expect.objectContaining({
+            memberName: "Pancho",
+            balance: "-1.0000",
+            sourceEventId: "99999999-9999-4999-8999-999999999999",
+          }),
+        }),
+      ]);
+      expect(insertedRows(fakeDb, auditLogEntry)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ actionKind: "alert.negative_member_balance.emit" }),
+      ]));
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.doUnmock("@mi-banquito/db/tenant");
+      vi.resetModules();
+    }
+  });
+
+  it("emits A11 after the configured number of consecutive contributions without photo", async () => {
+    const fakeDb = new FakeDb([
+      [],
+      [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }],
+      [{
+        memberId: "44444444-4444-4444-8444-444444444444",
+        displayName: "Pancho",
+        currentBalance: "20.0000",
+        state: "al_dia",
+      }],
+      [{ config: { no_slip_consecutive_threshold: 3 } }],
+      [
+        { id: "99999999-9999-4999-8999-999999999999", slipPhotoId: null },
+        { id: "77777777-7777-4777-8777-777777777777", slipPhotoId: null },
+        { id: "88888888-8888-4888-8888-888888888888", slipPhotoId: null },
+      ],
+      [],
+    ]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+    vi.doMock("@mi-banquito/db/tenant", () => ({
+      withTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => fakeDb.transaction(() => run(fakeDb)),
+      withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => fakeDb.transaction(() => run(fakeDb)),
+    }));
+
+    try {
+      const { createLedgerService } = await import("./ledger");
+      await createLedgerService().recordContribution(
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+        {
+          clientRequestId: "33333333-3333-4333-8333-333333333333",
+          memberId: "44444444-4444-4444-8444-444444444444",
+          amount: "10.0000",
+          datedOn: "2026-07-01",
+          paymentSource: "cash_in_meeting",
+          kind: "regular",
+          slipPhotoId: "",
+        },
+      );
+
+      expect(insertedRows(fakeDb, alert)).toEqual([
+        expect.objectContaining({
+          alertKind: "A11",
+          severity: "low",
+          audience: "treasurer",
+          subjectKind: "member",
+          subjectId: "44444444-4444-4444-8444-444444444444",
+          payload: expect.objectContaining({
+            memberName: "Pancho",
+            threshold: 3,
+            consecutiveCount: 3,
+          }),
+        }),
+      ]);
+      expect(insertedRows(fakeDb, auditLogEntry)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ actionKind: "alert.contribution_missing_photo.emit" }),
+      ]));
     } finally {
       vi.doUnmock("@mi-banquito/db");
       vi.doUnmock("@mi-banquito/db/tenant");
