@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { auth0 } from "@/lib/auth0";
 import { getDbOrgIdFromUser, getRolesFromUser } from "@/lib/auth/session-claims";
 import { hasMinRole, type AppRole } from "@/lib/auth/roles";
 import { ROUTE_ACCESS_DENIED, ROUTE_LOGIN } from "@/lib/routes";
 import { db } from "@mi-banquito/db";
 import { withTenantTransaction } from "@mi-banquito/db/tenant";
-import { auditLogEntry, member, organization, platformOperator, userAccount, userOrgMembership } from "@mi-banquito/db/schema";
+import { auditLogEntry, authAdminAction, member, organization, platformOperator, userAccount, userOrgMembership } from "@mi-banquito/db/schema";
 
 export type RequiredSession = {
   userId: string;
@@ -108,7 +108,7 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
   }
 
   const [org] = await db
-    .select({ status: organization.status })
+    .select({ status: organization.status, platformOperatorId: organization.platformOperatorId })
     .from(organization)
     .where(eq(organization.id, orgId));
   if (org?.status === "archived") {
@@ -156,6 +156,43 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
       const pendingMemberId = pendingMembership.memberId;
       const pendingUserAccountId = pendingMembership.userAccountId;
       await withTenantTransaction(orgId, async (tx) => {
+        const [inviteAction] = await tx
+          .select({
+            id: authAdminAction.id,
+            actorId: authAdminAction.actorId,
+            providerRequestId: authAdminAction.providerRequestId,
+          })
+          .from(authAdminAction)
+          .where(and(
+            eq(authAdminAction.orgId, orgId),
+            eq(authAdminAction.targetEmail, email),
+            eq(authAdminAction.actionKind, "treasurer_invite"),
+            eq(authAdminAction.status, "sent"),
+          ))
+          .orderBy(desc(authAdminAction.createdAt))
+          .limit(1);
+        let inviteAudit: { id: string; actorId: string } | undefined;
+        if (!inviteAction?.actorId) {
+          [inviteAudit] = await tx
+            .select({
+              id: auditLogEntry.id,
+              actorId: auditLogEntry.actorId,
+            })
+            .from(auditLogEntry)
+            .where(and(
+              eq(auditLogEntry.orgId, orgId),
+              eq(auditLogEntry.actionKind, "treasurer_invite.sent"),
+              eq(auditLogEntry.actorKind, "platform_operator"),
+              eq(auditLogEntry.subjectKind, "user_account"),
+              eq(auditLogEntry.subjectId, pendingUserAccountId),
+            ))
+            .orderBy(desc(auditLogEntry.at))
+            .limit(1);
+        }
+        const acceptanceActorId = inviteAction?.actorId ?? inviteAudit?.actorId ?? org?.platformOperatorId;
+        if (!acceptanceActorId) {
+          throw new Error("auth_invite_acceptance_missing_platform_operator_actor");
+        }
         await tx
           .update(userAccount)
           .set({ authSubject: userId, updatedAt: now })
@@ -169,8 +206,8 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
           .where(eq(member.id, pendingMemberId));
         await tx.insert(auditLogEntry).values({
           orgId,
-          actorKind: "system",
-          actorId: pendingMemberId,
+          actorKind: "platform_operator",
+          actorId: acceptanceActorId,
           actionKind: "auth.invite.accepted",
           subjectKind: "member",
           subjectId: pendingMemberId,
@@ -178,6 +215,9 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
             email,
             authSubject: userId,
             userAccountId: pendingUserAccountId,
+            inviteActionId: inviteAction?.id,
+            inviteAuditId: inviteAudit?.id,
+            providerRequestId: inviteAction?.providerRequestId,
           },
           reason: null,
           at: now,
