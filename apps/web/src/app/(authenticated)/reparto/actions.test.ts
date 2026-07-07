@@ -55,6 +55,7 @@ describe("reverseShareOutAction", () => {
       actorId: "33333333-3333-4333-8333-333333333333",
       shareOutId: "11111111-1111-4111-8111-111111111111",
       reason: "Acta corrigió reparto anual",
+      createArtifact: expect.any(Function),
     });
     expect(revalidatePath).toHaveBeenCalledWith("/reparto");
     expect(revalidatePath).toHaveBeenCalledWith("/estados");

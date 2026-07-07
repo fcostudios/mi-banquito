@@ -330,7 +330,7 @@
     "approveConfirmText": "Confirmo que el reparto fue revisado y que esta aprobación generará retiros, snapshots y PDFs.",
     "approveConfirmCheckbox": "Entiendo que la aprobación no debe repetirse",
     "reverseTitle": "Reverso dentro de ventana",
-    "reverseDescription": "Registra el reverso del reparto. Se crearán retiros negativos y los documentos archivados quedarán marcados como superseded sin borrarse.",
+    "reverseDescription": "Registra el reverso del reparto dentro de las 24 horas. Se crearán retiros negativos y los documentos archivados quedarán superseded sin borrarse.",
     "reverseReason": "Razón de reverso",
     "reverseSubmit": "Reversar reparto",
     "reason": "Razón",

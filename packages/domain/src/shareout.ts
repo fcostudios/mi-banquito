@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import {
   auditLogEntry,
   contributionCycle,
+  entityVersion,
   loanActivityPoints,
   member,
   memberTimeWeightedBalance,
@@ -123,6 +124,10 @@ export type ShareOutArtifactResult = {
 
 function totalMoney(lines: Array<{ value: string | null }>) {
   return money4(lines.reduce((sum, line) => sum + cents4(line.value ?? "0.0000"), ZERO));
+}
+
+function isYearEndShareOutArtifactKind(kind: string): kind is ShareOutArtifactInput["kind"] {
+  return kind === "year_end_member" || kind === "year_end_share_out" || kind === "year_end_snapshot";
 }
 
 export function createShareOutService(options: { now?: () => Date } = {}) {
@@ -663,7 +668,8 @@ export function createShareOutService(options: { now?: () => Date } = {}) {
       actorId: string;
       shareOutId: string;
       reason: string;
-      graceDays?: number;
+      createArtifact: (input: ShareOutArtifactInput) => Promise<ShareOutArtifactResult>;
+      graceHours?: number;
     }) {
       return withWritableTenantTransaction(input.orgId, async (tx) => {
         const [shareOut] = await tx.select().from(yearEndShareOut)
@@ -691,7 +697,7 @@ export function createShareOutService(options: { now?: () => Date } = {}) {
           status: shareOut.status,
           approvedAt: shareOut.approvedAt,
           now: reversedAt,
-          graceDays: input.graceDays ?? 10,
+          graceHours: input.graceHours ?? 24,
         });
 
         const lines = await tx.select().from(yearEndShareOutLine)
@@ -781,20 +787,81 @@ export function createShareOutService(options: { now?: () => Date } = {}) {
             eq(statementArchive.orgId, input.orgId),
             eq(statementArchive.yearEndShareOutId, input.shareOutId),
           ));
-        if (archives.length > 0) {
-          await tx.insert(statementArchiveSupersession).values(archives.map((archive) => ({
+        const supersessionRows: Array<typeof statementArchiveSupersession.$inferInsert> = [];
+        const supersedingArchiveIds: string[] = [];
+        for (const archive of archives) {
+          if (!isYearEndShareOutArtifactKind(archive.kind)) continue;
+          const supersedingPayload = {
+            kind: archive.kind,
+            reversalKind: "year_end_share_out_reversal",
+            year: shareOut.year,
+            shareOutId: input.shareOutId,
+            reversalId: reversal.id,
+            supersededStatementArchiveId: archive.id,
+            supersededPayloadHash: archive.canonicalPayloadHash,
+            memberId: archive.memberId,
+            reason: plan.reason,
+            withdrawalOffsets: plan.withdrawalOffsets,
+            generatedAt: reversedAt.toISOString(),
+          };
+          const supersedingHash = sha256Hex(canonicalJson(supersedingPayload));
+          const supersedingArtifact = await input.createArtifact({
+            orgId: input.orgId,
+            canonicalPayloadHash: supersedingHash,
+            kind: archive.kind,
+            periodLabel: String(archive.periodLabel),
+            payload: supersedingPayload,
+          });
+          const [supersedingArchive] = await tx.insert(statementArchive).values({
+            orgId: input.orgId,
+            kind: archive.kind,
+            memberId: archive.memberId,
+            periodLabel: `${archive.periodLabel}-reversal-${reversal.id}`,
+            pdfUri: supersedingArtifact.pdfUri,
+            canonicalPayloadHash: supersedingHash,
+            generatedAt: reversedAt,
+            periodCloseId: archive.periodCloseId ?? shareOut.periodCloseId,
+            yearEndShareOutId: input.shareOutId,
+            byteSize: supersedingArtifact.byteSize,
+            createdAt: reversedAt,
+            createdByKind: "member",
+          }).returning();
+          supersedingArchiveIds.push(supersedingArchive.id);
+          supersessionRows.push({
             orgId: input.orgId,
             supersededStatementArchiveId: archive.id,
-            supersedingStatementArchiveId: null,
+            supersedingStatementArchiveId: supersedingArchive.id,
             yearEndShareOutReversalId: reversal.id,
             reason: plan.reason,
             createdAt: reversedAt,
-          }))).onConflictDoNothing();
+          });
+        }
+        if (supersessionRows.length > 0) {
+          await tx.insert(statementArchiveSupersession).values(supersessionRows).onConflictDoNothing();
         }
 
         await tx.update(yearEndShareOut).set({
           status: "reversed",
         }).where(and(eq(yearEndShareOut.orgId, input.orgId), eq(yearEndShareOut.id, input.shareOutId)));
+        await tx.insert(entityVersion).values({
+          orgId: input.orgId,
+          entityKind: "YearEndShareOut",
+          entityId: input.shareOutId,
+          version: 1,
+          validFrom: reversedAt,
+          validTo: null,
+          payloadSnapshot: {
+            ...shareOut,
+            status: "reversed",
+            reversalId: reversal.id,
+            supersedingStatementArchiveIds: supersedingArchiveIds,
+          },
+          changeKind: "status_transition",
+          changeReason: plan.reason,
+          createdAt: reversedAt,
+          createdBy: input.actorId,
+          createdByKind: "member",
+        });
         await tx.insert(auditLogEntry).values({
           orgId: input.orgId,
           actorKind: "member",
@@ -807,6 +874,7 @@ export function createShareOutService(options: { now?: () => Date } = {}) {
             reversalId: reversal.id,
             offsetsCreated,
             supersededStatementArchiveIds: archives.map((archive) => archive.id),
+            supersedingStatementArchiveIds: supersedingArchiveIds,
           },
           reason: plan.reason,
           at: reversedAt,

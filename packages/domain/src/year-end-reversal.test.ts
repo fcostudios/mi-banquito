@@ -7,37 +7,37 @@ import {
 } from "./year-end-reversal";
 
 describe("year-end share-out reversal helpers", () => {
-  it("allows distributed or approved share-outs inside the grace window", () => {
-    const now = new Date("2026-07-10T12:00:00.000Z");
+  it("allows distributed or approved share-outs inside the 24-hour window", () => {
+    const now = new Date("2026-07-02T11:59:59.000Z");
     const approvedAt = new Date("2026-07-01T12:00:00.000Z");
 
     expect(() => assertShareOutReversalAllowed({
       status: "distributed",
       approvedAt,
       now,
-      graceDays: 10,
+      graceHours: 24,
     })).not.toThrow();
     expect(() => assertShareOutReversalAllowed({
       status: "approved",
       approvedAt,
       now,
-      graceDays: 10,
+      graceHours: 24,
     })).not.toThrow();
   });
 
-  it("blocks non-reversible statuses and share-outs outside the grace window", () => {
+  it("blocks non-reversible statuses and share-outs outside the 24-hour window", () => {
     expect(() => assertShareOutReversalAllowed({
       status: "draft",
       approvedAt: new Date("2026-07-01T12:00:00.000Z"),
       now: new Date("2026-07-02T12:00:00.000Z"),
-      graceDays: 10,
+      graceHours: 24,
     })).toThrow("share_out_not_reversible");
 
     expect(() => assertShareOutReversalAllowed({
       status: "distributed",
       approvedAt: new Date("2026-07-01T12:00:00.000Z"),
-      now: new Date("2026-07-12T12:00:00.000Z"),
-      graceDays: 10,
+      now: new Date("2026-07-02T12:00:01.000Z"),
+      graceHours: 24,
     })).toThrow("share_out_reversal_window_closed");
   });
 
@@ -96,8 +96,8 @@ describe("year-end share-out reversal helpers", () => {
     const base = {
       status: "distributed",
       approvedAt: new Date("2026-07-01T12:00:00.000Z"),
-      now: new Date("2026-07-05T12:00:00.000Z"),
-      graceDays: 10,
+      now: new Date("2026-07-02T11:00:00.000Z"),
+      graceHours: 24,
     };
 
     expect(isShareOutReversalEligibleForView({

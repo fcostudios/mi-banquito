@@ -25,7 +25,7 @@ export function assertShareOutReversalAllowed(input: {
   status: string;
   approvedAt: Date | string | null;
   now: Date;
-  graceDays: number;
+  graceHours: number;
 }) {
   if (!REVERSIBLE_STATUSES.has(input.status)) {
     throw new Error("share_out_not_reversible");
@@ -34,7 +34,7 @@ export function assertShareOutReversalAllowed(input: {
     throw new Error("share_out_reversal_approval_date_required");
   }
   const approvedAt = input.approvedAt instanceof Date ? input.approvedAt : new Date(input.approvedAt);
-  const windowEndsAt = new Date(approvedAt.getTime() + input.graceDays * 24 * 60 * 60 * 1000);
+  const windowEndsAt = new Date(approvedAt.getTime() + input.graceHours * 60 * 60 * 1000);
   if (input.now.getTime() > windowEndsAt.getTime()) {
     throw new Error("share_out_reversal_window_closed");
   }
@@ -50,7 +50,7 @@ export function isShareOutReversalEligibleForView(input: {
   status: string;
   approvedAt: Date | string | null;
   now: Date;
-  graceDays: number;
+  graceHours: number;
   lines: Array<{ finalShareAmount: string; withdrawalId: string | null }>;
 }) {
   try {

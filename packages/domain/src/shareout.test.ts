@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   auditLogEntry,
+  entityVersion,
   statementArchive,
   statementArchiveSupersession,
   withdrawal,
@@ -232,7 +233,11 @@ describe("year-end share-out", () => {
     })).not.toThrow();
   });
 
-  it("reverses a distributed share-out inside the grace window with offset withdrawals and audit", async () => {
+  it("reverses a distributed share-out inside 24 hours with offset withdrawals, superseding PDFs, entity version, and audit", async () => {
+    const createArtifact = vi.fn(async (input: { canonicalPayloadHash: string; kind: string }) => ({
+      pdfUri: `/archives/${input.kind}/${input.canonicalPayloadHash}.pdf`,
+      byteSize: 1234,
+    }));
     const fakeDb = new FakeDb({
       [tableNameOf(yearEndShareOut)]: [[{
         id: "shareout-1",
@@ -240,6 +245,7 @@ describe("year-end share-out", () => {
         year: 2026,
         status: "distributed",
         approvedAt: new Date("2026-07-01T12:00:00.000Z"),
+        periodCloseId: "period-close-1",
       }]],
       [tableNameOf(yearEndShareOutReversal)]: [[]],
       [tableNameOf(yearEndShareOutLine)]: [[{
@@ -251,23 +257,49 @@ describe("year-end share-out", () => {
         withdrawalId: "withdrawal-1",
       }]],
       [tableNameOf(statementArchive)]: [[
-        { id: "archive-1", orgId: "org-1", yearEndShareOutId: "shareout-1" },
-        { id: "archive-2", orgId: "org-1", yearEndShareOutId: "shareout-1" },
+        {
+          id: "archive-1",
+          orgId: "org-1",
+          kind: "year_end_member",
+          memberId: "member-1",
+          periodLabel: "2026",
+          pdfUri: "/old/member.pdf",
+          canonicalPayloadHash: "old-member-hash",
+          generatedAt: new Date("2026-07-01T12:00:00.000Z"),
+          periodCloseId: "period-close-1",
+          yearEndShareOutId: "shareout-1",
+          byteSize: 100,
+        },
+        {
+          id: "archive-2",
+          orgId: "org-1",
+          kind: "year_end_share_out",
+          memberId: null,
+          periodLabel: "2026",
+          pdfUri: "/old/shareout.pdf",
+          canonicalPayloadHash: "old-shareout-hash",
+          generatedAt: new Date("2026-07-01T12:00:00.000Z"),
+          periodCloseId: "period-close-1",
+          yearEndShareOutId: "shareout-1",
+          byteSize: 200,
+        },
       ]],
     }, {
       [tableNameOf(yearEndShareOutReversal)]: [[{ id: "reversal-1" }]],
       [tableNameOf(withdrawal)]: [[{ id: "withdrawal-reversal-1" }]],
+      [tableNameOf(statementArchive)]: [[{ id: "archive-new-1" }], [{ id: "archive-new-2" }]],
     });
 
     await withMockedShareOutDb(fakeDb, async () => {
       const { createShareOutService } = await import("./shareout");
-      const service = createShareOutService({ now: () => new Date("2026-07-05T12:00:00.000Z") });
+      const service = createShareOutService({ now: () => new Date("2026-07-02T11:00:00.000Z") });
 
       await expect(service.reverseApprovedShareOut({
         orgId: "org-1",
         actorId: "actor-1",
         shareOutId: "shareout-1",
         reason: "Acta corrigió reparto anual",
+        createArtifact,
       })).resolves.toEqual({
         reversed: true,
         reversalId: "reversal-1",
@@ -303,7 +335,45 @@ describe("year-end share-out", () => {
       expect.objectContaining({ status: "reversed" }),
     ]);
     expect(updatedRows(fakeDb, statementArchive)).toEqual([]);
-    expect(insertedRows(fakeDb, statementArchiveSupersession)).toHaveLength(2);
+    expect(createArtifact).toHaveBeenCalledTimes(2);
+    expect(insertedRows(fakeDb, statementArchive)).toEqual([
+      expect.objectContaining({
+        orgId: "org-1",
+        kind: "year_end_member",
+        memberId: "member-1",
+        periodLabel: "2026-reversal-reversal-1",
+        yearEndShareOutId: "shareout-1",
+      }),
+      expect.objectContaining({
+        orgId: "org-1",
+        kind: "year_end_share_out",
+        memberId: null,
+        periodLabel: "2026-reversal-reversal-1",
+        yearEndShareOutId: "shareout-1",
+      }),
+    ]);
+    expect(insertedRows(fakeDb, statementArchiveSupersession)).toEqual([
+      expect.objectContaining({
+        supersededStatementArchiveId: "archive-1",
+        supersedingStatementArchiveId: "archive-new-1",
+        yearEndShareOutReversalId: "reversal-1",
+      }),
+      expect.objectContaining({
+        supersededStatementArchiveId: "archive-2",
+        supersedingStatementArchiveId: "archive-new-2",
+        yearEndShareOutReversalId: "reversal-1",
+      }),
+    ]);
+    expect(insertedRows(fakeDb, entityVersion)).toEqual([
+      expect.objectContaining({
+        orgId: "org-1",
+        entityKind: "YearEndShareOut",
+        entityId: "shareout-1",
+        version: 1,
+        changeKind: "status_transition",
+        changeReason: "Acta corrigió reparto anual",
+      }),
+    ]);
     expect(insertedRows(fakeDb, auditLogEntry)).toEqual(expect.arrayContaining([
       expect.objectContaining({
         actionKind: "year_end_share_out.reversed",
@@ -314,7 +384,7 @@ describe("year-end share-out", () => {
     ]));
   });
 
-  it("blocks reversal outside the ten-day grace window", async () => {
+  it("blocks reversal outside the 24-hour grace window", async () => {
     const fakeDb = new FakeDb({
       [tableNameOf(yearEndShareOut)]: [[{
         id: "shareout-1",
@@ -328,13 +398,14 @@ describe("year-end share-out", () => {
 
     await withMockedShareOutDb(fakeDb, async () => {
       const { createShareOutService } = await import("./shareout");
-      const service = createShareOutService({ now: () => new Date("2026-07-12T12:00:00.000Z") });
+      const service = createShareOutService({ now: () => new Date("2026-07-02T12:00:01.000Z") });
 
       await expect(service.reverseApprovedShareOut({
         orgId: "org-1",
         actorId: "actor-1",
         shareOutId: "shareout-1",
         reason: "Acta corrigió reparto anual",
+        createArtifact: async () => ({ pdfUri: "/unused.pdf", byteSize: 1 }),
       })).rejects.toThrow("share_out_reversal_window_closed");
     });
     expect(insertedRows(fakeDb, withdrawal)).toEqual([]);
@@ -361,6 +432,7 @@ describe("year-end share-out", () => {
         actorId: "actor-1",
         shareOutId: "shareout-1",
         reason: "Acta corrigió reparto anual",
+        createArtifact: async () => ({ pdfUri: "/unused.pdf", byteSize: 1 }),
       })).resolves.toEqual({
         reversed: false,
         reversalId: "reversal-1",

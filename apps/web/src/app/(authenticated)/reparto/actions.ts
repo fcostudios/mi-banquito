@@ -85,6 +85,7 @@ export async function reverseShareOutAction(formData: FormData) {
       actorId: session.actorId,
       shareOutId,
       reason: String(formData.get("reason") ?? ""),
+      createArtifact: uploadYearEndArtifact,
     });
     reversed = result.reversed;
   } catch (error) {
