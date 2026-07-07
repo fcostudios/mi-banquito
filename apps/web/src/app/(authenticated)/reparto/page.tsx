@@ -43,7 +43,7 @@ export default async function ScrYearEndShareOutPage({
     status: shareOut.status,
     approvedAt: shareOut.approvedAt,
     now: new Date(),
-    graceDays: 10,
+    graceHours: 24,
     lines: shareOut.lines.map((line) => ({
       finalShareAmount: line.finalShareAmount,
       withdrawalId: line.withdrawalId,
