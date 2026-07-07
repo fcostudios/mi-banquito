@@ -65,7 +65,31 @@
       "lifecycleDescription": "Congela o archiva el banquito sin borrar sus datos.",
       "reason": "Razón",
       "freeze": "Congelar",
-      "archive": "Archivar"
+      "archive": "Archivar",
+      "treasuryAccess": {
+        "title": "Acceso de tesorería",
+        "description": "Invita a la tesorera del banquito o reenvía un enlace de ingreso cuando necesite recuperar acceso.",
+        "inviteTitle": "Invitar tesorera",
+        "resetTitle": "Recuperar ingreso",
+        "email": "Correo electrónico",
+        "displayName": "Nombre visible",
+        "inviteSubmit": "Enviar invitación",
+        "resetSubmit": "Enviar magic link",
+        "inviteSent": "Invitación enviada a Auth0.",
+        "resetSent": "Magic link enviado por correo.",
+        "whatsappCopyLabel": "Texto para WhatsApp",
+        "resetWhatsappCopy": "Hola, te enviamos un enlace nuevo para ingresar a {{org}} con {{email}}. Revisa tu correo y usa el enlace más reciente.",
+        "errors": {
+          "invalid-input": "Revisa el correo y el nombre antes de continuar.",
+          "organization-not-found": "No encontramos esa organización.",
+          "auth0-org-required": "Esta organización todavía no tiene Auth0 Org ID.",
+          "treasurer-already-active": "Ese correo ya tiene acceso activo como tesorera.",
+          "invite-failed": "No se pudo enviar la invitación. Intenta nuevamente.",
+          "reset-rate-limited": "Ya se envió un enlace hace menos de cinco minutos.",
+          "active-treasurer-required": "Ese correo no tiene acceso activo como tesorera.",
+          "reset-failed": "No se pudo enviar el magic link. Intenta nuevamente."
+        }
+      }
     },
     "businessRules": {
       "title": "Reglas del grupo",
