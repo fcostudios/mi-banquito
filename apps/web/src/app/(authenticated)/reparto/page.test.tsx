@@ -69,7 +69,7 @@ describe("ScrYearEndShareOutPage", () => {
     expect(screen.getByText("Decisión de gobernanza requerida")).toBeInTheDocument();
     expect(screen.getByText("Ana Mora")).toBeInTheDocument();
     expect(screen.getByLabelText("Monto final Ana Mora")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Guardar override" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar ajuste" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Aprobar reparto" })).toBeInTheDocument();
   });
 
