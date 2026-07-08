@@ -21,13 +21,13 @@
 As a treasurer, I want to undo an approved year-end share-out if I spot an error before the assembly meeting, so that I'm not forced to live with a wrong distribution.
 
 ## Acceptance Criteria
-- [ ] AC-1: Within **24 h** of `YearEndShareOut.status = approved`, a "Revertir reparto" action is available; after that grace window it is unavailable to the treasurer.
-- [ ] AC-2: The reversal creates **N reversal `Withdrawal` rows** — one per approved share-out line — exactly offsetting the distributed amounts (the share-out is undone via compensating ledger entries, not by deleting the original rows).
-- [ ] AC-3: All year-end PDFs are **superseded**: a new generation runs and the prior archives are marked `StatementArchive.kind = year_end_*_superseded`.
-- [ ] AC-4: `YearEndShareOut.status` is set to `reversed`.
-- [ ] AC-5: The action requires a **confirmation modal in plain Spanish** plus a mandatory **reason**, both captured before any write.
-- [ ] AC-6: **After** the grace window, only the platform operator can reverse — via direct, audited DB recovery (no treasurer self-serve path post-window).
-- [ ] AC-7: The reversal is idempotent / single-shot: a reverted share-out cannot be reverted again, and re-running does not create extra `Withdrawal` rows.
+- [x] AC-1: Within **24 h** of `YearEndShareOut.status = approved`, a "Revertir reparto" action is available; after that grace window it is unavailable to the treasurer.
+- [x] AC-2: The reversal creates **N reversal `Withdrawal` rows** — one per approved share-out line — exactly offsetting the distributed amounts (the share-out is undone via compensating ledger entries, not by deleting the original rows).
+- [x] AC-3: All year-end PDFs are **superseded**: a new generation runs and the prior archives are marked `StatementArchive.kind = year_end_*_superseded`.
+- [x] AC-4: `YearEndShareOut.status` is set to `reversed`.
+- [x] AC-5: The action requires a **confirmation modal in plain Spanish** plus a mandatory **reason**, both captured before any write.
+- [x] AC-6: **After** the grace window, only the platform operator can reverse — via direct, audited DB recovery (no treasurer self-serve path post-window).
+- [x] AC-7: The reversal is idempotent / single-shot: a reverted share-out cannot be reverted again, and re-running does not create extra `Withdrawal` rows.
 
 ## Technical Notes
 - **Data model:** `YearEndShareOut.status` gains a `reversed` state (HR-1 versioned via `EntityVersion`); N reversal `Withdrawal` rows linked to the share-out; `StatementArchive` rows re-keyed to `year_end_*_superseded`. Any enum/state addition uses a timestamp-slug migration per HR-25 (`slug=share_out_reversed`).

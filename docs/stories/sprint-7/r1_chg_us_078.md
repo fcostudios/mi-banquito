@@ -21,11 +21,11 @@
 As a treasurer, I want to mark "Lucía promised to pay on Friday" with a date and be reminded on that day, so that I don't have to keep promised-payment dates in my head.
 
 ## Acceptance Criteria
-- [ ] AC-1: On a late A/R row the treasurer can record a promise capturing the subject `(member, loan_or_cycle, promised_date, optional_amount)`; `promised_date` is required, `amount` optional.
-- [ ] AC-2: Recording a promise writes an `Alert` extended with `kind = promise_marked` carrying that subject (Alert-extension pattern per Architect N3).
-- [ ] AC-3: On the **promised date**, the alert **reappears** in the bell with `severity = medium` (reminder), surfacing the member and the promised amount/date.
-- [ ] AC-4: The promise outcome is **resolved** either implicitly — by recording a matching contribution/repayment on/after the promised date — or explicitly via a *"no cumplió"* annotation; resolved promises stop reappearing.
-- [ ] AC-5: The promise + reminder + outcome are first-class and logged (not a transient UI flag): the outcome state is queryable for the collections history.
+- [x] AC-1: On a late A/R row the treasurer can record a promise capturing the subject `(member, loan_or_cycle, promised_date, optional_amount)`; `promised_date` is required, `amount` optional.
+- [x] AC-2: Recording a promise writes an `Alert` extended with `kind = promise_marked` carrying that subject (Alert-extension pattern per Architect N3).
+- [x] AC-3: On the **promised date**, the alert **reappears** in the bell with `severity = medium` (reminder), surfacing the member and the promised amount/date.
+- [x] AC-4: The promise outcome is **resolved** either implicitly — by recording a matching contribution/repayment on/after the promised date — or explicitly via a *"no cumplió"* annotation; resolved promises stop reappearing.
+- [x] AC-5: The promise + reminder + outcome are first-class and logged (not a transient UI flag): the outcome state is queryable for the collections history.
 
 ## Technical Notes
 - **Data model:** Extend the `Alert` model with `kind = promise_marked` and a subject payload `(member_id, loan_id|cycle_id, promised_date, amount?)` plus an outcome field (`cumplió` / `no_cumplió` / open). If a new column/enum value is needed, add a timestamp-slug migration per HR-25 (`V<UTC>__alert_promise_kind.sql`, story Meta `slug=alert_promise_kind`) — no raw `Vxxx`.

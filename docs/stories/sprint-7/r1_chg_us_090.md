@@ -20,12 +20,12 @@
 As a treasurer, I want a gentle alert when a member's last few contributions all lack a slip photo, so that I can ask for the receipts and keep the records well-backed.
 
 ## Acceptance Criteria
-- [ ] AC-1: The emitter runs **post-commit on `RecordContribution` (P1)**.
-- [ ] AC-2: For the contributing member, if the **last N contributions** (default `N = 3`) all have `slip_photo_id IS NULL`, an `Alert` is written with `kind = A11`, `severity = low`, `audience = treasurer`.
-- [ ] AC-3: The Spanish copy is: *"Los últimos {n} aportes de {member} no tienen foto adjunta. Considera pedirla para mantener el respaldo."* with `{n}` the configured threshold.
-- [ ] AC-4: De-dup honors `dedup_window = 7d` on `(org_id, A11, subject_id=member_id, window)` — a follow-up no-photo contribution within 7 days does not re-emit.
-- [ ] AC-5: Recording a contribution **with** a slip photo breaks the streak, so the next evaluation no longer trips A11 for that member.
-- [ ] AC-6: The threshold `N` is configurable (default 3) via `GroupConfig.config` rather than hardcoded.
+- [x] AC-1: The emitter runs **post-commit on `RecordContribution` (P1)**.
+- [x] AC-2: For the contributing member, if the **last N contributions** (default `N = 3`) all have `slip_photo_id IS NULL`, an `Alert` is written with `kind = A11`, `severity = low`, `audience = treasurer`.
+- [x] AC-3: The Spanish copy is: *"Los últimos {n} aportes de {member} no tienen foto adjunta. Considera pedirla para mantener el respaldo."* with `{n}` the configured threshold.
+- [x] AC-4: De-dup honors `dedup_window = 7d` on `(org_id, A11, subject_id=member_id, window)` — a follow-up no-photo contribution within 7 days does not re-emit.
+- [x] AC-5: Recording a contribution **with** a slip photo breaks the streak, so the next evaluation no longer trips A11 for that member.
+- [x] AC-6: The threshold `N` is configurable (default 3) via `GroupConfig.config` rather than hardcoded.
 
 ## Technical Notes
 - **Data model:** Append-only `Alert`; `subject_id = member_id`. Reads the member's most-recent N `Contribution` rows and their `slip_photo_id`. Threshold from `GroupConfig.config` (e.g. `no_slip_consecutive_threshold`, default 3). No migration (A11 exists in the catalogue; added as a new emit story per Verifier F2).
