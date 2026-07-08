@@ -499,4 +499,164 @@ describe("year-end share-out", () => {
     expect(insertedRows(fakeDb, withdrawal)).toEqual([]);
     expect(insertedRows(fakeDb, yearEndShareOutReversal)).toEqual([]);
   });
+
+  it("reuses existing supersession for null-member group archives on reversal retry", async () => {
+    const createArtifact = vi.fn(async () => ({ pdfUri: "/should-not-upload.pdf", byteSize: 1 }));
+    const fakeDb = new FakeDb({
+      [tableNameOf(yearEndShareOut)]: [[{
+        id: "shareout-1",
+        orgId: "org-1",
+        year: 2026,
+        status: "reversed",
+        approvedAt: new Date("2026-07-01T12:00:00.000Z"),
+        periodCloseId: "period-close-1",
+      }]],
+      [tableNameOf(yearEndShareOutReversal)]: [[{
+        id: "reversal-1",
+        yearEndShareOutId: "shareout-1",
+        reason: "Acta corrigió reparto anual",
+        reversedAt: new Date("2026-07-02T11:00:00.000Z"),
+        reversalPayload: {
+          shareOutId: "shareout-1",
+          reason: "Acta corrigió reparto anual",
+          withdrawalOffsets: [{
+            lineId: "line-1",
+            memberId: "member-1",
+            amount: "-27.1234",
+            reversesId: "withdrawal-1",
+          }],
+        },
+      }]],
+      [tableNameOf(statementArchive)]: [[{
+        id: "archive-1",
+        orgId: "org-1",
+        kind: "year_end_share_out",
+        memberId: null,
+        periodLabel: "2026",
+        pdfUri: "/old/shareout.pdf",
+        canonicalPayloadHash: "old-shareout-hash",
+        generatedAt: new Date("2026-07-01T12:00:00.000Z"),
+        periodCloseId: "period-close-1",
+        yearEndShareOutId: "shareout-1",
+        byteSize: 200,
+      }]],
+      [tableNameOf(statementArchiveSupersession)]: [[{
+        id: "supersession-1",
+        supersededStatementArchiveId: "archive-1",
+        supersedingStatementArchiveId: "archive-new-1",
+        yearEndShareOutReversalId: "reversal-1",
+      }]],
+    });
+
+    await withMockedShareOutDb(fakeDb, async () => {
+      const { createShareOutService } = await import("./shareout");
+      const service = createShareOutService({ now: () => new Date("2026-07-02T11:30:00.000Z") });
+
+      await expect(service.reverseApprovedShareOut({
+        orgId: "org-1",
+        actorId: "actor-1",
+        shareOutId: "shareout-1",
+        reason: "Acta corrigió reparto anual",
+        createArtifact,
+      })).resolves.toMatchObject({
+        reversed: false,
+        reversalId: "reversal-1",
+        shareOutId: "shareout-1",
+        offsetsCreated: 0,
+        supersedingArchiveIds: ["archive-new-1"],
+      });
+    });
+
+    expect(createArtifact).not.toHaveBeenCalled();
+    expect(insertedRows(fakeDb, statementArchive)).toEqual([]);
+    expect(insertedRows(fakeDb, statementArchiveSupersession)).toEqual([]);
+  });
+
+  it("links an existing null-member superseding archive without uploading a duplicate", async () => {
+    const createArtifact = vi.fn(async () => ({ pdfUri: "/should-not-upload.pdf", byteSize: 1 }));
+    const fakeDb = new FakeDb({
+      [tableNameOf(yearEndShareOut)]: [[{
+        id: "shareout-1",
+        orgId: "org-1",
+        year: 2026,
+        status: "reversed",
+        approvedAt: new Date("2026-07-01T12:00:00.000Z"),
+        periodCloseId: "period-close-1",
+      }]],
+      [tableNameOf(yearEndShareOutReversal)]: [[{
+        id: "reversal-1",
+        yearEndShareOutId: "shareout-1",
+        reason: "Acta corrigió reparto anual",
+        reversedAt: new Date("2026-07-02T11:00:00.000Z"),
+        reversalPayload: {
+          shareOutId: "shareout-1",
+          reason: "Acta corrigió reparto anual",
+          withdrawalOffsets: [{
+            lineId: "line-1",
+            memberId: "member-1",
+            amount: "-27.1234",
+            reversesId: "withdrawal-1",
+          }],
+        },
+      }]],
+      [tableNameOf(statementArchive)]: [
+        [{
+          id: "archive-1",
+          orgId: "org-1",
+          kind: "year_end_snapshot",
+          memberId: null,
+          periodLabel: "2026",
+          pdfUri: "/old/snapshot.pdf",
+          canonicalPayloadHash: "old-snapshot-hash",
+          generatedAt: new Date("2026-07-01T12:00:00.000Z"),
+          periodCloseId: "period-close-1",
+          yearEndShareOutId: "shareout-1",
+          byteSize: 300,
+        }],
+        [{
+          id: "archive-new-1",
+          orgId: "org-1",
+          kind: "year_end_snapshot",
+          memberId: null,
+          periodLabel: "2026-reversal-reversal-1",
+          pdfUri: "/new/snapshot.pdf",
+          canonicalPayloadHash: "new-snapshot-hash",
+          generatedAt: new Date("2026-07-02T11:00:00.000Z"),
+          periodCloseId: "period-close-1",
+          yearEndShareOutId: "shareout-1",
+          byteSize: 301,
+        }],
+      ],
+      [tableNameOf(statementArchiveSupersession)]: [[]],
+    });
+
+    await withMockedShareOutDb(fakeDb, async () => {
+      const { createShareOutService } = await import("./shareout");
+      const service = createShareOutService({ now: () => new Date("2026-07-02T11:30:00.000Z") });
+
+      await expect(service.reverseApprovedShareOut({
+        orgId: "org-1",
+        actorId: "actor-1",
+        shareOutId: "shareout-1",
+        reason: "Acta corrigió reparto anual",
+        createArtifact,
+      })).resolves.toMatchObject({
+        reversed: false,
+        reversalId: "reversal-1",
+        shareOutId: "shareout-1",
+        offsetsCreated: 0,
+        supersedingArchiveIds: ["archive-new-1"],
+      });
+    });
+
+    expect(createArtifact).not.toHaveBeenCalled();
+    expect(insertedRows(fakeDb, statementArchive)).toEqual([]);
+    expect(insertedRows(fakeDb, statementArchiveSupersession)).toEqual([
+      expect.objectContaining({
+        supersededStatementArchiveId: "archive-1",
+        supersedingStatementArchiveId: "archive-new-1",
+        yearEndShareOutReversalId: "reversal-1",
+      }),
+    ]);
+  });
 });
