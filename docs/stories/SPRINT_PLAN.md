@@ -243,20 +243,23 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 **Stories:** 10 | **Points:** 0 SP
 
+> **Status:** Closed / shipped. Verification completed with schema verification,
+> full test suite, type-check, lint, and production build on 2026-07-08.
+
 ### Execution Order
 
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |
 |---|-------|-------|------|------|---------------|-----|------------|--------|----------|------|
-| 1 | full-stack | **US-064** ⬜ | System emits A4 liquidez bajo margen alert | ? ?SP | `See story file` | — | US-062, US-054 | →12 | — | [r1_alerts_us_064.md](sprint-7/r1_alerts_us_064.md) |
-| 2 | full-stack | **US-066** ⬜ | System emits A6 prestamo en mora alert | ? ?SP | `See story file` | — | US-033, US-034, US-040 | — | — | [r1_alerts_us_066.md](sprint-7/r1_alerts_us_066.md) |
-| 3 | full-stack | **US-068** ⬜ | System emits A14 saldo de miembro negativo alert | ? ?SP | `See story file` | — | US-031 | →3 | — | [r1_alerts_us_068.md](sprint-7/r1_alerts_us_068.md) |
-| 4 | full-stack | **US-078** ⬜ | Treasurer marks a chase-promise with date + receives a reminder | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_078.md](sprint-7/r1_chg_us_078.md) |
-| 5 | full-stack | **US-082** ⬜ | Operator re-issues a magic-link from /admin when treasurer cannot log in | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_082.md](sprint-7/r1_chg_us_082.md) |
-| 6 | full-stack | **US-084** ⬜ | Treasurer reverses an approved year-end share-out within grace window | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_084.md](sprint-7/r1_chg_us_084.md) |
-| 7 | full-stack | **US-089** ⬜ | System emits A9 *Cambio de configuración del grupo* (Low, treasurer) | ? ?SP | `See story file` | — | US-017, US-028 | — | — | [r1_chg_us_089.md](sprint-7/r1_chg_us_089.md) |
-| 8 | full-stack | **US-090** ⬜ | System emits A11 *Aporte sin foto de comprobante (≥ N consecutivos)* (Low, treas | ? ?SP | `See story file` | — | US-008, US-029 | — | — | [r1_chg_us_090.md](sprint-7/r1_chg_us_090.md) |
-| 9 | full-stack | **US-018** ⬜ | Platform operator invites the treasurer via Auth0 organization invite | ? ?SP | `See story file` | — | US-015, US-064, US-016 | →2 | — | [r1_admin_us_018.md](sprint-7/r1_admin_us_018.md) |
-| 10 | full-stack | **US-065** ⬜ | System emits A5 compromiso reparto excede proyeccion alert | ? ?SP | `See story file` | — | US-051, US-054, US-064 | — | — | [r1_alerts_us_065.md](sprint-7/r1_alerts_us_065.md) |
+| 1 | full-stack | **US-064** ✅ | System emits A4 liquidez bajo margen alert | ? ?SP | `See story file` | — | US-062, US-054 | →12 | — | [r1_alerts_us_064.md](sprint-7/r1_alerts_us_064.md) |
+| 2 | full-stack | **US-066** ✅ | System emits A6 prestamo en mora alert | ? ?SP | `See story file` | — | US-033, US-034, US-040 | — | — | [r1_alerts_us_066.md](sprint-7/r1_alerts_us_066.md) |
+| 3 | full-stack | **US-068** ✅ | System emits A14 saldo de miembro negativo alert | ? ?SP | `See story file` | — | US-031 | →3 | — | [r1_alerts_us_068.md](sprint-7/r1_alerts_us_068.md) |
+| 4 | full-stack | **US-078** ✅ | Treasurer marks a chase-promise with date + receives a reminder | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_078.md](sprint-7/r1_chg_us_078.md) |
+| 5 | full-stack | **US-082** ✅ | Operator re-issues a magic-link from /admin when treasurer cannot log in | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_082.md](sprint-7/r1_chg_us_082.md) |
+| 6 | full-stack | **US-084** ✅ | Treasurer reverses an approved year-end share-out within grace window | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_084.md](sprint-7/r1_chg_us_084.md) |
+| 7 | full-stack | **US-089** ✅ | System emits A9 *Cambio de configuración del grupo* (Low, treasurer) | ? ?SP | `See story file` | — | US-017, US-028 | — | — | [r1_chg_us_089.md](sprint-7/r1_chg_us_089.md) |
+| 8 | full-stack | **US-090** ✅ | System emits A11 *Aporte sin foto de comprobante (≥ N consecutivos)* (Low, treas | ? ?SP | `See story file` | — | US-008, US-029 | — | — | [r1_chg_us_090.md](sprint-7/r1_chg_us_090.md) |
+| 9 | full-stack | **US-018** ✅ | Platform operator invites the treasurer via Auth0 organization invite | ? ?SP | `See story file` | — | US-015, US-064, US-016 | →2 | — | [r1_admin_us_018.md](sprint-7/r1_admin_us_018.md) |
+| 10 | full-stack | **US-065** ✅ | System emits A5 compromiso reparto excede proyeccion alert | ? ?SP | `See story file` | — | US-051, US-054, US-064 | — | — | [r1_alerts_us_065.md](sprint-7/r1_alerts_us_065.md) |
 
 ### References
 

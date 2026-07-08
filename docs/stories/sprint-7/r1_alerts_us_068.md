@@ -20,11 +20,11 @@
 As a treasurer, I want the system to alert me (critically) if any member's balance ever computes as negative, so that I can immediately investigate what should be a never-happens data-integrity violation.
 
 ## Acceptance Criteria
-- [ ] AC-1: The emitter runs **post-event on `RecomputeMemberCompliance` (P7)** — i.e. whenever the `member_compliance_state` materialized view recomputes balances.
-- [ ] AC-2: If any member balance computes **< 0**, an `Alert` is written with `kind = A14`, `severity = critical`, `audience = treasurer`.
-- [ ] AC-3: The Spanish copy is: *"El saldo de {member} quedó en negativo (USD {amount}). Esto no debería pasar — por favor revisa."* with `{amount}` the negative balance magnitude.
-- [ ] AC-4: De-dup uses `dedup_window = immediate` — every distinct negative-balance event is surfaced (no suppression window collapsing repeated integrity violations).
-- [ ] AC-5: The **platform operator** is also alerted via the NFR-OBS-01 observability path (this is a data-integrity defect, not a normal treasurer event).
+- [x] AC-1: The emitter runs **post-event on `RecomputeMemberCompliance` (P7)** — i.e. whenever the `member_compliance_state` materialized view recomputes balances.
+- [x] AC-2: If any member balance computes **< 0**, an `Alert` is written with `kind = A14`, `severity = critical`, `audience = treasurer`.
+- [x] AC-3: The Spanish copy is: *"El saldo de {member} quedó en negativo (USD {amount}). Esto no debería pasar — por favor revisa."* with `{amount}` the negative balance magnitude.
+- [x] AC-4: De-dup uses `dedup_window = immediate` — every distinct negative-balance event is surfaced (no suppression window collapsing repeated integrity violations).
+- [x] AC-5: The **platform operator** is also alerted via the NFR-OBS-01 observability path (this is a data-integrity defect, not a normal treasurer event).
 
 ## Technical Notes
 - **Data model:** Append-only `Alert`; `subject_id = member_id`. Reads computed balances from the `member_compliance_state` materialized view (PRIN-07). No migration (A14 exists in the catalogue).

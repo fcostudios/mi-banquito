@@ -20,11 +20,11 @@
 As a treasurer, I want the system to warn me when the projected year-end share-out commitment exceeds the projected available capital, so that I don't approve a distribution the group cannot actually pay.
 
 ## Acceptance Criteria
-- [ ] AC-1: The emitter runs **post-commit on `EvaluateYearEndCommitment` (P11)**.
-- [ ] AC-2: When the **projected year-end commitment** (computed per BR-09 time-weighted interest + BR-11 per-member breakdown) exceeds the **projected available capital**, an `Alert` row is written with `kind = A5`, `severity = high`, `audience = treasurer`.
-- [ ] AC-3: The Spanish copy cites the three concrete figures: projected payout, projected available, and the shortfall.
-- [ ] AC-4: The alert **remains active** until a subsequent P11 evaluation shows it resolved (commitment ≤ available); de-dup uses `dedup_window = 7d` on `(org_id, A5, subject_id, window)`.
-- [ ] AC-5: While an A5 is active at share-out **approval time**, the approval flow (US-053) requires an explicit treasurer **override with reason** before it proceeds (per Review Pass F16) — this emitter exposes the active-A5 state the approval guard reads.
+- [x] AC-1: The emitter runs **post-commit on `EvaluateYearEndCommitment` (P11)**.
+- [x] AC-2: When the **projected year-end commitment** (computed per BR-09 time-weighted interest + BR-11 per-member breakdown) exceeds the **projected available capital**, an `Alert` row is written with `kind = A5`, `severity = high`, `audience = treasurer`.
+- [x] AC-3: The Spanish copy cites the three concrete figures: projected payout, projected available, and the shortfall.
+- [x] AC-4: The alert **remains active** until a subsequent P11 evaluation shows it resolved (commitment ≤ available); de-dup uses `dedup_window = 7d` on `(org_id, A5, subject_id, window)`.
+- [x] AC-5: While an A5 is active at share-out **approval time**, the approval flow (US-053) requires an explicit treasurer **override with reason** before it proceeds (per Review Pass F16) — this emitter exposes the active-A5 state the approval guard reads.
 
 ## Technical Notes
 - **Data model:** Append-only `Alert`. Inputs: `YearEndShareOut` projected lines (BR-09/BR-11 computation) and the projected available capital from the liquidity projection. No migration (A5 exists in the catalogue).
