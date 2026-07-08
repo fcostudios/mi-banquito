@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import {
   auditLogEntry,
   contributionCycle,
@@ -896,6 +896,47 @@ export function createShareOutService(options: { now?: () => Date } = {}) {
       for (const archive of phase.archives) {
         if (!isYearEndShareOutArtifactKind(archive.kind)) continue;
         if (String(archive.periodLabel).endsWith(`-reversal-${phase.reversal.id}`)) continue;
+        const supersedingPeriodLabel = `${archive.periodLabel}-reversal-${phase.reversal.id}`;
+        const existingSupersedingId = await withWritableTenantTransaction(input.orgId, async (tx) => {
+          const [existingSupersession] = await tx.select().from(statementArchiveSupersession)
+            .where(and(
+              eq(statementArchiveSupersession.orgId, input.orgId),
+              eq(statementArchiveSupersession.supersededStatementArchiveId, archive.id),
+              eq(statementArchiveSupersession.yearEndShareOutReversalId, phase.reversal.id),
+            ))
+            .limit(1);
+          if (existingSupersession?.supersedingStatementArchiveId) {
+            return existingSupersession.supersedingStatementArchiveId;
+          }
+
+          const [existingArchive] = await tx.select().from(statementArchive)
+            .where(and(
+              eq(statementArchive.orgId, input.orgId),
+              eq(statementArchive.kind, archive.kind),
+              archive.memberId ? eq(statementArchive.memberId, archive.memberId) : isNull(statementArchive.memberId),
+              eq(statementArchive.periodLabel, supersedingPeriodLabel),
+              eq(statementArchive.yearEndShareOutId, input.shareOutId),
+            ))
+            .limit(1);
+          if (!existingArchive) {
+            return null;
+          }
+
+          await tx.insert(statementArchiveSupersession).values({
+            orgId: input.orgId,
+            supersededStatementArchiveId: archive.id,
+            supersedingStatementArchiveId: existingArchive.id,
+            yearEndShareOutReversalId: phase.reversal.id,
+            reason: phase.reason,
+            createdAt: phase.reversedAt,
+          }).onConflictDoNothing();
+          return existingArchive.id;
+        });
+        if (existingSupersedingId) {
+          supersedingArchiveIds.push(existingSupersedingId);
+          continue;
+        }
+
         const supersedingPayload = {
           kind: archive.kind,
           reversalKind: "year_end_share_out_reversal",
@@ -918,11 +959,33 @@ export function createShareOutService(options: { now?: () => Date } = {}) {
           payload: supersedingPayload,
         });
         await withWritableTenantTransaction(input.orgId, async (tx) => {
+          const [existingArchive] = await tx.select().from(statementArchive)
+            .where(and(
+              eq(statementArchive.orgId, input.orgId),
+              eq(statementArchive.kind, archive.kind),
+              archive.memberId ? eq(statementArchive.memberId, archive.memberId) : isNull(statementArchive.memberId),
+              eq(statementArchive.periodLabel, supersedingPeriodLabel),
+              eq(statementArchive.yearEndShareOutId, input.shareOutId),
+            ))
+            .limit(1);
+          if (existingArchive) {
+            await tx.insert(statementArchiveSupersession).values({
+              orgId: input.orgId,
+              supersededStatementArchiveId: archive.id,
+              supersedingStatementArchiveId: existingArchive.id,
+              yearEndShareOutReversalId: phase.reversal.id,
+              reason: phase.reason,
+              createdAt: phase.reversedAt,
+            }).onConflictDoNothing();
+            supersedingArchiveIds.push(existingArchive.id);
+            return;
+          }
+
           const [supersedingArchive] = await tx.insert(statementArchive).values({
             orgId: input.orgId,
             kind: archive.kind,
             memberId: archive.memberId,
-            periodLabel: `${archive.periodLabel}-reversal-${phase.reversal.id}`,
+            periodLabel: supersedingPeriodLabel,
             pdfUri: supersedingArtifact.pdfUri,
             canonicalPayloadHash: supersedingHash,
             generatedAt: phase.reversedAt,
