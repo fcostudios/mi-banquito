@@ -29,6 +29,10 @@ vi.mock("@mi-banquito/domain", () => ({
         memberId: "m1",
         at: new Date("2026-07-02T10:00:00.000Z"),
         text: "Pancho registró un pago de $16.00 el 2026-07-02.",
+        details: [
+          { label: "Nota", value: "Pago de atraso 2026-06" },
+          { label: "Aplicado a", value: "2026-06" },
+        ],
       },
     ]),
   }),
@@ -44,6 +48,10 @@ describe("ScrHistoryPage", () => {
     expect(card).not.toBeNull();
     expect(within(card!).getByText("Pago registrado")).toBeInTheDocument();
     expect(within(card!).getByText("02/07/2026, 05:00")).toBeInTheDocument();
+    expect(within(card!).getByText("Nota")).toBeInTheDocument();
+    expect(within(card!).getByText("Pago de atraso 2026-06")).toBeInTheDocument();
+    expect(within(card!).getByText("Aplicado a")).toBeInTheDocument();
+    expect(within(card!).getByText("2026-06")).toBeInTheDocument();
     expect(container).not.toHaveTextContent("loan.repayment.create");
   });
 });

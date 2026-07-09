@@ -1,6 +1,6 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
-import { auditLogEntry } from "@mi-banquito/db/schema";
+import { auditLogEntry, member } from "@mi-banquito/db/schema";
 
 export type AuditRow = typeof auditLogEntry.$inferSelect;
 
@@ -45,6 +45,12 @@ export type AuditNarratedEntry = {
   memberId: string | null;
   at: Date;
   text: string;
+  details: AuditNarratedDetail[];
+};
+
+export type AuditNarratedDetail = {
+  label: string;
+  value: string;
 };
 
 export type AuditPdfPayload = {
@@ -110,6 +116,53 @@ function memberIdFromPayload(payload: PayloadObject): string | undefined {
   return stringField(payload, "memberId")
     ?? stringField(payload, "borrowerMemberId")
     ?? stringField(payload, "subjectMemberId");
+}
+
+function paymentSourceLabel(value: string | undefined): string | undefined {
+  if (value === "cash_in_meeting") {
+    return "Efectivo en reunión";
+  }
+  if (value === "bank_transfer") {
+    return "Transferencia bancaria";
+  }
+  if (value === "petty_cash_deposit") {
+    return "Depósito de caja chica";
+  }
+  return value;
+}
+
+function detail(label: string, value: string | undefined): AuditNarratedDetail[] {
+  return value ? [{ label, value }] : [];
+}
+
+function periodFromNote(value: string | undefined): string | undefined {
+  return value?.match(/\b\d{4}-\d{2}\b/)?.[0];
+}
+
+function contributionDetails(payload: PayloadObject): AuditNarratedDetail[] {
+  const notes = stringField(payload, "notes");
+  return [
+    ...detail("Nota", notes),
+    ...detail("Aplicado a", stringField(payload, "cycleLabel") ?? periodFromNote(notes)),
+    ...detail("Fuente", paymentSourceLabel(stringField(payload, "paymentSource"))),
+  ];
+}
+
+function auditDetails(input: AuditNarrationInput): AuditNarratedDetail[] {
+  const payload = payloadObject(input.payloadSnapshot);
+  if (input.actionKind === "contribution.create") {
+    return contributionDetails(payload);
+  }
+  if (input.actionKind === "contribution.reverse") {
+    return [
+      ...detail("Razón", stringField(payload, "reverseReason") ?? input.reason ?? undefined),
+      ...detail("Aplicado a", stringField(payload, "cycleLabel")),
+    ];
+  }
+  return [
+    ...detail("Nota", stringField(payload, "notes")),
+    ...detail("Razón", input.reason ?? undefined),
+  ];
 }
 
 const templates: Record<string, (input: AuditNarrationInput) => string> = {
@@ -185,8 +238,13 @@ export function filterAuditRows<T extends AuditFilterableRow>(input: {
   });
 }
 
-function narratedEntry(row: AuditRow): AuditNarratedEntry {
+function narratedEntry(row: AuditRow, memberNames = new Map<string, string>()): AuditNarratedEntry {
   const payload = payloadObject(row.payloadSnapshot);
+  const payloadMemberId = memberIdFromPayload(payload) ?? (row.subjectKind === "member" ? row.subjectId ?? undefined : undefined);
+  const enrichedPayload = payloadMemberId && !stringField(payload, "memberName") && memberNames.has(payloadMemberId)
+    ? { ...payload, memberName: memberNames.get(payloadMemberId) }
+    : payload;
+  const enrichedRow = enrichedPayload === payload ? row : { ...row, payloadSnapshot: enrichedPayload };
   return {
     id: row.id,
     orgId: row.orgId,
@@ -195,10 +253,31 @@ function narratedEntry(row: AuditRow): AuditNarratedEntry {
     actionKind: row.actionKind,
     subjectKind: row.subjectKind,
     subjectId: row.subjectId,
-    memberId: memberIdFromPayload(payload) ?? (row.subjectKind === "member" ? row.subjectId ?? undefined : undefined) ?? null,
+    memberId: payloadMemberId ?? null,
     at: dateValue(row.at),
-    text: narrateAuditRow(row),
+    text: narrateAuditRow(enrichedRow),
+    details: auditDetails(enrichedRow),
   };
+}
+
+async function memberNameMap(orgId: string, rows: AuditRow[]): Promise<Map<string, string>> {
+  const memberIds = [...new Set(rows.flatMap((row) => {
+    const payload = payloadObject(row.payloadSnapshot);
+    if (stringField(payload, "memberName")) {
+      return [];
+    }
+    const id = memberIdFromPayload(payload) ?? (row.subjectKind === "member" ? row.subjectId ?? undefined : undefined);
+    return id ? [id] : [];
+  }))];
+  if (memberIds.length === 0) {
+    return new Map();
+  }
+  const members = await db.select({
+    id: member.id,
+    displayName: member.displayName,
+  }).from(member)
+    .where(and(eq(member.orgId, orgId), inArray(member.id, memberIds)));
+  return new Map(members.map((row) => [row.id, row.displayName]));
 }
 
 export function buildAuditPdfPayload(entries: AuditNarratedEntry[]): AuditPdfPayload {
@@ -219,8 +298,9 @@ export const createAuditService = (): AuditService => ({
     const rows = await db.select().from(auditLogEntry)
       .where(and(eq(auditLogEntry.orgId, filters.orgId)))
       .orderBy(desc(auditLogEntry.at));
+    const names = await memberNameMap(filters.orgId, rows);
     return filterAuditRows({
-      rows: rows.map(narratedEntry),
+      rows: rows.map((row) => narratedEntry(row, names)),
       filters,
     });
   },
