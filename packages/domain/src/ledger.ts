@@ -870,15 +870,22 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
       .where(and(eq(contribution.orgId, orgId), eq(contribution.clientRequestId, input.clientRequestId)));
     if (existing) return existing;
 
-    const [cycle] = await db.select().from(contributionCycle)
-      .where(and(eq(contributionCycle.orgId, orgId), eq(contributionCycle.status, "open")))
-      .orderBy(desc(contributionCycle.opensOn));
+    const targetedCycleId = input.cycleId || "";
+    const [cycle] = targetedCycleId
+      ? await db.select().from(contributionCycle)
+        .where(and(eq(contributionCycle.orgId, orgId), eq(contributionCycle.id, targetedCycleId)))
+      : await db.select().from(contributionCycle)
+        .where(and(eq(contributionCycle.orgId, orgId), eq(contributionCycle.status, "open")))
+        .orderBy(desc(contributionCycle.opensOn));
 
     return withWritableTenantTransaction(orgId, async (tx) => {
       let auditEntry: AuditLogEntryInsert | undefined;
       const row = await writeWithAudit({
         write: async () => {
           let activeCycle = cycle;
+          if (targetedCycleId && !activeCycle) {
+            throw new Error("contribution_cycle_not_found");
+          }
           if (!activeCycle) {
             const label = input.datedOn.slice(0, 7);
             const [currentConfig] = await tx.select().from(groupConfig)

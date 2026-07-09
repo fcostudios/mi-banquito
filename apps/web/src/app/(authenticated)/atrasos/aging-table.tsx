@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   buildChaseMessage,
   buildWhatsAppChaseUrl,
@@ -10,7 +11,12 @@ import { currentEcuadorDateString } from "@mi-banquito/contracts";
 import { ButtonPrimary, ButtonSecondary } from "@mi-banquito/ui";
 import { ecCurrency } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
-import { markPromiseAction, markPromiseOutcomeAction, recordChaseAttemptAction } from "./actions";
+import {
+  markPromiseAction,
+  markPromiseOutcomeAction,
+  recordChaseAttemptAction,
+  recordOverdueContributionAction,
+} from "./actions";
 import { PromiseDialog } from "./promise-dialog";
 
 const copy = messages.atrasos;
@@ -52,6 +58,10 @@ function hasActionSource(row: CollectionsAgingRow): boolean {
   return Boolean(row.memberId && (row.loanId || row.cycleId));
 }
 
+function canRecordContributionPayment(row: CollectionsAgingRow): boolean {
+  return row.reasonKind === "aporte" && Boolean(row.memberId && row.cycleId);
+}
+
 function hiddenSourceFields(row: CollectionsAgingRow) {
   return (
     <>
@@ -81,6 +91,17 @@ function PromiseOutcomeActions({ promiseId }: { promiseId: string }) {
         </ButtonSecondary>
       </form>
     </div>
+  );
+}
+
+function OverdueContributionPaymentAction({ row }: { row: CollectionsAgingRow }) {
+  return (
+    <form action={recordOverdueContributionAction} className="w-full sm:w-auto">
+      <input type="hidden" name="clientRequestId" value={randomUUID()} />
+      <input type="hidden" name="memberId" value={row.memberId ?? ""} />
+      <input type="hidden" name="cycleId" value={row.cycleId ?? ""} />
+      <ButtonPrimary type="submit" labelKey={copy.recordPayment} />
+    </form>
   );
 }
 
@@ -174,6 +195,9 @@ export function AgingTable({ rows }: { rows: CollectionsAgingRow[] }) {
                 />
                 {row.openPromiseId ? (
                   <PromiseOutcomeActions promiseId={row.openPromiseId} />
+                ) : null}
+                {canRecordContributionPayment(row) ? (
+                  <OverdueContributionPaymentAction row={row} />
                 ) : null}
                 <div className="flex flex-wrap gap-2">
                   {rowWhatsappUrl ? (
