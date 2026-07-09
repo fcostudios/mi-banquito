@@ -319,7 +319,7 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 ## Sprint 10: Sprint 10
 
-**Stories:** 7 | **Points:** 0 SP
+**Stories:** 8 | **Points:** 0 SP
 
 ### Execution Order
 
@@ -332,6 +332,7 @@ See `docs/specs/09_architecture.md` for bounded context details.
 | 5 | full-stack | **US-105** ⬜ | System writes the immutable year-end balance snapshot at close (CHG-003) | ? ?SP | `See story file` | — | US-046, US-101 | →9 | — | [r1_chg_us_105.md](sprint-10/r1_chg_us_105.md) |
 | 6 | full-stack | **US-108** ⬜ | Period/method-freeze guard at year-end (BR-09 / BR-18) | ? ?SP | `See story file` | — | US-046, US-100 | — | — | [r1_misc_us_108.md](sprint-10/r1_misc_us_108.md) |
 | 7 | full-stack | **US-104** ⬜ | Treasurer configures + waives mora (group-config + condonación, O5) | ? ?SP | `See story file` | — | US-101, US-102 | — | — | [r1_misc_us_104.md](sprint-10/r1_misc_us_104.md) |
+| 8 | full-stack | **US-126** ⬜ | Treasurer records one member payment with BR-26 allocation waterfall | 5 SP | `See story file` | CHG-009 | US-029, US-036, US-040, US-100 | — | — | [r1_chg_us_126.md](sprint-10/r1_chg_us_126.md) |
 
 ### Parallel Tracks
 
