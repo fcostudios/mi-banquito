@@ -180,3 +180,4 @@
 {"story":"US-077","event":"done","notes":"Queued write copy and count indicator implemented; client_request_id dedupe already enforced by write tables."}
 {"story":"US-085","event":"done_with_deferral","notes":"Public verifier endpoint/page implemented; QR/PDF footer embedding deferred to statement PDF generator story."}
 {"story":"US-087","event":"done","notes":"Pilot log page, entries, checklist, and report route implemented."}
+{"story":"US-100","event":"decision","id":"BR-26","text":"Add Member Payment Allocation Waterfall: untargeted member payments apply to loan mora/fees, loan interest, loan principal, overdue aportes, current aporte, then require a one-tap treasurer decision for extra money.","reason":"Pilot feedback showed that recording a regular aporte can leave older obligations late; the rule must live in the substrate/rule registry so aporte, prestamo, atrasos, history, statements, liquidity, and reconciliation stay consistent."}
