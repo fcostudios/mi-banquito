@@ -932,7 +932,10 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
             actionKind: "contribution.create",
             subjectKind: "contribution",
             subjectId: created.id,
-            payloadSnapshot: created,
+            payloadSnapshot: {
+              ...created,
+              cycleLabel: activeCycle.cycleLabel,
+            },
             reason: null,
             at: now,
             createdAt: now,
