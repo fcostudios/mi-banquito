@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import { sql } from "drizzle-orm";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   distributableSurplus,
@@ -19,6 +20,16 @@ describe("Sprint 6 schema", () => {
     expect(memberTimeWeightedBalance.saldoPonderadoUsdDias.name).toBe("saldo_ponderado_usd_dias");
     expect(loanActivityPoints.loanActivityBasis.name).toBe("loan_activity_basis");
     expect(distributableSurplus.distributableSurplus.name).toBe("distributable_surplus");
+  });
+
+  it("derives member compliance from aging obligations", () => {
+    const migration = readFileSync(
+      new URL("./migrations/V20260709011000__align_compliance_with_ar_aging.sql", import.meta.url),
+      "utf8",
+    );
+
+    expect(migration).toContain("FROM mv_ar_aging aging");
+    expect(migration).toContain("WHEN member_aging.max_days_late IS NOT NULL THEN 'atrasado'");
   });
 
   runIfDatabase("exposes member balance, year-end materialized views, and archive/dedup indexes", async () => {
