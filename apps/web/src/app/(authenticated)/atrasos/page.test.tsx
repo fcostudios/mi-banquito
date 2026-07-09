@@ -89,4 +89,35 @@ describe("ScrArAgingPage", () => {
       "aporte",
     );
   });
+
+  it("renders a targeted payment action for overdue contribution rows", async () => {
+    listAgingRows.mockResolvedValueOnce([
+      {
+        id: "aging-aporte-1",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        memberId: "22222222-2222-4222-8222-222222222222",
+        memberName: "Toitq",
+        whatsappNumber: null,
+        reasonKind: "aporte",
+        cycleId: "55555555-5555-4555-8555-555555555555",
+        loanId: null,
+        periodLabel: "2026-06",
+        dueDate: "2026-06-30",
+        daysLate: 8,
+        amountDue: "20.0000",
+        lastActionAt: null,
+        openPromiseId: null,
+        openPromisePromisedOn: null,
+      },
+    ]);
+
+    const { container } = render(await ScrArAgingPage({
+      searchParams: Promise.resolve({}),
+    }));
+
+    const row = screen.getByRole("article", { name: /Toitq/ });
+    expect(within(row).getByRole("button", { name: "Registrar pago" })).toBeInTheDocument();
+    expect(container.querySelector('input[name="cycleId"]')).toHaveValue("55555555-5555-4555-8555-555555555555");
+    expect(container.querySelector('input[name="periodLabel"]')).toHaveValue("2026-06");
+  });
 });

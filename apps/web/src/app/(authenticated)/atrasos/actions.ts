@@ -1,11 +1,16 @@
 "use server";
-
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ZodError } from "zod";
-import { chaseAttemptFormSchema, currentEcuadorDateString, markPromiseFormSchema } from "@mi-banquito/contracts";
+import {
+  chaseAttemptFormSchema,
+  contributionFormSchema,
+  currentEcuadorDateString,
+  markPromiseFormSchema,
+} from "@mi-banquito/contracts";
 import {
   createCollectionsService,
+  createLedgerService,
   type DateOnlyString,
   type PromiseOutcome,
 } from "@mi-banquito/domain";
@@ -49,7 +54,10 @@ function validationMessage(error: unknown): string {
 
 function revalidateCollectionsViews() {
   revalidatePath("/atrasos");
+  revalidatePath("/");
+  revalidatePath("/socias");
   revalidatePath("/historial");
+  revalidatePath("/aportes");
 }
 
 function parsePromiseOutcome(values: Record<string, FormDataEntryValue>): {
@@ -108,6 +116,45 @@ export async function markPromiseOutcomeAction(formData: FormData) {
 
   revalidateCollectionsViews();
   redirect(`/atrasos?promiseOutcome=${outcome}`);
+}
+
+export async function recordOverdueContributionAction(formData: FormData) {
+  const session = await requireTreasurer();
+
+  try {
+    const values = formDataToObject(formData);
+    const clientRequestId = String(values.clientRequestId ?? "");
+    const memberId = String(values.memberId ?? "");
+    const cycleId = String(values.cycleId ?? "");
+    if (!uuidPattern.test(clientRequestId) || !uuidPattern.test(memberId) || !uuidPattern.test(cycleId)) {
+      throw new Error("collections_obligation_not_found");
+    }
+
+    const agingRows = await createCollectionsService().listAgingRows(session.orgId, "aporte");
+    const agingRow = agingRows.find((row) => row.memberId === memberId && row.cycleId === cycleId);
+    if (!agingRow) {
+      throw new Error("collections_obligation_not_found");
+    }
+
+    const parsed = contributionFormSchema.parse({
+      clientRequestId,
+      memberId,
+      cycleId,
+      amount: String(agingRow.amountDue),
+      datedOn: currentEcuadorDateString(),
+      paymentSource: "cash_in_meeting",
+      kind: "regular",
+      slipPhotoId: "",
+      notes: `Pago de atraso ${agingRow.periodLabel}`,
+    });
+
+    await createLedgerService().recordContribution(session.orgId, session.actorId, parsed);
+  } catch (error) {
+    redirect(`/atrasos?error=${encodeURIComponent(validationMessage(error))}`);
+  }
+
+  revalidateCollectionsViews();
+  redirect("/atrasos?payment=1");
 }
 
 export async function recordChaseAttemptAction(formData: FormData) {

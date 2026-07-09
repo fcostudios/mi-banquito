@@ -227,6 +227,7 @@ export const contributionKindSchema = z.enum(["regular", "partial"]);
 export const contributionFormSchema = z.object({
   clientRequestId: uuidString,
   memberId: uuidString,
+  cycleId: uuidString.optional().or(z.literal("")),
   amount: moneyString,
   datedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   paymentSource: contributionSourceSchema.default("cash_in_meeting"),
