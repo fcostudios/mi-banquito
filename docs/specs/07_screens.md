@@ -166,9 +166,8 @@ Target persona: **La Tesorera (P01)** for the bulk of screens. Secondary active 
 
 **SEC05.11 — Registrar pago**
 - **ID:** `SCR-record-repayment` — **Route:** `/prestamos/[id]/pago` — **Goal:** record a repayment with automatic split.
-- **Sections:** loan summary header (outstanding); amount (currency-input); date; slip optional; notes optional; on submit, system shows split breakdown *"Aplicado: USD X a mora/comisiones + USD Y a interés + USD Z a capital"* before confirming.
-- **BR-26 waterfall:** untargeted member payments apply to loan mora/fees, loan interest, loan principal, overdue aportes, current aporte, then stop for a one-tap extra-money decision (`Aporte extra`, `Prepagar aporte`, `Abonar a capital`).
-- **Failure:** over/under per F47 — over → show the one-tap BR-26 extra-money decision; under → confirm partial; multi-cuotas (amount ≥ 2 installments) → confirm.
+- **Sections:** loan summary header (outstanding); amount (currency-input); date; slip optional; notes optional; on submit, system shows split breakdown *"Aplicado: USD X a interés + USD Y a capital"* before confirming.
+- **Failure:** over/under per F47 — over → offer to record excess as `Withdrawal`; under → confirm partial; multi-cuotas (amount ≥ 2 installments) → confirm.
 
 **SEC05.12 — Atrasos**
 - **ID:** `SCR-ar-aging` — **Route:** `/atrasos` — **Goal:** know who to chase first.

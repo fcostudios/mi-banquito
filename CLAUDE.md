@@ -13,7 +13,6 @@ Drizzle, Auth0) — there is no separate backend service or container.
 |------|-------|-----------|
 | **This file (CLAUDE.md)** | Root | Always — architecture rules, current sprint, coding standards |
 | **Sprint plan** | `docs/stories/SPRINT_PLAN.md` | Before picking a story — sprints, status, execution order |
-| **Deferred external blockers** | `docs/stories/DEFERRED_EXTERNAL_BLOCKERS.md` | Before closing Sprint 0 or starting Sprint 1 — account/manual evidence still pending |
 | **Story files** | `docs/stories/` | Before coding — full spec: ACs, API contracts, entity changes, screen wiring |
 | **Screen specs (TOON)** | `docs/screens/` | For UI — `dataSource` tells you which API to call per section |
 | **Architecture** | `docs/specs/09_architecture.md` | For bounded-context structure + API conventions |
@@ -197,17 +196,37 @@ See `docs/decisions/` for full decision history.
 
 Full targets + patterns: [`docs/dev-guide/TESTING.md`](docs/dev-guide/TESTING.md).
 
-## Testing Conventions (MANDATORY)
+## Testing
 
-Full patterns: [`docs/dev-guide/TESTING.md`](docs/dev-guide/TESTING.md)
+**Before writing, modifying, or deleting any test, you MUST read `TESTING.md` in this
+repo and follow it.** The org-wide rationale is in `docs/TEST_EFFECTIVENESS_STANDARD.md`.
+These are hard constraints, not suggestions — a PR that violates them will be rejected.
 
-**Critical gotchas (cause test failures):**
-- Exact URL matching in fetch mocks — `/api/v1/socias` also matches `/api/v1/socias/summary` if not exact.
-- `beforeEach(() => useMyStore.getState().reset())` — prevent Zustand state leakage between tests.
-- `getByRole()` preferred over `getByText()` — more specific and accessible.
-- **Server Components** can't use hooks/state — test them as async functions returning JSX; unit-test client logic in the `"use client"` modules.
-- **Route handlers** (`apps/web/src/app/api/**/route.ts`): assert against a test Drizzle client or a typed mock of `db` — never the production connection.
+Non-negotiable rules (summarized from `TESTING.md` §1):
 
+- **Never use print/log as a test.** `console.log` / `System.out` / `print`, or a test that
+  only checks "does not throw", is NOT an oracle. Every test asserts a property or contract.
+- **Never mock code we own.** Mock ONLY true third-party network boundaries (payments,
+  email/SMS/push, LLM providers). Use Testcontainers or in-memory real implementations for
+  databases, our own services, the event store, and read models. Every third-party mock must
+  be backed by a Pact contract test.
+- **Test aggregates with given/when/then over events:** `GIVEN [past events] WHEN [command]
+  THEN [emitted events | rejection]`. Do not mock the event store.
+- **Use the strongest available oracle** (exact -> property-based -> metamorphic -> differential
+  -> golden). Use property-based tests for all scoring/standings/money math. Do not default to
+  exact-equality on large objects.
+- **Do not write tests to raise coverage.** Coverage is a diagnostic, never a target. The only
+  effectiveness target is the mutation score on critical paths. A new test must kill a mutant
+  that was not previously killed; if it only adds coverage, it is redundant -- do not add it.
+- **Keep tests deterministic:** inject the clock and RNG seed, no live network, no reliance on
+  ordering or timing.
+- **Assert tenant isolation** on every path touching tenant-scoped data.
+
+Scope your test-writing to small, well-specified correctness bugs with clear reproduction and
+expected behavior. Do not spray shallow or heavily-mocked tests to inflate volume -- test volume
+is not a goal and is measured as a cost, not a quality.
+
+When you change logic in a `TESTING.md` §3 critical path, update `TESTING.md` §3 in the same PR.
 
 ## Build Verification Gate
 
@@ -217,6 +236,7 @@ Before marking any story `done`:
 - `pnpm type-check` passes (`tsc --noEmit`, zero errors).
 - `pnpm lint` passes (Next.js lint + the design-system token lints).
 - `pnpm build` succeeds — runs `next build --webpack` (the serverless/PWA bundler).
+- `pnpm test` passes — Vitest across the workspace. Tests must meet the effectiveness bar in [`docs/dev-guide/TESTING.md`](docs/dev-guide/TESTING.md) §4 (real-DB seam tests via the pglite fixture, strongest available oracle; coverage is a diagnostic, never a completion target — TE-1 / R1).
 - `cd packages/db && pnpm drizzle-kit push && node scripts/verify-schema.mjs` applies the Drizzle schema to a fresh database AND verifies it landed (push exits 0 on an unreachable URL — the verifier fails loud on a silent no-op); no duplicate timestamp migrations under `packages/db/src/migrations/`.
 - Report evidence: `{"story":"US-XXX","event":"build_pass",...}` then `{"event":"done",...}`.
 

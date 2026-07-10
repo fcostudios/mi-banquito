@@ -21,12 +21,12 @@ As a treasurer, I want to answer "¿cuánto tengo?" instantly by searching any m
 | Backstage Process | — |
 | Blocked By | US-026, US-031 |
 ## Acceptance Criteria
-- [x] AC-1: `SCR-treasurer-home` (`/`) has a member-picker that accepts a partial name and filters the member list as the treasurer types.
-- [x] AC-2: Selecting a result opens `SCR-member-detail` (`/socias/[id]`) in a single tap.
-- [x] AC-3: On member-detail the current balance is prominent — rendered at 28 px in tabular figures.
-- [x] AC-4: The balance is read from the `mv_member_compliance_state` materialized view (the UI reads the derived view, it does not compute the balance live).
-- [x] AC-5: A "Compartir saldo por WhatsApp" share intent is available from member-detail, pre-filling the share template with the member's name + current balance (`pattern.share-via-whatsapp`).
-- [x] AC-6: The picker is scoped to the treasurer's own group — members of other orgs never appear.
+- [ ] AC-1: `SCR-treasurer-home` (`/`) has a member-picker that accepts a partial name and filters the member list as the treasurer types.
+- [ ] AC-2: Selecting a result opens `SCR-member-detail` (`/socias/[id]`) in a single tap.
+- [ ] AC-3: On member-detail the current balance is prominent — rendered at 28 px in tabular figures.
+- [ ] AC-4: The balance is read from the `mv_member_compliance_state` materialized view (the UI reads the derived view, it does not compute the balance live).
+- [ ] AC-5: A "Compartir saldo por WhatsApp" share intent is available from member-detail, pre-filling the share template with the member's name + current balance (`pattern.share-via-whatsapp`).
+- [ ] AC-6: The picker is scoped to the treasurer's own group — members of other orgs never appear.
 
 ## Technical Notes
 - **Data model:** Read-only. `Member` (name search) + `mv_member_compliance_state` (current balance per member). No new entity / no migration.

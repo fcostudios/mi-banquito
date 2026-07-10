@@ -22,16 +22,12 @@ As a treasurer, I want to confirm the close, so that the period is locked and no
 | Blocked By | US-044, US-045 |
 ## Acceptance Criteria
 
-- [x] AC-1: The `SCR-monthly-close` confirm action writes a `PeriodClose` row for the reconciliation cycle (referencing `reconciliation_cycle_id`); confirm is only available when the cycle is within tolerance (US-044) or has an `annotated_acceptance` resolution (US-045).
-- [x] AC-2: After the `PeriodClose` is written, any subsequent insert OR update of a ledger entry (`Contribution`, `Withdrawal`, `Repayment`, `InterestAccrual`, `Expense`) with `dated_on ≤ PeriodClose.closed_at::date` is rejected — including reversal entries, which must instead be entered in the next open cycle (period-lock invariant, A-ER-12).
-- [x] AC-3: The lock is enforced both at the application layer (pre-flight check) and via a Postgres row trigger (paired with US-070); the trigger is the authoritative guard.
-- [x] AC-4: On success the screen shows the close summary copy — e.g. "Mayo cerrado. Reconciliación: cero discrepancia." for an in-tolerance close, or the annotation summary when the close carried an `annotated_acceptance`.
-- [x] AC-5: Confirming close is idempotent per cycle — a second confirm for an already-closed cycle does not insert a duplicate `PeriodClose` and returns the existing close.
-- [x] AC-6: The `PeriodClose` write and its `AuditLogEntry` insert occur in one DB transaction; an injected audit-write failure rolls back the close (NFR-SEC-04).
-
-## Closeout
-
-Closed in Sprint 5 monthly-close slice. Verified by reconciliation domain tests, schema tests, build checks, and the live June 2026 close/archive.
+- [ ] AC-1: The `SCR-monthly-close` confirm action writes a `PeriodClose` row for the reconciliation cycle (referencing `reconciliation_cycle_id`); confirm is only available when the cycle is within tolerance (US-044) or has an `annotated_acceptance` resolution (US-045).
+- [ ] AC-2: After the `PeriodClose` is written, any subsequent insert OR update of a ledger entry (`Contribution`, `Withdrawal`, `Repayment`, `InterestAccrual`, `Expense`) with `dated_on ≤ PeriodClose.closed_at::date` is rejected — including reversal entries, which must instead be entered in the next open cycle (period-lock invariant, A-ER-12).
+- [ ] AC-3: The lock is enforced both at the application layer (pre-flight check) and via a Postgres row trigger (paired with US-070); the trigger is the authoritative guard.
+- [ ] AC-4: On success the screen shows the close summary copy — e.g. "Mayo cerrado. Reconciliación: cero discrepancia." for an in-tolerance close, or the annotation summary when the close carried an `annotated_acceptance`.
+- [ ] AC-5: Confirming close is idempotent per cycle — a second confirm for an already-closed cycle does not insert a duplicate `PeriodClose` and returns the existing close.
+- [ ] AC-6: The `PeriodClose` write and its `AuditLogEntry` insert occur in one DB transaction; an injected audit-write failure rolls back the close (NFR-SEC-04).
 
 ## Technical Notes
 - **Data model:** `PeriodClose` (1:1 from `ReconciliationCycle` via `results_in`): `reconciliation_cycle_id`, `closed_at`, `closed_by`, summary fields. Append-only (carries `created_by`/`created_by_kind`). Period-lock enforced by the trigger delivered in US-070; if not yet present a timestamp-slug migration per HR-25 (`slug=period_lock_trigger`).

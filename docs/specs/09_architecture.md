@@ -644,7 +644,7 @@ mi-banquito/                     # Turborepo + pnpm workspaces root
 
 ### Configuration & feature flags
 
-- **Environment variables (per Vercel project):** `DATABASE_URL` (Neon connection string), `AUTH0_*` (issuer, client id, client secret, audience, scope), `CRON_SECRET` (shared bearer for cron route handlers), `SENTRY_DSN`, `BLOB_READ_WRITE_TOKEN`.
+- **Environment variables (per Vercel project):** `DATABASE_URL` (Neon connection string), `AUTH0_*` (issuer, client id, client secret, audience, scope), `CRON_SECRET` (shared bearer for cron route handlers), `SENTRY_DSN`, `VERCEL_BLOB_READ_WRITE_TOKEN`.
 - **Feature flags:** R1 ships without a feature-flag service; toggleable behaviors live in `GroupConfig` (e.g., `interest_resolution = daily | per_period`). R2 may adopt a lightweight flag service if needed.
 
 ---
@@ -844,7 +844,7 @@ R1 has **no separate analytics store** — analytical queries (per-org KPIs for 
 ### Secrets management
 
 - All secrets stored as Vercel environment variables (encrypted at rest by Vercel).
-- `DATABASE_URL`, `AUTH0_*`, `CRON_SECRET`, `SENTRY_DSN`, `BLOB_READ_WRITE_TOKEN` — never committed to source.
+- `DATABASE_URL`, `AUTH0_*`, `CRON_SECRET`, `SENTRY_DSN`, `VERCEL_BLOB_READ_WRITE_TOKEN` — never committed to source.
 - Local development uses `.env.local` (gitignored).
 
 ### Encryption
@@ -1514,14 +1514,14 @@ flowchart LR
 
 ## EOY + Multi-group Architecture Delta (CHG-002..008)
 
-> Consolidated architecture impact of the end-of-year + multi-group change set. Detail lives in `09b_business_rules.md` (BR-17..26), `04_er_model.md` (entities), `08_scope.md` (US-100..125), `BR_CONFIG_ARCH_REVIEW_2026-05-31.md` (D-ARCH-1/2/3, ratified), and `CHG_PLAN_eoy_2026-05-31.md`. Executed spec-rebaseline (IMP-230). Composes with IMP-228 (sidebar overflow) + IMP-229 (header active-context chip).
+> Consolidated architecture impact of the end-of-year + multi-group change set. Detail lives in `09b_business_rules.md` (BR-17..25), `04_er_model.md` (entities), `08_scope.md` (US-100..125), `BR_CONFIG_ARCH_REVIEW_2026-05-31.md` (D-ARCH-1/2/3, ratified), and `CHG_PLAN_eoy_2026-05-31.md`. Executed spec-rebaseline (IMP-230). Composes with IMP-228 (sidebar overflow) + IMP-229 (header active-context chip).
 
 ### Business-rule configuration & execution (CHG-002/004; D-ARCH ratified)
 - **Config substrate.** Per-group rule values that are hot/queried stay typed `GroupConfig` columns; the **rule-param long-tail** (`config.mora`, `config.distribution`) lives in a **typed, zod-validated `config jsonb` lane** (add a knob → no migration). Year-end / Assembly-governed params live on **`SurplusGovernanceDecision`** (Tier C); the opaque `GroupConfig.year_end_share_out_formula` is **deprecated**.
-- **Execution.** Rules are pure functions in `packages/domain/rules/*` invoked via a **registry keyed by BR-id**; each receives a frozen `RuleContext` from **`loadConfig(orgId, asOf)`** (resolves version → zod-validates → merges platform defaults; **defaults-at-read**, never backfill a versioned row). **Three temporal modes:** *stamped* (loans), *period-locked / governance-snapshot* (year-end), *per-accrual-day* (mora). Action-time rules such as **BR-26 member payment allocation** receive an explicit obligation snapshot and return stamped allocation lines. All money math `decimal(18,4)`. The **BR-config substrate story (US-100) precedes** the rule stories. (Full contract: 09b §1.)
+- **Execution.** Rules are pure functions in `packages/domain/rules/*` invoked via a **registry keyed by BR-id**; each receives a frozen `RuleContext` from **`loadConfig(orgId, asOf)`** (resolves version → zod-validates → merges platform defaults; **defaults-at-read**, never backfill a versioned row). **Three temporal modes:** *stamped* (loans), *period-locked / governance-snapshot* (year-end), *per-accrual-day* (mora). All money math `decimal(18,4)`. The **BR-config substrate story (US-100) precedes** the rule stories. (Full contract: 09b §1.)
 
 ### New domain processes (extends the Process View)
-`ComputeSurplus` (BR-19) · `RunTwoPoolShareOut` (BR-21 — supersedes single-pool P16/P25) · `SnapshotYearEnd` (BR-18) · mora accrual in the daily cron (BR-17) · `RecordShareOutDisposition` (BR-23) · `AllocateMemberPayment` (BR-26) · **active-group middleware** `ResolveActiveGroup` (BR-25). **Year-end runtime sequence:** `PeriodClose(is_year_end)` → `SnapshotYearEnd` → `ComputeSurplus` → **Assembly governance (set-before-reparto)** → `RunTwoPoolShareOut` → per-member disposition → year-end PDFs + BALANCE BANQUITO.
+`ComputeSurplus` (BR-19) · `RunTwoPoolShareOut` (BR-21 — supersedes single-pool P16/P25) · `SnapshotYearEnd` (BR-18) · mora accrual in the daily cron (BR-17) · `RecordShareOutDisposition` (BR-23) · `Convert... n/a` · **active-group middleware** `ResolveActiveGroup` (BR-25). **Year-end runtime sequence:** `PeriodClose(is_year_end)` → `SnapshotYearEnd` → `ComputeSurplus` → **Assembly governance (set-before-reparto)** → `RunTwoPoolShareOut` → per-member disposition → year-end PDFs + BALANCE BANQUITO.
 
 ### Materialized views / data (extends Data Architecture)
 NEW `mv_loan_activity_points` (Σ(A+B) = principal repaid on own loans **A** + guaranteed non-member loans **B** via `LoanGuarantor`) and `mv_distributable_surplus`; extend `mv_interest_gains_per_fiscal_year`; `mv_available_capital` reflects `reserva→capital` at **next-year open** (O3). Immutable `YearEndBalanceSnapshot` is the point-in-time source for balances + `cxc_anterior`.

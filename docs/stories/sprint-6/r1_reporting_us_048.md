@@ -22,12 +22,12 @@ As a treasurer, I want to produce per-member statements after the monthly close 
 | Blocked By | US-046, US-047 |
 ## Acceptance Criteria
 
-- [x] AC-1: After a `PeriodClose` for the cycle exists, `SCR-statements-archive` (`/estados`) shows a "Generar estados de cuenta de {month}" CTA scoped to that closed period.
-- [x] AC-2: The batch action generates exactly one `monthly_member` PDF per active member of the group via `@react-pdf/renderer`, server-side in a Server Action; each statement contains the member's contributions, withdrawals, and closing balance for the period plus group branding.
-- [x] AC-3: Each generated PDF is hashed over its canonical JSON payload (SHA-256, not over PDF bytes) and persisted as a `StatementArchive` row (`kind=monthly_member`, `member_id` set, `period_label`, `pdf_uri`, `canonical_payload_hash`, `period_close_id`, `created_by_kind=system`).
-- [x] AC-4: A per-member preview is available before/after batch generation; on-demand individual generation is also reachable from `SCR-member-detail` (`/socias/[id]`) for a single member.
-- [x] AC-5: Generation is idempotent — re-running for the same `(org_id, kind, member_id, period_label)` reuses the existing archive (UNIQUE constraint) rather than producing a duplicate; the canonical hash is stable for identical inputs (NFR-PERF-03: P95 < 2 s/PDF).
-- [x] AC-6: `StatementArchive` is append-only — no `UPDATE`/`DELETE`; a regenerate after data change is a new canonical cut. Every generation emits an `AuditLogEntry` in the same transaction.
+- [ ] AC-1: After a `PeriodClose` for the cycle exists, `SCR-statements-archive` (`/estados`) shows a "Generar estados de cuenta de {month}" CTA scoped to that closed period.
+- [ ] AC-2: The batch action generates exactly one `monthly_member` PDF per active member of the group via `@react-pdf/renderer`, server-side in a Server Action; each statement contains the member's contributions, withdrawals, and closing balance for the period plus group branding.
+- [ ] AC-3: Each generated PDF is hashed over its canonical JSON payload (SHA-256, not over PDF bytes) and persisted as a `StatementArchive` row (`kind=monthly_member`, `member_id` set, `period_label`, `pdf_uri`, `canonical_payload_hash`, `period_close_id`, `created_by_kind=system`).
+- [ ] AC-4: A per-member preview is available before/after batch generation; on-demand individual generation is also reachable from `SCR-member-detail` (`/socias/[id]`) for a single member.
+- [ ] AC-5: Generation is idempotent — re-running for the same `(org_id, kind, member_id, period_label)` reuses the existing archive (UNIQUE constraint) rather than producing a duplicate; the canonical hash is stable for identical inputs (NFR-PERF-03: P95 < 2 s/PDF).
+- [ ] AC-6: `StatementArchive` is append-only — no `UPDATE`/`DELETE`; a regenerate after data change is a new canonical cut. Every generation emits an `AuditLogEntry` in the same transaction.
 
 ## Technical Notes
 - **Data model:** `StatementArchive` (`reporting_context`, append-only) — `kind=monthly_member`, `member_id`, `period_label`, `pdf_uri`, `canonical_payload_hash` UNIQUE(org_id, kind, member_id, period_label), `period_close_id` FK, `byte_size`, `created_by_kind=system`. No new migration if the table already exists; otherwise timestamp-slug per HR-25.

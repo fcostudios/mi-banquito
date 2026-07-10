@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es-EC">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mis grupos — Mi Banquito</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" defer></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js" defer></script>
+  <script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter'],
+        mono: ['IBM Plex Mono'],
+      },
+      colors: {
+        primary: {
+          50: '#eaf2ed',
+          100: '#d5e4dc',
+          200: '#abcab9',
+          300: '#81af95',
+          400: '#579572',
+          500: '#2D7A4F',
+          600: '#286e47',
+          700: '#24623f',
+          800: '#205537',
+          900: '#1b492f'
+        },
+        accent: {
+          DEFAULT: '#C45F36'
+        },
+        gray: {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a'
+        },
+        // slate is an alias of gray so existing slate-* classes use the same neutral palette
+        slate: {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a'
+        },
+        success: '#15803D',
+        warning: '#C2410C',
+        error: '#B91C1C',
+        info: '#B45309',
+      },
+      boxShadow: {
+        sm: '0 1px 2px rgba(15,23,42,0.06)',
+        md: '0 2px 8px rgba(15,23,42,0.08)',
+        lg: '0 10px 15px rgba(0,0,0,0.10)',
+        xl: '0 20px 25px rgba(0,0,0,0.12)',
+      },
+    },
+  },
+};
+</script>
+  <style>
+    /* ── Design tokens (matches /src/styles/tokens.css) ─────────────────── */
+    :root {
+      --color-primary:     #2D7A4F;
+      --color-primary-50: #eaf2ed;
+      --color-primary-100: #d5e4dc;
+      --color-primary-200: #abcab9;
+      --color-primary-300: #81af95;
+      --color-primary-400: #579572;
+      --color-primary-500: #2D7A4F;
+      --color-primary-600: #286e47;
+      --color-primary-700: #24623f;
+      --color-primary-800: #205537;
+      --color-primary-900: #1b492f;
+      --color-accent:      #C45F36;
+      --color-secondary:   #1E5180;
+      --color-success: #15803D;
+      --color-warning: #C2410C;
+      --color-error: #B91C1C;
+      --color-info: #B45309;
+      --color-background: #F8F4E9;
+      --color-surface: #FFFFFF;
+      --color-surface-muted: #E2E8F0;
+      --color-border: #CBD5E1;
+      --color-text-primary: #0F172A;
+      --color-text-secondary: #475569;
+      --color-text-on-primary: #F8F4E9;
+      --font-sans: Inter;
+      --font-mono: IBM Plex Mono;
+      --font-size-body: 18px;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+      --radius-full: 9999px;
+      --shadow-none: 0 0 transparent;
+      --shadow-sm: 0 1px 2px rgba(15,23,42,0.06);
+      --shadow-md: 0 2px 8px rgba(15,23,42,0.08);
+      --transition-fast: 120ms;
+      --transition-normal: 180ms;
+    }
+    /* ── IMP-209 I10 — notebook card style (flat; no heavy shadow/gradient) ── */
+    .rounded-xl { border-radius: var(--radius-md, 0.5rem) !important; }
+    .rounded-2xl, .rounded-3xl { border-radius: var(--radius-lg, 0.75rem) !important; }
+    .shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: none !important; }
+    .hover\:shadow-sm:hover, .hover\:shadow:hover, .hover\:shadow-md:hover,
+    .hover\:shadow-lg:hover, .hover\:shadow-xl:hover { box-shadow: none !important; }
+    .border-slate-200 { border-color: var(--color-border, #e2e8f0) !important; }
+    /* notebook bans gradients: neutralize gradient utilities + inline gradient heroes */
+    [class*="bg-gradient-"] { background-image: none !important; }
+    /* I15 — notebook primitive: faint ruled-paper lines on the canvas (behind cards). */
+    body { background-image: repeating-linear-gradient(
+        var(--color-background, #f8f4e9) 0 31px,
+        color-mix(in srgb, var(--color-primary, #2d7a4f) 7%, transparent) 31px 32px) !important; }
+
+    /* ── IMP-209 I11 — comfortable density (larger content type) ── */
+    main .text-xs { font-size: 0.8125rem !important; }
+    main .text-sm { font-size: 1rem !important; line-height: 1.5rem !important; }
+    main table td { font-size: 1rem !important; }
+    main label { font-size: 1rem !important; }
+
+    /* ── IMP-209 I12 — sidebar shell hover/active tint from brand primary ── */
+    aside [data-sidebar-item]:hover { background-color: var(--color-primary-50, #f1f5f9) !important; }
+
+    /* ── IMP-209 I14 — deliberate-ledger wizard (signing-a-document calm) ── */
+    [id*="_circle_"] { border-radius: var(--radius-sm, 4px) !important;
+        box-shadow: none !important; border-width: 1px !important; }
+    [id*="_circle_"] + span, [id*="_circle_"] ~ span { letter-spacing: 0.01em; }
+    /* ── Base ──────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      /* IMP-208 I02 — body canvas reads project's --color-background token
+       * (e.g. cream #F8F4E9 for Mi Banquito); falls back to neutral slate. */
+      background: var(--color-background, #f8fafc);
+      color: var(--color-text-primary, var(--color-gray-900, #0f172a));
+      /* IMP-208 I02 — body size honors project token (default_body_size_px).
+       * Fallback raised to 18px so brands that intentionally use a larger
+       * baseline (Mi Banquito; accessibility-first projects) don't collapse
+       * to a smaller default if the CSS var fails to resolve. Inter renders
+       * 16px → 17px more legibly anyway, so 18px is a strictly-better
+       * default for unspec'd projects. */
+      font-size: var(--font-size-body, 18px);
+    }
+    code, pre, .font-mono { font-family: var(--font-mono); }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    @keyframes shimmer {
+      0%   { background-position: -200% 0; }
+      100% { background-position:  200% 0; }
+    }
+    .skeleton {
+      background: linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s ease-in-out infinite;
+      border-radius: 4px;
+    }
+    /* Focus ring (matches --focus-ring-color) */
+    :focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+  </style>
+</head>
+<body class="overflow-x-hidden antialiased">
+<link rel="stylesheet" href="./nous-runtime.css">
+<script>
+  window.NOUS_CONTEXT = Object.freeze({
+  "screen": "SCR-group-picker",
+  "route": "/grupos",
+  "flows": [],
+  "roles": [
+    "tesorera"
+  ],
+  "lang": "es-EC",
+  "messages": {},
+  "generated_at": "2026-06-02T11:58:21Z",
+  "change_id": null
+});
+</script>
+<script src="./nous-runtime.js"></script>
+<script>window.NOUS_MODAL_CACHE = {};</script>
+
+<!-- IMP-208 I02 — body palette comes from project tokens via the inline style block (--color-background / --color-text-primary). The hardcoded bg-gray-50 / text-gray-900 was masking the project's brand canvas. -->
+
+
+<header class="w-full border-b border-[color:var(--color-border,#e2e8f0)] bg-[color:var(--color-surface,#ffffff)]"><div class="max-w-5xl mx-auto px-6"><div class="flex items-center justify-between h-16"><div class="flex items-center gap-3"><a href="SCR-treasurer-home.html" class="flex items-center gap-2.5 no-underline"><div class="w-9 h-9 rounded-lg bg-[color:var(--color-primary,#2d7a4f)] flex items-center justify-center text-white"><i data-lucide="BookOpen" class="w-5 h-5 text-white"></i></div><div class="leading-tight"><span class="text-lg font-bold" style="color:var(--color-text-primary,#0f172a)">Mi Banquito</span></div></a><details data-nous-context class="relative inline-flex items-center"><summary aria-label="Cambiar grupo" class="list-none cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[color:var(--color-border,#e2e8f0)] bg-[color:var(--color-surface,#ffffff)] text-sm text-slate-700 hover:bg-slate-50 select-none"><i data-lucide="Users" class="w-4 h-4"></i><span class="font-medium">Banquito El Valle</span><i data-lucide="ChevronDown" class="w-3.5 h-3.5"></i></summary><div role="menu" aria-label="Cambiar grupo" class="absolute left-0 top-full mt-1 z-50 min-w-[13rem] rounded-lg border border-[color:var(--color-border,#e2e8f0)] bg-[color:var(--color-surface,#ffffff)] shadow-lg p-1.5"><div class="px-2 pt-1 pb-1.5 text-[11px] uppercase tracking-wide text-slate-400">Cambiar grupo</div><button type="button" role="menuitemradio" aria-checked="true" class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm rounded-md text-[color:var(--color-primary,#2d7a4f)] font-semibold bg-slate-50"><span>Banquito El Valle</span><i data-lucide="Check" class="w-3.5 h-3.5 ml-auto"></i></button><button type="button" role="menuitemradio" aria-checked="false" class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm rounded-md text-slate-700 hover:bg-slate-50"><span>Banquito Las Peñas</span></button><button type="button" role="menuitemradio" aria-checked="false" class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm rounded-md text-slate-700 hover:bg-slate-50"><span>Banquito La Dolorosa</span></button></div></details></div><div class="flex items-center gap-3"><div class="flex items-center gap-0.5 bg-slate-100 rounded-md p-0.5" role="group"><button class="px-2 py-1 rounded text-[11px] font-semibold text-slate-500">EN</button><button class="px-2 py-1 rounded text-[11px] font-semibold bg-[color:var(--color-primary,#2d7a4f)] text-white">ES</button></div><button type="button" aria-label="Notificaciones" class="relative p-2 rounded-lg hover:bg-slate-100 text-slate-500"><i data-lucide="Bell" class="w-5 h-5"></i><span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span></button><div class="w-8 h-8 rounded-full bg-[color:var(--color-primary,#2d7a4f)] text-white flex items-center justify-center text-xs font-semibold">FL</div></div></div><nav data-nous-sidebar class="flex items-center gap-6 overflow-x-auto hide-scrollbar -mb-px" aria-label="Navegación"><a href="SCR-treasurer-home.html" data-route="SCR-treasurer-home" class="inline-flex items-center gap-1.5 px-1 py-3 text-base no-underline transition-colors text-slate-600 hover:text-[color:var(--color-primary,#2d7a4f)] border-b-2 border-transparent"><i data-lucide="Home" class="w-4 h-4"></i><span>Inicio</span></a><a href="SCR-members-list.html" data-route="SCR-members-list" class="inline-flex items-center gap-1.5 px-1 py-3 text-base no-underline transition-colors text-slate-600 hover:text-[color:var(--color-primary,#2d7a4f)] border-b-2 border-transparent"><i data-lucide="Users" class="w-4 h-4"></i><span>Socias</span></a><a href="SCR-contributions-cycle.html" data-route="SCR-contributions-cycle" class="inline-flex items-center gap-1.5 px-1 py-3 text-base no-underline transition-colors text-slate-600 hover:text-[color:var(--color-primary,#2d7a4f)] border-b-2 border-transparent"><i data-lucide="Wallet" class="w-4 h-4"></i><span>Aportes</span></a><a href="SCR-record-base-fund-quota.html" data-route="SCR-record-base-fund-quota" class="inline-flex items-center gap-1.5 px-1 py-3 text-base no-underline transition-colors text-slate-600 hover:text-[color:var(--color-primary,#2d7a4f)] border-b-2 border-transparent"><i data-lucide="Banknote" class="w-4 h-4"></i><span>Cuota base</span></a><a href="SCR-loans-list.html" data-route="SCR-loans-list" class="inline-flex items-center gap-1.5 px-1 py-3 text-base no-underline transition-colors text-slate-600 hover:text-[color:var(--color-primary,#2d7a4f)] border-b-2 border-transparent"><i data-lucide="HandCoins" class="w-4 h-4"></i><span>Préstamos</span></a><a href="SCR-ar-aging.html" data-route="SCR-ar-aging" class="inline-flex items-center gap-1.5 px-1 py-3 text-base no-underline transition-colors text-slate-600 hover:text-[color:var(--color-primary,#2d7a4f)] border-b-2 border-transparent"><i data-lucide="AlertCircle" class="w-4 h-4"></i><span>Atrasos</span></a><details data-nous-more class="relative inline-flex items-center"><summary class="list-none cursor-pointer inline-flex items-center gap-1 px-1 py-3 text-base text-slate-600 hover:text-[color:var(--color-primary,#2d7a4f)] select-none" aria-label="Más"><span>Más</span><i data-lucide="ChevronDown" class="w-4 h-4"></i></summary><div role="menu" class="absolute right-0 top-full mt-1 z-50 min-w-[14rem] rounded-lg border border-[color:var(--color-border,#e2e8f0)] bg-[color:var(--color-surface,#ffffff)] shadow-lg p-1.5"><a href="SCR-history.html" data-route="SCR-history" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm no-underline rounded-md text-slate-700 hover:bg-slate-50"><i data-lucide="History" class="w-4 h-4"></i><span>Historial</span></a><a href="SCR-accounts.html" data-route="SCR-accounts" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm no-underline rounded-md text-slate-700 hover:bg-slate-50"><i data-lucide="Banknote" class="w-4 h-4"></i><span>Cuentas del grupo</span></a><a href="SCR-solidarity-collection.html" data-route="SCR-solidarity-collection" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm no-underline rounded-md text-slate-700 hover:bg-slate-50"><i data-lucide="HandCoins" class="w-4 h-4"></i><span>Colecta solidaria</span></a><a href="SCR-monthly-close.html" data-route="SCR-monthly-close" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm no-underline rounded-md text-slate-700 hover:bg-slate-50"><i data-lucide="CheckCircle2" class="w-4 h-4"></i><span>Cierre del mes</span></a><a href="SCR-statements-archive.html" data-route="SCR-statements-archive" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm no-underline rounded-md text-slate-700 hover:bg-slate-50"><i data-lucide="FileText" class="w-4 h-4"></i><span>Estados de cuenta</span></a><a href="SCR-cash-flow-projection.html" data-route="SCR-cash-flow-projection" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm no-underline rounded-md text-slate-700 hover:bg-slate-50"><i data-lucide="LineChart" class="w-4 h-4"></i><span>Liquidez proyectada</span></a><a href="SCR-year-end-share-out.html" data-route="SCR-year-end-share-out" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm no-underline rounded-md text-slate-700 hover:bg-slate-50"><i data-lucide="PiggyBank" class="w-4 h-4"></i><span>Reparto fin de año</span></a><a href="SCR-balance-banquito.html" data-route="SCR-balance-banquito" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm no-underline rounded-md text-slate-700 hover:bg-slate-50"><i data-lucide="Scale" class="w-4 h-4"></i><span>Balance del banquito</span></a><div class="my-1 border-t border-slate-100"></div><a href="SCR-group-config.html" data-route="SCR-group-config" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm no-underline rounded-md text-slate-700 hover:bg-slate-50"><i data-lucide="Settings" class="w-4 h-4"></i><span>Mi grupo</span></a></div></details></nav></div></header>
+
+
+
+<!-- Main content -->
+<main class="max-w-5xl mx-auto px-6 py-8 min-h-screen" role="main" id="main-content" data-modal-content>
+  <div class="p-6">
+    <div class="flex items-center justify-between mb-6"><div><div class="flex items-center gap-2 mb-0.5"><h1 class="text-xl font-bold text-slate-900">Mis grupos</h1></div></div><div class="flex items-center gap-2"><button  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"><i data-lucide="download" class="w-4 h-4"></i>Exportar</button></div></div><div class="grid grid-cols-12 gap-4"><div class="col-span-full" data-section="picker_intro"><div class="rounded-xl border bg-sky-50 border-sky-200 text-sky-900 [&_i]:text-sky-600 px-5 py-4"><div class="flex items-start gap-3"><i data-lucide="users" class="w-5 h-5 mt-0.5 shrink-0"></i><div class="flex-1 min-w-0"><h3 class="text-sm font-semibold mb-1">¿Qué grupo vas a administrar?</h3><p class="text-sm leading-relaxed">Manejas más de un banquito. Elige uno para entrar — todo lo que registres quedará dentro de ese grupo. Puedes cambiar de grupo en cualquier momento desde la barra superior.</p></div></div></div></div>
+<div class="col-span-full" data-section="groups_table"><h3 class="text-sm font-semibold text-slate-900 mb-3">Tus banquitos</h3><div class="bg-white rounded-xl border border-slate-200 overflow-hidden"><div class="overflow-x-auto"><table class="w-full"><thead class="bg-slate-50 border-b border-slate-200"><tr><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap  ">Grupo<i data-lucide="chevron-down" class="w-3 h-3 inline ml-0.5 opacity-50"></i></th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap  ">Tu rol<i data-lucide="chevron-down" class="w-3 h-3 inline ml-0.5 opacity-50"></i></th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap  ">Última actividad<i data-lucide="chevron-down" class="w-3 h-3 inline ml-0.5 opacity-50"></i></th></tr></thead><tbody><tr class="hover:bg-slate-50 border-b border-slate-100  motion-row-pressable cursor-pointer" onclick="window.location.href='SCR-treasurer-home.html'"><td class="px-4 py-3 whitespace-nowrap "><span class="text-sm text-slate-700">Banquito El Valle</span></td><td class="px-4 py-3 whitespace-nowrap "><span class="text-sm text-slate-700">Tesorera</span></td><td class="px-4 py-3 whitespace-nowrap "><span class="text-sm text-slate-700">2026-05-28</span></td></tr><tr class="hover:bg-slate-50 border-b border-slate-100  motion-row-pressable cursor-pointer" onclick="window.location.href='SCR-treasurer-home.html'"><td class="px-4 py-3 whitespace-nowrap "><span class="text-sm text-slate-700">Banquito Las Peñas</span></td><td class="px-4 py-3 whitespace-nowrap "><span class="text-sm text-slate-700">Tesorera</span></td><td class="px-4 py-3 whitespace-nowrap "><span class="text-sm text-slate-700">2026-05-26</span></td></tr><tr class="hover:bg-slate-50 border-b border-slate-100  motion-row-pressable cursor-pointer" onclick="window.location.href='SCR-treasurer-home.html'"><td class="px-4 py-3 whitespace-nowrap "><span class="text-sm text-slate-700">Banquito La Dolorosa</span></td><td class="px-4 py-3 whitespace-nowrap "><span class="text-sm text-slate-700">Tesorera</span></td><td class="px-4 py-3 whitespace-nowrap "><span class="text-sm text-slate-700">2026-05-20</span></td></tr></tbody></table></div><div class="flex items-center justify-between px-4 py-3 border-t border-slate-200"><p class="text-xs text-slate-500">Mostrando 3 de 47 resultados</p><div class="flex gap-2"><button class="px-3 py-1 text-xs border border-slate-300 rounded hover:bg-slate-50">Anterior</button><button class="px-3 py-1 text-xs bg-primary-500 text-white rounded hover:bg-primary-600">Siguiente</button></div></div></div></div></div>
+  </div>
+</main>
+
+
+
+<!-- Generated: 2026-06-02T11:58:21Z -->
+<!-- Source: SCR-group-picker | Locale: es-EC -->
+
+<script>
+// Initialize Lucide icons
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.lucide) lucide.createIcons();
+  // IMP-208 Sprint 2.T — conditional rendering evaluator.
+  // Watches form-field changes and toggles [hidden] on sections that
+  // declare a `data-conditional-on="<field_id> == 'value'"` attribute.
+  // Supports simple equality + && conjunction. Default: section is hidden
+  // when the predicate is false, visible when true.
+  // Resolve a field's CURRENT value (checked radio in a group, else element value).
+  function fieldValue(fieldId) {
+    var radios = document.querySelectorAll('[name="'+fieldId+'"]');
+    if (radios.length) {
+      for (var i=0;i<radios.length;i++){ if (radios[i].checked) return radios[i].value; }
+      // no radio checked yet → unresolved
+      return null;
+    }
+    var el = document.getElementById(fieldId) || document.querySelector('[data-field="'+fieldId+'"]');
+    return el ? el.value : null;
+  }
+  function firstField(expr) {
+    var m = (expr||'').match(/^([\w.]+)/);
+    return m ? m[1] : '';
+  }
+  function condMatches(expr) {
+    if (!expr) return true;
+    var parts = expr.split('&&').map(function(s){return s.trim();});
+    return parts.every(function(part){
+      var m = part.match(/^([\w.]+)\s*(==|!=)\s*['"]?([\w.\-_]+)['"]?$/);
+      if (!m) return true;
+      var v = fieldValue(m[1]);
+      if (v === null) return false;           // unresolved → not a match (fail-closed)
+      return m[2] === '==' ? v === m[3] : v !== m[3];
+    });
+  }
+  // Group-aware reveal: for each field, show exactly ONE conditional branch —
+  // the matching one, or (if the field is unresolved at load) the first in the group.
+  function applyConditionals() {
+    var groups = {};
+    document.querySelectorAll('[data-conditional-on]').forEach(function(sec){
+      var f = firstField(sec.getAttribute('data-conditional-on'));
+      (groups[f] = groups[f] || []).push(sec);
+    });
+    Object.keys(groups).forEach(function(f){
+      var secs = groups[f];
+      var resolved = fieldValue(f) !== null;
+      var shownOne = false;
+      secs.forEach(function(sec){
+        var ok = condMatches(sec.getAttribute('data-conditional-on'));
+        if (ok) { sec.removeAttribute('hidden'); shownOne = true; }
+        else sec.setAttribute('hidden','');
+      });
+      // Field unresolved (nothing checked) → reveal the first branch so the screen
+      // is never blank; user selection then switches via the change handler.
+      if (!resolved && !shownOne && secs.length) secs[0].removeAttribute('hidden');
+    });
+  }
+  // IMP-217 — conditional REQUIREDNESS. A field carrying
+  // data-required-when="<field> == '<value>'" is always visible but becomes
+  // `required` only when the predicate holds. Reuses fieldValue()/condMatches()
+  // (the same evaluator as visibility conditionals) so the two compose. Toggles
+  // the control's `required` attribute + an id-linked asterisk span
+  // (data-req-star-for="<id>") so the label gains/loses its "*".
+  function applyRequiredConditionals() {
+    document.querySelectorAll('[data-required-when]').forEach(function(ctl){
+      var expr = ctl.getAttribute('data-required-when') || '';
+      var match = condMatches(expr);   // fail-closed false on unresolved controller
+      ctl.toggleAttribute('required', match);
+      var star = document.querySelector('[data-req-star-for="' + (ctl.id || '') + '"]');
+      if (star) star.classList.toggle('hidden', !match);
+    });
+  }
+  document.addEventListener('change', applyConditionals);
+  document.addEventListener('input', applyConditionals);
+  document.addEventListener('change', applyRequiredConditionals);
+  document.addEventListener('input', applyRequiredConditionals);
+  setTimeout(applyConditionals, 50);
+  setTimeout(applyRequiredConditionals, 50);
+});
+
+// Command palette toggle
+function toggleCommandPalette() {
+  var el = document.getElementById('command-palette');
+  if (el) el.classList.toggle('hidden');
+}
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    toggleCommandPalette();
+  }
+  if (e.key === 'Escape') {
+    var el = document.getElementById('command-palette');
+    if (el) el.classList.add('hidden');
+  }
+});
+
+// Tab switching
+function switchTab(tabId, idx) {
+  var buttons = document.querySelectorAll('[id^="btn-' + tabId + '_"]');
+  var panels = document.querySelectorAll('[id^="panel-' + tabId + '_"]');
+  buttons.forEach(function(b, i) {
+    if (i === idx) {
+      b.classList.add('border-b-2', 'border-primary-500', 'text-primary-600', 'font-semibold');
+      b.classList.remove('text-slate-500');
+    } else {
+      b.classList.remove('border-b-2', 'border-primary-500', 'text-primary-600', 'font-semibold');
+      b.classList.add('text-slate-500');
+    }
+  });
+  panels.forEach(function(p, i) {
+    p.classList.toggle('hidden', i !== idx);
+    p.classList.toggle('block', i === idx);
+  });
+  if (window.lucide) lucide.createIcons();
+}
+
+// Wizard navigation
+function updateWizardIndicator(wizardId, activeIdx) {
+  var circles = document.querySelectorAll('[id^="' + wizardId + '_circle_"]');
+  var base = 'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold';
+  var labelBase = 'text-[11px] hidden sm:block text-center max-w-[72px] leading-tight';
+  circles.forEach(function(c, i) {
+    c.className = base + (i === activeIdx
+      ? ' bg-primary-500 text-white shadow-sm ring-2 ring-primary-200'
+      : ' bg-white text-slate-500 border-2 border-slate-300');
+    var parent = c.parentElement;
+    if (parent) {
+      var lbl = parent.querySelector('span');
+      if (lbl) {
+        lbl.className = labelBase + (i === activeIdx ? ' text-primary-600 font-semibold' : ' text-slate-400');
+      }
+    }
+  });
+}
+function wizardNext(wizardId) {
+  var steps = document.querySelectorAll('[id^="' + wizardId + '_step_"]');
+  for (var i = 0; i < steps.length - 1; i++) {
+    if (!steps[i].classList.contains('hidden')) {
+      steps[i].classList.add('hidden');
+      steps[i].classList.remove('block');
+      steps[i+1].classList.remove('hidden');
+      steps[i+1].classList.add('block');
+      updateWizardIndicator(wizardId, i + 1);
+      var pbN = document.getElementById('wizard_prev_btn'); if (pbN) pbN.hidden = false;
+      break;
+    }
+  }
+}
+function wizardPrev(wizardId) {
+  var steps = document.querySelectorAll('[id^="' + wizardId + '_step_"]');
+  for (var i = 1; i < steps.length; i++) {
+    if (!steps[i].classList.contains('hidden')) {
+      steps[i].classList.add('hidden');
+      steps[i].classList.remove('block');
+      steps[i-1].classList.remove('hidden');
+      steps[i-1].classList.add('block');
+      updateWizardIndicator(wizardId, i - 1);
+      var pbP = document.getElementById('wizard_prev_btn'); if (pbP) pbP.hidden = (i - 1 === 0);
+      break;
+    }
+  }
+}
+</script>
+<style data-imp="IMP-160-motion-catalog">.motion-modal>summary~*{opacity:0;transform:translateY(-4px);transition:opacity 180ms cubic-bezier(0.2, 0, 0, 1),transform 180ms cubic-bezier(0.2, 0, 0, 1)}.motion-modal[open]>summary~*{opacity:1;transform:none}.motion-modal.motion-modal-ring{box-shadow:0 0 0 4px rgba(252,211,77,.55),0 0 0 6px rgba(252,211,77,.25)}.motion-row-pressable{cursor:pointer;transition:background-color 220ms cubic-bezier(0.2, 0, 0, 1)}.motion-row-pressed{background-color:rgba(254,243,199,.6)!important}.motion-row-chevron{display:inline-flex;align-items:center;margin-left:.5rem;color:#94a3b8;transition:transform 160ms cubic-bezier(0.2, 0, 0, 1)}tr:hover .motion-row-chevron{transform:translateX(3px)}.motion-card-pressable{cursor:pointer;transition:transform 90ms cubic-bezier(0.2, 0, 0, 1)}.motion-card-pressed{transform:scale(.97)}.motion-btn-pressable{transition:transform 70ms cubic-bezier(0.2, 0, 0, 1)}.motion-btn-pressed{transform:scale(.96)}body.motion-page-leaving{opacity:.6;transition:opacity 160ms cubic-bezier(0.4, 0, 1, 1)}@media (prefers-reduced-motion: reduce){.motion-modal>summary~*,.motion-modal[open]>summary~*,.motion-row-pressable,.motion-row-chevron,.motion-card-pressable,.motion-btn-pressable,body.motion-page-leaving{transition:none!important;animation:none!important;transform:none!important}}</style><script data-imp="IMP-160-wiring">(function(){var I=[{"selector":"[data-section=\"groups_table\"] tbody tr","kind":"row","navigate_to":"SCR-treasurer-home"}];var R=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;function openModal(id){var d=document.querySelector('details[data-section="'+id+'"]');if(!d)d=document.querySelector('details[data-section="'+id+'__default"]');if(!d)d=document.querySelector('details[data-section^="'+id+'__"]');if(!d)return;d.classList.add("motion-modal");d.open=true;var r=d.getBoundingClientRect();window.scrollTo({top:r.top+window.scrollY-80,behavior:R?"auto":"smooth"});d.classList.add("motion-modal-ring");setTimeout(function(){d.classList.remove("motion-modal-ring")},R?0:1400);}function navigate(scr){var delay=R?0:160;document.body.classList.add("motion-page-leaving");setTimeout(function(){window.location.href=scr+".html"},delay);}function press(el,cls,ms){if(R)return;el.classList.add(cls);setTimeout(function(){el.classList.remove(cls)},ms);}function wireRow(tr,i){var ex=(i.exclude_targets||["A","BUTTON"]).map(function(s){return s.toUpperCase()});tr.addEventListener("click",function(ev){var t=ev.target;while(t&&t!==tr){if(ex.indexOf((t.tagName||"").toUpperCase())>=0)return;t=t.parentNode}var hold=R?0:140;tr.classList.add("motion-row-pressed");setTimeout(function(){tr.classList.remove("motion-row-pressed");if(i.opens_modal)openModal(i.opens_modal);else if(i.navigate_to)navigate(i.navigate_to);},hold);});var td=tr.querySelector("td:last-child");if(td&&!td.querySelector(".motion-row-chevron")){var c=document.createElement("span");c.className="motion-row-chevron";c.innerHTML="\u203A";td.appendChild(c)}}function wire(){I.forEach(function(i){var els=document.querySelectorAll(i.selector);els.forEach(function(el){el.style.cursor="pointer";if(i.kind==="row"){wireRow(el,i);return}var pressCls=i.kind==="card"?"motion-card-pressed":"motion-btn-pressed";var pressMs=i.kind==="card"?90:70;el.addEventListener("mousedown",function(){press(el,pressCls,pressMs)});el.addEventListener("click",function(ev){ev.preventDefault();if(i.opens_modal)openModal(i.opens_modal);else if(i.navigate_to)navigate(i.navigate_to);})})})}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",wire)}else{wire()}})();</script></body>
+</html>

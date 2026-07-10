@@ -20,11 +20,11 @@
 As a treasurer, I want the system to alert me when the projected cash flow dips below the group's safety margin, so that I can act before the banquito runs short of liquidity.
 
 ## Acceptance Criteria
-- [x] AC-1: The emitter runs **post-commit on `ProjectCashFlow` (P9)** — i.e. whenever the `liquidez_proyectada` projection is (re)materialized.
-- [x] AC-2: If **any** monthly projection across the 12-month horizon falls below `GroupConfig.config.safety_margin_amount`, an `Alert` row is written with `kind = A4`, `severity = high`, `audience = treasurer`.
-- [x] AC-3: The alert copy is in Spanish and cites the **specific month** that breached and the **shortfall amount** (margin − projected) for that month.
-- [x] AC-4: De-dup honors `dedup_window = 7d` — the engine suppresses a duplicate by the natural key `(org_id, alert_kind=A4, subject_id, window)` so a re-projection within 7 days does not re-emit the same breach.
-- [x] AC-5: When a later P9 projection shows all 12 months at/above the margin, no new A4 is emitted (resolution is implicit; the bell stops surfacing it once outside the window).
+- [ ] AC-1: The emitter runs **post-commit on `ProjectCashFlow` (P9)** — i.e. whenever the `liquidez_proyectada` projection is (re)materialized.
+- [ ] AC-2: If **any** monthly projection across the 12-month horizon falls below `GroupConfig.config.safety_margin_amount`, an `Alert` row is written with `kind = A4`, `severity = high`, `audience = treasurer`.
+- [ ] AC-3: The alert copy is in Spanish and cites the **specific month** that breached and the **shortfall amount** (margin − projected) for that month.
+- [ ] AC-4: De-dup honors `dedup_window = 7d` — the engine suppresses a duplicate by the natural key `(org_id, alert_kind=A4, subject_id, window)` so a re-projection within 7 days does not re-emit the same breach.
+- [ ] AC-5: When a later P9 projection shows all 12 months at/above the margin, no new A4 is emitted (resolution is implicit; the bell stops surfacing it once outside the window).
 
 ## Technical Notes
 - **Data model:** Append-only `Alert` (`alerts_context`). Reads the `liquidez_proyectada` materialized view (PRIN-07) and `GroupConfig.config.safety_margin_amount`. No migration (A4 is an existing alert kind in the 14-kind catalogue, `03b §6`).
