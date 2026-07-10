@@ -193,11 +193,18 @@ export const contribution = pgTable("contribution", {
   reverseReason: text("reverse_reason"),
   adjustmentCycleId: uuid("adjustment_cycle_id").references((): AnyPgColumn => reconciliationCycle.id),
   clientRequestId: uuid("client_request_id"),
-  paymentReceiptId: uuid("payment_receipt_id").references((): AnyPgColumn => paymentReceipt.id),
+  paymentReceiptId: uuid("payment_receipt_id"),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
-});
+}, (table) => [
+  unique("uq_contribution_org_member_receipt_id").on(table.orgId, table.memberId, table.paymentReceiptId, table.id),
+  foreignKey({
+    name: "fk_contribution_payment_receipt_org_member",
+    columns: [table.orgId, table.memberId, table.paymentReceiptId],
+    foreignColumns: [paymentReceipt.orgId, paymentReceipt.memberId, paymentReceipt.id],
+  }),
+]);
 
 export const withdrawal = pgTable("withdrawal", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -287,8 +294,8 @@ export const paymentAllocation = pgTable("payment_allocation", {
   loanScheduleId: uuid("loan_schedule_id").references((): AnyPgColumn => loanSchedule.id),
   loanFeeId: uuid("loan_fee_id").references((): AnyPgColumn => loanFee.id),
   cycleId: uuid("cycle_id").references((): AnyPgColumn => contributionCycle.id),
-  repaymentId: uuid("repayment_id").references((): AnyPgColumn => repayment.id),
-  contributionId: uuid("contribution_id").references((): AnyPgColumn => contribution.id),
+  repaymentId: uuid("repayment_id"),
+  contributionId: uuid("contribution_id"),
   brId: text("br_id").notNull(),
   groupConfigVersion: integer("group_config_version").notNull(),
   createdAt: timestamp("created_at").notNull(),
@@ -297,6 +304,16 @@ export const paymentAllocation = pgTable("payment_allocation", {
     name: "fk_payment_allocation_receipt_org_member",
     columns: [table.orgId, table.memberId, table.receiptId],
     foreignColumns: [paymentReceipt.orgId, paymentReceipt.memberId, paymentReceipt.id],
+  }),
+  foreignKey({
+    name: "fk_payment_allocation_contribution_org_member_receipt",
+    columns: [table.orgId, table.memberId, table.receiptId, table.contributionId],
+    foreignColumns: [contribution.orgId, contribution.memberId, contribution.paymentReceiptId, contribution.id],
+  }),
+  foreignKey({
+    name: "fk_payment_allocation_repayment_org_member_receipt",
+    columns: [table.orgId, table.memberId, table.receiptId, table.repaymentId],
+    foreignColumns: [repayment.orgId, repayment.memberId, repayment.paymentReceiptId, repayment.id],
   }),
 ]);
 
@@ -479,11 +496,18 @@ export const repayment = pgTable("repayment", {
   reverseReason: text("reverse_reason"),
   adjustmentCycleId: uuid("adjustment_cycle_id").references((): AnyPgColumn => reconciliationCycle.id),
   clientRequestId: uuid("client_request_id"),
-  paymentReceiptId: uuid("payment_receipt_id").references((): AnyPgColumn => paymentReceipt.id),
+  paymentReceiptId: uuid("payment_receipt_id"),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
-});
+}, (table) => [
+  unique("uq_repayment_org_member_receipt_id").on(table.orgId, table.memberId, table.paymentReceiptId, table.id),
+  foreignKey({
+    name: "fk_repayment_payment_receipt_org_member",
+    columns: [table.orgId, table.memberId, table.paymentReceiptId],
+    foreignColumns: [paymentReceipt.orgId, paymentReceipt.memberId, paymentReceipt.id],
+  }),
+]);
 
 export const promise = pgTable("promise", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
