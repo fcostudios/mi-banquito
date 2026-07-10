@@ -29,4 +29,21 @@ describe("ScrRecordContributionPage", () => {
     expect(screen.getByText("Origen del pago")).toBeInTheDocument();
     expect(container.querySelector('select[name="paymentSource"]')).toHaveValue("cash_in_meeting");
   });
+
+  it("renders one-tap BR-26 extra-money decisions during confirmation", async () => {
+    render(await ScrRecordContributionPage({
+      searchParams: Promise.resolve({
+        confirm: "1",
+        clientRequestId: "11111111-1111-4111-8111-111111111111",
+        memberId: "22222222-2222-4222-8222-222222222222",
+        amount: "30.00",
+        datedOn: "2026-07-09",
+        paymentSource: "cash_in_meeting",
+      }),
+    }));
+
+    expect(screen.getByRole("radio", { name: /Aporte extra/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Prepagar aporte/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Abonar a capital/i })).toBeInTheDocument();
+  });
 });
