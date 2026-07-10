@@ -3,12 +3,34 @@ import { describe, expect, it } from "vitest";
 import {
   buildStatementShareUrl,
   canonicalJson,
+  monthlyMemberStatementContributions,
   monthlyMemberStatementPayload,
+  monthlyMemberStatementReceivedPayments,
   publicStatementPdfUrl,
   publicVerifyUrl,
   sha256Hex,
   verifierResultText,
 } from "./reporting";
+
+const statementCopy = {
+  monthlySectionTitle: "Estado mensual",
+  openingBalance: "Saldo inicial",
+  contribution: "Aporte {{date}}",
+  withdrawal: "Retiro {{date}}",
+  closingBalance: "Saldo final",
+  treasurer: "Tesorera",
+  groupAccount: "Cuenta del grupo",
+  noGroupAccount: "Sin cuenta registrada",
+  receivedPaymentsTitle: "Pagos recibidos",
+  receivedPayment: "Pago recibido de {{member}}",
+  loanFee: "Mora/comisión préstamo",
+  loanInterest: "Interés préstamo",
+  loanPrincipal: "Capital préstamo",
+  contributionAllocation: "Aporte {{cycle}}",
+  fallbackAllocation: "Aplicación",
+  unknownCycle: "sin período",
+  unknownMember: "socia",
+};
 
 describe("public statement verification", () => {
   it("orders object keys deterministically before hashing", () => {
@@ -43,10 +65,144 @@ describe("public statement verification", () => {
       withdrawals: [],
       treasurerName: "Pancho",
       bankLast4: "1234",
+      copy: statementCopy,
     });
 
     expect(payload.sections[0].rows).toContainEqual({ label: "Saldo inicial", value: "USD 100.00" });
     expect(sha256Hex(canonicalJson(payload))).toHaveLength(64);
+  });
+
+  it("keeps grouped BR-26 contribution child rows as statement rows without receipt duplication", () => {
+    const forward = [
+      { id: "receipt-1", amount: "40.0000", datedOn: "2026-07-09", slipPhotoUri: null, sourceKind: "payment_receipt" },
+      { id: "child-current", amount: "20.0000", datedOn: "2026-07-09", slipPhotoUri: null, sourceKind: "contribution" },
+      { id: "child-overdue", amount: "20.0000", datedOn: "2026-07-09", slipPhotoUri: null, sourceKind: "contribution" },
+    ] as const;
+    const contributions = monthlyMemberStatementContributions([...forward]);
+    const reversedContributions = monthlyMemberStatementContributions([...forward].reverse());
+    const payload = monthlyMemberStatementPayload({
+      orgName: "Mi Banquito",
+      periodLabel: "2026-07",
+      member: { id: "m1", displayName: "Ana Mora" },
+      openingBalance: "100.0000",
+      closingBalance: "140.0000",
+      contributions,
+      withdrawals: [],
+      treasurerName: "Pancho",
+      bankLast4: null,
+      copy: statementCopy,
+    });
+    const reversedPayload = monthlyMemberStatementPayload({
+      orgName: "Mi Banquito",
+      periodLabel: "2026-07",
+      member: { id: "m1", displayName: "Ana Mora" },
+      openingBalance: "100.0000",
+      closingBalance: "140.0000",
+      contributions: reversedContributions,
+      withdrawals: [],
+      treasurerName: "Pancho",
+      bankLast4: null,
+      copy: statementCopy,
+    });
+    const rows = payload.sections[0].rows;
+
+    expect(rows.filter((row) => row.label === "Aporte 2026-07-09")).toHaveLength(2);
+    expect(contributions.map((row) => row.id)).toEqual(["child-current", "child-overdue"]);
+    expect(rows).not.toContainEqual(expect.objectContaining({ label: expect.stringContaining("payment_receipt") }));
+    expect(canonicalJson(reversedPayload)).toBe(canonicalJson(payload));
+    expect(sha256Hex(canonicalJson(payload))).toHaveLength(64);
+  });
+
+  it("renders grouped BR-26 receipt statements once with allocation split details", () => {
+    const rows = [
+      {
+        receiptId: "receipt-1",
+        receiptAmount: "80.0000",
+        receiptDatedOn: "2026-07-09",
+        memberName: "Toitq",
+        allocationKind: "contribution_current",
+        allocationAmount: "20.0000",
+        cycleLabel: "2026-07",
+        sortOrder: 4,
+      },
+      {
+        receiptId: "receipt-1",
+        receiptAmount: "80.0000",
+        receiptDatedOn: "2026-07-09",
+        memberName: "Toitq",
+        allocationKind: "loan_interest",
+        allocationAmount: "10.0000",
+        cycleLabel: null,
+        sortOrder: 1,
+      },
+      {
+        receiptId: "receipt-1",
+        receiptAmount: "80.0000",
+        receiptDatedOn: "2026-07-09",
+        memberName: "Toitq",
+        allocationKind: "loan_principal",
+        allocationAmount: "30.0000",
+        cycleLabel: null,
+        sortOrder: 2,
+      },
+      {
+        receiptId: "receipt-1",
+        receiptAmount: "80.0000",
+        receiptDatedOn: "2026-07-09",
+        memberName: "Toitq",
+        allocationKind: "contribution_overdue",
+        allocationAmount: "20.0000",
+        cycleLabel: "2026-06",
+        sortOrder: 3,
+      },
+    ];
+    const payload = monthlyMemberStatementPayload({
+      orgName: "Mi Banquito",
+      periodLabel: "2026-07",
+      member: { id: "m1", displayName: "Toitq" },
+      openingBalance: "100.0000",
+      closingBalance: "140.0000",
+      contributions: [],
+      receivedPayments: monthlyMemberStatementReceivedPayments(rows, statementCopy),
+      withdrawals: [],
+      treasurerName: "Pancho",
+      bankLast4: null,
+      copy: statementCopy,
+    });
+    const reversedPayload = monthlyMemberStatementPayload({
+      orgName: "Mi Banquito",
+      periodLabel: "2026-07",
+      member: { id: "m1", displayName: "Toitq" },
+      openingBalance: "100.0000",
+      closingBalance: "140.0000",
+      contributions: [],
+      receivedPayments: monthlyMemberStatementReceivedPayments([...rows].reverse(), statementCopy),
+      withdrawals: [],
+      treasurerName: "Pancho",
+      bankLast4: null,
+      copy: statementCopy,
+    });
+
+    expect(payload).toMatchObject({
+      sections: expect.arrayContaining([
+        expect.objectContaining({
+          title: "Pagos recibidos",
+          rows: [
+            expect.objectContaining({
+              label: "Pago recibido de Toitq",
+              amount: "80.0000",
+              details: [
+                "Interés préstamo: 10.0000",
+                "Capital préstamo: 30.0000",
+                "Aporte 2026-06: 20.0000",
+                "Aporte 2026-07: 20.0000",
+              ],
+            }),
+          ],
+        }),
+      ]),
+    });
+    expect(canonicalJson(reversedPayload)).toBe(canonicalJson(payload));
   });
 
   it("builds a WhatsApp share URL for archived statements", () => {

@@ -1,44 +1,118 @@
-# Testing Conventions Reference
+# TESTING.md — Mi Banquito
 
-Patterns for testing the serverless Next.js app (route handlers, Server/Client
-Components, Drizzle, stores). See `CLAUDE.md` for the condensed rules.
+> Per-repo testing contract. Governed by the org-wide **Test Effectiveness Standard**
+> (`docs/TEST_EFFECTIVENESS_STANDARD.md`). This is the concrete instantiation for this repo.
+> When this file and the Standard disagree, the Standard wins and this file is fixed.
+>
+> **Coding agents (Claude Code, Cursor, Copilot) MUST read this file before writing or
+> modifying any test.** The rules in §1 are hard constraints. This file is generated — do
+> not hand-edit; change it by updating the spec/config it derives from.
 
-## Route Handler Tests
+## 1. Rules for coding agents (hard constraints) — STACK-AGNOSTIC
 
-```ts
-import { GET } from "@/app/api/<resource>/route";
+- **No print/log as a test.** `console.log`, `System.out`, `print`, or a bare "runs without throwing" is **not** an oracle. Every test asserts a property or contract.
+- **Do not mock code we own.** Mock **only** true third-party network boundaries (payments, email/SMS/push, LLM providers, external partner APIs). Databases, our own services, the event store, and read-model stores run **real** via Testcontainers or in-memory real implementations.
+- **Third-party mocks must be contract-backed.** Any mock of an external API MUST have a corresponding contract test (Pact) so the mock cannot silently drift from the real provider.
+- **Aggregates use given/when/then over events.** `GIVEN [historical events] WHEN [command] THEN [emitted events | rejection reason]`. Never mock the event store.
+- **Prefer strong oracles.** Order: exact behavioral → property-based → metamorphic → differential → golden. Use property-based for all scoring/money/derived-state math. Do not default to exact-equality on large objects.
+- **A new test must kill a mutant it did not previously kill.** If it only raises coverage and kills no new mutant, it is redundant — do not add it.
+- **Never add tests to raise a coverage number.** The only effectiveness target is mutation score on critical paths (§3).
+- **Determinism is mandatory.** Inject the clock and RNG seed. No live network to uncontrolled hosts. No reliance on collection ordering or timing.
+- **Assert tenant isolation** on every path that touches tenant-scoped data.
 
-// Inject a test db client / mock the session; assert on the Response.
-it("returns 401 without a session", async () => {
-  const res = await GET();
-  expect(res.status).toBe(401);
-});
+Violating any of the above is grounds for the reviewer to reject the PR outright.
+
+## 2. Test layers in this repo
+
+The **aggregate + projection layers should be the widest part of the suite**, not the unit layer.
+
+| Layer | Doubles |
+|---|---|
+| Domain unit (value objects, pure rules) | none |
+| Aggregate / command | none (in-memory event store) |
+| Projection / read model | none |
+| Integration (DB, outbox, auth) | 3rd-party only |
+| Contract (external APIs) | contract broker |
+| E2E (critical journeys) | none |
+| Metamorphic / differential (oracle-hard logic) | n/a |
+
+## 3. Effectiveness-critical paths (the gated set)
+
+> The few areas where a silent fault is materially costly. Mutation testing runs on the diff
+> intersected with this set. Adding logic here without updating this file is a review smell.
+> *(Authoritative machine-derived set: [`testing/critical-paths.md`](../../testing/critical-paths.md),
+> generated from this project's business rules + graph. Keep current.)*
+
+- **Tenant isolation** — every path that touches tenant-scoped data (filtered by `org_id`). → explicit isolation assertions (a query for tenant A must never return tenant B's rows).
+- **Authorization** — role/permission gates on commands/mutations. → integration tests for allowed vs forbidden (expect 403).
+- **Money / tax / financial math** (if present) — amounts, rounding, and idempotency of charge/ledger events. → property-based + a provider contract test.
+- **Account** — auth-sensitive entity (name heuristic).
+- **InterestAccrual** — money-sensitive entity (name heuristic).
+- **LoanFee** — money-sensitive entity (name heuristic).
+- **Member** — auth-sensitive entity (name heuristic).
+- **Organization** — tenant-sensitive entity (name heuristic).
+- **Repayment** — money-sensitive entity (name heuristic).
+- **UserAccount** — auth-sensitive entity (name heuristic).
+- **UserOrgMembership** — auth-sensitive entity (name heuristic).
+- **YearEndBalanceSnapshot** — money-sensitive entity (name heuristic).
+- **YearEndBalanceSnapshotLine** — money-sensitive entity (name heuristic).
+- **member_compliance_state_view** — auth-sensitive entity (name heuristic).
+- *(Derived from this project's business rules + graph — `testing/critical-paths.md`. Keep current.)*
+
+## 4. CI gates
+
+- **Effectiveness gate:** diff-scoped **mutation score ≥ 80%** on changed code within §3. Surviving mutants must be killed or annotated `@equivalent: <reason>` with reviewer sign-off. *(Threshold provisional — recalibrate after the first month of real diffs.)*
+- **Coverage:** reported as a *diagnostic only*; it never gates. A PR cannot pass on coverage alone.
+- **Contract:** external-API contract verification must pass; a broken provider contract fails the build even if mocked unit tests pass.
+- **Flake:** any test failing intermittently on unchanged code is quarantined within 1 working day (tagged `@quarantine`, ticketed) and excluded from the gate until fixed or deleted.
+
+Pipeline order (fail-fast): lint/type → domain+property → aggregate+projection → integration → contract → **mutation (gate)** → e2e.
+
+## 5. Agent test-generation loop
+
+1. Generate tests for changed code in §3.
+2. CI runs diff-scoped mutation.
+3. **Keep only tests that kill previously-surviving mutants;** drop coverage-only redundant tests.
+4. Report surviving mutants as an "assurance gap" for the author to close.
+5. CI reports **mock-to-test ratio** and **assertion-to-print ratio**; large deviation from the repo baseline is flagged.
+
+Encourage agent test-writing for **small, well-specified correctness bugs with clear reproduction and expected behavior**; suppress reflexive test-spraying elsewhere.
+
+## 6. Stack & commands — Node / TS
+
+| Concern | Tool |
+|---|---|
+| Runner | Vitest |
+| Property-based | fast-check |
+| Real deps | Testcontainers |
+| Contract | Pact |
+| Mutation (gate) | Stryker |
+| E2E | Playwright |
+| Coverage (diagnostic) | c8 / istanbul |
+
+```bash
+# NOTE: these task names are wired by the test harness (TE-2); until then the
+# package ships no test runner — do not assume `test`/`test:mutation` run yet.
+<test>             # unit + aggregate + projection (fast)
+<test:integration> # Testcontainers
+<test:contract>    # contract verification
+<test:mutation>    # mutation on critical-path diff  ← the gate
+<test:e2e>         # critical journeys
 ```
 
-- Assert against a **test Drizzle client** (or a typed mock of `db`) — never the production connection.
-- Cover the auth branches: no session → 401, wrong role → 403, happy path → 200.
+## 7. PR checklist (copy into the PR description)
 
-## Component Tests
-
-- **Server Components** are async functions returning JSX — test them by awaiting and asserting the tree; they cannot use hooks/state.
-- **Client Components** (`"use client"`) — render with Testing Library; prefer `getByRole()` over `getByText()`.
-- Reset Zustand stores between tests:
-  ```ts
-  beforeEach(() => useMyStore.getState().reset());
-  ```
-
-## Fetch Mock Isolation
-
-```ts
-// Use EXACT URL matching — broad patterns collide
-global.fetch = jest.fn((url: string) => {
-  if (url === "/api/v1/socias") return Promise.resolve({ json: () => sociasData });
-  if (url === "/api/v1/socias/summary") return Promise.resolve({ json: () => summaryData });
-  return Promise.reject(new Error(`Unhandled: ${url}`));
-}) as jest.Mock;
+```
+[ ] New/changed critical code (§3) has given/when/then or property/metamorphic tests
+[ ] No mocks of code we own; third-party mocks are contract-backed
+[ ] No print/log used as an oracle; assertions constrain real behavior
+[ ] Diff mutation score ≥ threshold; surviving mutants killed or annotated @equivalent
+[ ] No test added solely to raise coverage; redundant tests removed
+[ ] Deterministic (injected clock/seed, no live network, no ordering luck)
+[ ] Tenant isolation asserted where the path is tenant-scoped
+[ ] TESTING.md §3 updated if critical-path logic changed
 ```
 
-## Verification
+## 8. Reference
 
-A story is not done until `pnpm type-check`, `pnpm lint`, and `pnpm build` all pass —
-see [`DEFINITION_OF_DONE.md`](DEFINITION_OF_DONE.md).
+Full rationale + evidence base: `docs/TEST_EFFECTIVENESS_STANDARD.md`.

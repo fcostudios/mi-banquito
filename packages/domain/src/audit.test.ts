@@ -472,6 +472,54 @@ describe("audit narration", () => {
     expect(text).toBe("Pancho registró un aporte de $20.00 el 2026-07-02.");
   });
 
+  it("exposes contribution notes and target periods as rendered audit details", async () => {
+    const fakeDb = new FakeDb([
+      [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          orgId: "11111111-1111-4111-8111-111111111111",
+          actorKind: "member",
+          actorId: "33333333-3333-4333-8333-333333333333",
+          actionKind: "contribution.create",
+          subjectKind: "contribution",
+          subjectId: "44444444-4444-4444-8444-444444444444",
+          payloadSnapshot: {
+            memberId: "m1",
+            amount: "20.0000",
+            datedOn: "2026-07-08",
+            notes: "Pago de atraso 2026-06",
+            paymentSource: "cash_in_meeting",
+          },
+          reason: null,
+          at: new Date("2026-07-09T03:17:00.000Z"),
+          createdAt: new Date("2026-07-09T03:17:00.000Z"),
+        },
+      ],
+      [
+        {
+          id: "m1",
+          displayName: "Toitq",
+        },
+      ],
+    ]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAuditService: createDynamicAuditService } = await import("./audit");
+      const [entry] = await createDynamicAuditService().listNarratedEntries({
+        orgId: "11111111-1111-4111-8111-111111111111",
+      });
+
+      expect(entry).toEqual(expect.objectContaining({
+        text: "Toitq registró un aporte de $20.00 el 2026-07-08.",
+        details: [
+          { label: "Nota", value: "Pago de atraso 2026-06" },
+          { label: "Aplicado a", value: "2026-06" },
+          { label: "Fuente", value: "Efectivo en reunión" },
+        ],
+      }));
+    });
+  });
+
   it("falls back safely for unknown actions", () => {
     const text = narrateAuditRow({
       id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -504,6 +552,7 @@ describe("audit narration", () => {
       "business_rules.view",
       "adjustment_period.open",
       "base_fund_quota.payment",
+      "payment.receipt.recorded",
     ]));
   });
 
@@ -566,6 +615,62 @@ describe("audit narration", () => {
 
     expect(text).toBe("Se corrigió el registro de pago de Pancho por $16.00 el 2026-07-02.");
     expect(text).not.toContain("loan.repayment.data_correction");
+  });
+
+  it("narrates BR-26 grouped payment receipts with allocation details", async () => {
+    const fakeDb = new FakeDb([
+      [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          orgId: "11111111-1111-4111-8111-111111111111",
+          actorKind: "member",
+          actorId: "33333333-3333-4333-8333-333333333333",
+          actionKind: "payment.receipt.recorded",
+          subjectKind: "payment_receipt",
+          subjectId: "44444444-4444-4444-8444-444444444444",
+          payloadSnapshot: {
+            memberId: "m1",
+            receivedAmount: "45.0000",
+            datedOn: "2026-07-09",
+            extraDecision: "future_contribution",
+            allocations: [
+              { kind: "loan_interest", amount: "5.0000", loanId: "loan-1" },
+              { kind: "contribution_overdue", amount: "20.0000", cycleId: "cycle-1", cycleLabel: "2026-06" },
+              { kind: "contribution_current", amount: "20.0000", cycleId: "cycle-2", cycleLabel: "2026-07" },
+              { kind: "extra_savings", amount: 3, contributionId: "contribution-3" },
+              { kind: "loan_fee", loanId: "loan-2" },
+            ],
+          },
+          reason: null,
+          at: new Date("2026-07-09T03:17:00.000Z"),
+          createdAt: new Date("2026-07-09T03:17:00.000Z"),
+        },
+      ],
+      [
+        {
+          id: "m1",
+          displayName: "Toitq",
+        },
+      ],
+    ]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAuditService: createDynamicAuditService } = await import("./audit");
+      const [entry] = await createDynamicAuditService().listNarratedEntries({
+        orgId: "11111111-1111-4111-8111-111111111111",
+      });
+
+      expect(entry).toEqual(expect.objectContaining({
+        text: "Toitq registró un pago agrupado de $45.00 el 2026-07-09.",
+        details: [
+          { label: "Decisión extra", value: "Prepagar aporte futuro" },
+          { label: "Aplicado a interés", value: "$5.00" },
+          { label: "Aporte 2026-06", value: "$20.00" },
+          { label: "Aporte 2026-07", value: "$20.00" },
+          { label: "Aporte extra / ahorro", value: "$3.00" },
+        ],
+      }));
+    });
   });
 
   it("filters by member, action kind, and date range with AND semantics", () => {
@@ -702,6 +807,7 @@ describe("audit narration", () => {
         memberId: "m1",
         at: new Date("2026-07-02T10:00:00.000Z"),
         text: "Pancho registró un aporte de $20.00 el 2026-07-02.",
+        details: [],
       },
     ];
 

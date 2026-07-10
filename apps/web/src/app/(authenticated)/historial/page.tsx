@@ -36,6 +36,7 @@ const actionLabels: Record<(typeof narratedAuditActionKinds)[number], string> = 
   "business_rules.view": copy.actions.businessRulesView,
   "adjustment_period.open": copy.actions.adjustmentPeriodOpen,
   "base_fund_quota.payment": copy.actions.baseFundQuotaPayment,
+  "payment.receipt.recorded": copy.actions.paymentReceiptRecorded,
 };
 
 function actionLabel(actionKind: string) {
@@ -128,6 +129,16 @@ export default async function ScrHistoryPage({
                 <dd>{entry.actorKind}</dd>
               </div>
             </dl>
+            {entry.details.length > 0 ? (
+              <dl className="grid gap-2 border-t border-border pt-3 text-sm text-text-secondary md:grid-cols-3">
+                {entry.details.map((detail) => (
+                  <div key={`${entry.id}-${detail.label}`}>
+                    <dt className="font-medium text-text-primary">{detail.label}</dt>
+                    <dd>{detail.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
           </article>
         ))}
       </section>

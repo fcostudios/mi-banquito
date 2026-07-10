@@ -376,7 +376,7 @@ The principal risks to delivery are the bus factor of one (a solo developer), th
 
 ### US-006 — Configure environment variables across local + preview + prod
 - **As**: Operator | **Want to**: have a single source of truth for env vars | **So that**: secrets don't leak and previews work
-- **AC**: `DATABASE_URL`, `AUTH0_*`, `CRON_SECRET`, `SENTRY_DSN`, `BLOB_READ_WRITE_TOKEN`, `NEXT_PUBLIC_SENTRY_DSN` set per environment; `.env.example` checked in; `.env.local` gitignored
+- **AC**: `DATABASE_URL`, `AUTH0_*`, `CRON_SECRET`, `SENTRY_DSN`, `VERCEL_BLOB_READ_WRITE_TOKEN`, `NEXT_PUBLIC_SENTRY_DSN` set per environment; `.env.example` checked in; `.env.local` gitignored
 - **Prerequisites**: US-003, US-004, US-005
 - **Gap callout**: NEW
 
@@ -1572,7 +1572,7 @@ The following findings are AC-level enhancements that fit naturally into the per
 | OP-02 | Monthly drift sweep practice | Operator review | Calendar reminder + log per `/admin/drift` |
 | OP-03 | Monthly Neon backup-restore test | Operator review | Verify NFR-DURAB-01 |
 | OP-04 | Monthly cost review across Vercel + Neon + Auth0 + Vercel Blob | Operator review F38 area | NFR-COST-01 verification |
-| OP-05 | Secrets rotation playbook (`CRON_SECRET`, `AUTH0_CLIENT_SECRET`, `BLOB_READ_WRITE_TOKEN`) | Operator review F38 | Runbook R-7 |
+| OP-05 | Secrets rotation playbook (`CRON_SECRET`, `AUTH0_CLIENT_SECRET`, `VERCEL_BLOB_RW_TOKEN`) | Operator review F38 | Runbook R-7 |
 
 ---
 

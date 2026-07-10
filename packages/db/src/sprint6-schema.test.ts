@@ -32,6 +32,18 @@ describe("Sprint 6 schema", () => {
     expect(migration).toContain("WHEN member_aging.max_days_late IS NOT NULL THEN 'atrasado'");
   });
 
+  it("refreshes aging before compliance in the shared read-model refresh function", () => {
+    const migration = readFileSync(
+      new URL("./migrations/V20260709213000__refresh_ar_aging_before_compliance.sql", import.meta.url),
+      "utf8",
+    );
+
+    expect(migration.indexOf("REFRESH MATERIALIZED VIEW mv_ar_aging"))
+      .toBeGreaterThanOrEqual(0);
+    expect(migration.indexOf("REFRESH MATERIALIZED VIEW mv_ar_aging"))
+      .toBeLessThan(migration.indexOf("REFRESH MATERIALIZED VIEW mv_member_compliance_state"));
+  });
+
   runIfDatabase("exposes member balance, year-end materialized views, and archive/dedup indexes", async () => {
     const { db } = await import("./index");
 

@@ -368,6 +368,7 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
       id: row.id,
       borrowerName: await resolveBorrowerName(orgId, row),
       borrowerKind: row.borrowerKind,
+      borrowerMemberId: row.borrowerMemberId,
       principalAmount: money4(row.principalAmount),
       currencyCode: row.currencyCode,
       status: row.status,
@@ -406,6 +407,7 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
       id: row.id,
       borrowerName: await resolveBorrowerName(orgId, row),
       borrowerKind: row.borrowerKind,
+      borrowerMemberId: row.borrowerMemberId,
       principalAmount: money4(row.principalAmount),
       currencyCode: row.currencyCode,
       status: row.status,
@@ -414,6 +416,7 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
       termPeriods: row.termPeriods,
       originatedOn: row.originatedOn,
       guarantorName: guarantorMember?.displayName,
+      guarantorMemberId: guarantorRows[0]?.guarantorMemberId,
       referrerName: referrerMember?.displayName,
       schedule: [...scheduleRows].sort((left, right) => left.periodIndex - right.periodIndex).map((schedule) => ({
         periodIndex: schedule.periodIndex,

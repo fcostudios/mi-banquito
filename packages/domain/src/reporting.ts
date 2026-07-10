@@ -8,6 +8,8 @@ import {
   contributionCycle,
   member,
   organization,
+  paymentAllocation,
+  paymentReceipt,
   periodClose,
   statementArchive,
   withdrawal,
@@ -27,6 +29,7 @@ export interface ReportingService {
     actorId: string;
     periodCloseId: string;
     memberId?: string;
+    statementCopy: MonthlyMemberStatementCopy;
     createArtifact: (input: MonthlyMemberStatementArtifactInput) => Promise<MonthlyMemberStatementArtifactResult>;
   }): Promise<{ generated: number; reused: number }>;
   recordStatementShare(input: { orgId: string; actorId: string; statementArchiveId: string }): Promise<{ whatsappUrl: string | null }>;
@@ -79,6 +82,26 @@ export function money(value: string | number): string {
   return `USD ${Number(value).toFixed(2)}`;
 }
 
+export type MonthlyMemberStatementCopy = {
+  monthlySectionTitle: string;
+  openingBalance: string;
+  contribution: string;
+  withdrawal: string;
+  closingBalance: string;
+  treasurer: string;
+  groupAccount: string;
+  noGroupAccount: string;
+  receivedPaymentsTitle: string;
+  receivedPayment: string;
+  loanFee: string;
+  loanInterest: string;
+  loanPrincipal: string;
+  contributionAllocation: string;
+  fallbackAllocation: string;
+  unknownCycle: string;
+  unknownMember: string;
+};
+
 export function monthlyMemberStatementPayload(input: {
   orgName: string;
   periodLabel: string;
@@ -86,10 +109,13 @@ export function monthlyMemberStatementPayload(input: {
   openingBalance: string;
   closingBalance: string;
   contributions: Array<{ id: string; amount: string; datedOn: string; slipPhotoUri: string | null }>;
+  receivedPayments?: Array<{ id: string; amount: string; datedOn: string; memberName: string; details: string[] }>;
   withdrawals: Array<{ id: string; amount: string; datedOn: string }>;
   treasurerName: string;
   bankLast4: string | null;
+  copy: MonthlyMemberStatementCopy;
 }) {
+  const copy = input.copy;
   return {
     kind: "monthly_member",
     orgName: input.orgName,
@@ -98,28 +124,121 @@ export function monthlyMemberStatementPayload(input: {
     sections: [
       {
         id: "member-monthly",
-        title: "Estado mensual",
+        title: copy.monthlySectionTitle,
         rows: [
-          { label: "Saldo inicial", value: money(input.openingBalance) },
+          { label: copy.openingBalance, value: money(input.openingBalance) },
           ...input.contributions.map((row) => ({
-            label: `Aporte ${row.datedOn}`,
+            label: copy.contribution.replace("{{date}}", row.datedOn),
             value: money(row.amount),
             href: row.slipPhotoUri,
           })),
           ...input.withdrawals.map((row) => ({
-            label: `Retiro ${row.datedOn}`,
+            label: copy.withdrawal.replace("{{date}}", row.datedOn),
             value: money(row.amount),
           })),
-          { label: "Saldo final", value: money(input.closingBalance) },
-          { label: "Tesorera", value: input.treasurerName },
-          { label: "Cuenta del grupo", value: input.bankLast4 ? `****${input.bankLast4}` : "Sin cuenta registrada" },
+          { label: copy.closingBalance, value: money(input.closingBalance) },
+          { label: copy.treasurer, value: input.treasurerName },
+          { label: copy.groupAccount, value: input.bankLast4 ? `****${input.bankLast4}` : copy.noGroupAccount },
         ],
       },
+      ...(input.receivedPayments && input.receivedPayments.length > 0
+        ? [{
+            id: "member-received-payments",
+            title: copy.receivedPaymentsTitle,
+            rows: input.receivedPayments.map((row) => ({
+              label: copy.receivedPayment.replace("{{member}}", row.memberName),
+              amount: row.amount,
+              datedOn: row.datedOn,
+              details: row.details,
+            })),
+          }]
+        : []),
     ],
   };
 }
 
 export type MonthlyMemberStatementPayload = ReturnType<typeof monthlyMemberStatementPayload>;
+
+export type MemberStatementContributionSource = {
+  id: string;
+  amount: string;
+  datedOn: string;
+  slipPhotoUri: string | null;
+  sourceKind?: "contribution" | "payment_receipt";
+};
+
+export function monthlyMemberStatementContributions(
+  rows: MemberStatementContributionSource[],
+): Array<{ id: string; amount: string; datedOn: string; slipPhotoUri: string | null }> {
+  return rows
+    .filter((row) => row.sourceKind !== "payment_receipt")
+    .sort((left, right) => left.datedOn.localeCompare(right.datedOn) || left.id.localeCompare(right.id))
+    .map((row) => ({
+      id: row.id,
+      amount: row.amount,
+      datedOn: row.datedOn,
+      slipPhotoUri: row.slipPhotoUri,
+    }));
+}
+
+export type MonthlyMemberStatementContribution = ReturnType<typeof monthlyMemberStatementContributions>[number];
+
+export type MemberStatementReceiptAllocationSource = {
+  receiptId: string;
+  receiptAmount: string;
+  receiptDatedOn: string;
+  memberName: string;
+  allocationKind: string;
+  allocationAmount: string;
+  cycleLabel: string | null;
+  sortOrder: number;
+};
+
+function allocationStatementLabel(
+  row: Pick<MemberStatementReceiptAllocationSource, "allocationKind" | "cycleLabel">,
+  copy: MonthlyMemberStatementCopy,
+): string {
+  switch (row.allocationKind) {
+    case "loan_fee":
+      return copy.loanFee;
+    case "loan_interest":
+      return copy.loanInterest;
+    case "loan_principal":
+      return copy.loanPrincipal;
+    case "contribution_overdue":
+    case "contribution_current":
+    case "contribution_future":
+    case "extra_savings":
+      return copy.contributionAllocation.replace("{{cycle}}", row.cycleLabel ?? copy.unknownCycle);
+    default:
+      return copy.fallbackAllocation;
+  }
+}
+
+export function monthlyMemberStatementReceivedPayments(
+  rows: MemberStatementReceiptAllocationSource[],
+  copy: MonthlyMemberStatementCopy,
+): Array<{ id: string; amount: string; datedOn: string; memberName: string; details: string[] }> {
+  const grouped = new Map<string, MemberStatementReceiptAllocationSource[]>();
+  for (const row of [...rows].sort((left, right) =>
+    left.receiptDatedOn.localeCompare(right.receiptDatedOn)
+      || left.receiptId.localeCompare(right.receiptId)
+      || left.sortOrder - right.sortOrder
+  )) {
+    grouped.set(row.receiptId, [...(grouped.get(row.receiptId) ?? []), row]);
+  }
+
+  return [...grouped.entries()].map(([receiptId, allocations]) => {
+    const first = allocations[0];
+    return {
+      id: receiptId,
+      amount: first?.receiptAmount ?? "0.0000",
+      datedOn: dateOnly(first?.receiptDatedOn ?? ""),
+      memberName: first?.memberName ?? copy.unknownMember,
+      details: allocations.map((row) => `${allocationStatementLabel(row, copy)}: ${row.allocationAmount}`),
+    };
+  });
+}
 
 export type MonthlyMemberStatementArtifactInput = {
   orgId: string;
@@ -225,6 +344,7 @@ export function createReportingService(): ReportingService {
             id: contribution.id,
             amount: contribution.amount,
             datedOn: contribution.datedOn,
+            paymentReceiptId: contribution.paymentReceiptId,
           }).from(contribution)
             .where(and(
               eq(contribution.orgId, input.orgId),
@@ -232,7 +352,34 @@ export function createReportingService(): ReportingService {
               sql`${contribution.datedOn} >= ${periodStart}`,
               sql`${contribution.datedOn} <= ${periodEnd}`,
             ))
-            .orderBy(contribution.datedOn);
+            .orderBy(contribution.datedOn, contribution.id);
+          const receiptAllocations = await tx.select({
+            receiptId: paymentReceipt.id,
+            receiptAmount: paymentReceipt.amount,
+            receiptDatedOn: paymentReceipt.datedOn,
+            memberName: member.displayName,
+            allocationKind: paymentAllocation.allocationKind,
+            allocationAmount: paymentAllocation.amount,
+            cycleLabel: contributionCycle.cycleLabel,
+            sortOrder: paymentAllocation.sortOrder,
+          })
+            .from(paymentReceipt)
+            .innerJoin(paymentAllocation, and(
+              eq(paymentAllocation.orgId, paymentReceipt.orgId),
+              eq(paymentAllocation.receiptId, paymentReceipt.id),
+            ))
+            .leftJoin(contributionCycle, and(
+              eq(contributionCycle.orgId, paymentAllocation.orgId),
+              eq(contributionCycle.id, paymentAllocation.cycleId),
+            ))
+            .innerJoin(member, and(eq(member.orgId, paymentReceipt.orgId), eq(member.id, paymentReceipt.memberId)))
+            .where(and(
+              eq(paymentReceipt.orgId, input.orgId),
+              eq(paymentReceipt.memberId, row.id),
+              sql`${paymentReceipt.datedOn} >= ${periodStart}`,
+              sql`${paymentReceipt.datedOn} <= ${periodEnd}`,
+            ))
+            .orderBy(paymentReceipt.datedOn, paymentReceipt.id, paymentAllocation.sortOrder);
           const withdrawals = await tx.select({
             id: withdrawal.id,
             amount: withdrawal.amount,
@@ -256,12 +403,14 @@ export function createReportingService(): ReportingService {
             member: { id: row.id, displayName: row.displayName },
             openingBalance: money4(openingBalance),
             closingBalance: money4(closingBalance),
-            contributions: contributions.map((item) => ({
+            contributions: monthlyMemberStatementContributions(contributions.map((item) => ({
               id: item.id,
               amount: item.amount,
               datedOn: dateOnly(item.datedOn),
               slipPhotoUri: null,
-            })),
+              sourceKind: item.paymentReceiptId ? "payment_receipt" : "contribution",
+            }))),
+            receivedPayments: monthlyMemberStatementReceivedPayments(receiptAllocations, input.statementCopy),
             withdrawals: withdrawals.map((item) => ({
               id: item.id,
               amount: item.amount,
@@ -269,6 +418,7 @@ export function createReportingService(): ReportingService {
             })),
             treasurerName: "member",
             bankLast4: null,
+            copy: input.statementCopy,
           });
           const hash = sha256Hex(canonicalJson(payload));
           const existing = await tx.select({ id: statementArchive.id }).from(statementArchive)

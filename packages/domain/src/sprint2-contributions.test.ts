@@ -194,6 +194,58 @@ describe("Sprint 2 contribution source and partial state", () => {
     }
   });
 
+  it("records an explicitly targeted contribution against the overdue cycle and refreshes read models", async () => {
+    const overdueCycle = {
+      id: "55555555-5555-4555-8555-555555555555",
+      orgId: "11111111-1111-4111-8111-111111111111",
+      cycleLabel: "2026-06",
+      expectedAmountPerMember: "20.0000",
+      status: "closed",
+    };
+    const fakeDb = new FakeDb([
+      [],
+      [overdueCycle],
+    ]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+    vi.doMock("@mi-banquito/db/tenant", () => ({
+      withTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => fakeDb.transaction(() => run(fakeDb)),
+      withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) => fakeDb.transaction(() => run(fakeDb)),
+    }));
+
+    try {
+      const { createLedgerService } = await import("./ledger");
+      await createLedgerService().recordContribution(
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222",
+        {
+          clientRequestId: "33333333-3333-4333-8333-333333333333",
+          memberId: "44444444-4444-4444-8444-444444444444",
+          cycleId: overdueCycle.id,
+          amount: "20.0000",
+          datedOn: "2026-07-08",
+          paymentSource: "cash_in_meeting",
+          kind: "regular",
+          slipPhotoId: "",
+          notes: "Pago de atraso 2026-06",
+        },
+      );
+
+      expect(insertedRows(fakeDb, contribution)[0]).toMatchObject({
+        cycleId: overdueCycle.id,
+        memberId: "44444444-4444-4444-8444-444444444444",
+        amount: "20.0000",
+        datedOn: "2026-07-08",
+      });
+      expect(insertedRows(fakeDb, contributionCycle)).toHaveLength(0);
+      expect(fakeDb.executedSql).toHaveLength(1);
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.doUnmock("@mi-banquito/db/tenant");
+      vi.resetModules();
+    }
+  });
+
   it("emits A14 when a contribution event leaves the member balance negative", async () => {
     const fakeDb = new FakeDb([
       [],

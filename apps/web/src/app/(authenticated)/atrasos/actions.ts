@@ -1,11 +1,16 @@
 "use server";
-
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ZodError } from "zod";
-import { chaseAttemptFormSchema, currentEcuadorDateString, markPromiseFormSchema } from "@mi-banquito/contracts";
+import {
+  chaseAttemptFormSchema,
+  currentEcuadorDateString,
+  memberPaymentFormSchema,
+  markPromiseFormSchema,
+} from "@mi-banquito/contracts";
 import {
   createCollectionsService,
+  createPaymentService,
   type DateOnlyString,
   type PromiseOutcome,
 } from "@mi-banquito/domain";
@@ -49,7 +54,41 @@ function validationMessage(error: unknown): string {
 
 function revalidateCollectionsViews() {
   revalidatePath("/atrasos");
+  revalidatePath("/");
+  revalidatePath("/socias");
   revalidatePath("/historial");
+  revalidatePath("/aportes");
+}
+
+function memberPaymentConfirmationRedirect(input: Record<string, unknown>): string {
+  const params = new URLSearchParams({ confirm: "1" });
+  for (const key of [
+    "clientRequestId",
+    "memberId",
+    "amount",
+    "datedOn",
+    "paymentSource",
+    "slipPhotoId",
+    "notes",
+    "targetCycleId",
+    "targetLoanId",
+  ]) {
+    const value = input[key];
+    if (typeof value === "string" && value) {
+      params.set(key, value);
+    }
+  }
+  return `/aportes/registrar?${params.toString()}`;
+}
+
+type MemberPaymentPreviewResult = Awaited<ReturnType<ReturnType<typeof createPaymentService>["previewMemberPayment"]>>;
+
+function startsWithTargetCycle(preview: MemberPaymentPreviewResult, cycleId: string): boolean {
+  const [firstAllocation] = preview.allocations;
+  return Boolean(firstAllocation && (
+    (firstAllocation.kind === "contribution_overdue" || firstAllocation.kind === "contribution_current" || firstAllocation.kind === "contribution_future")
+    && firstAllocation.cycleId === cycleId
+  ));
 }
 
 function parsePromiseOutcome(values: Record<string, FormDataEntryValue>): {
@@ -108,6 +147,68 @@ export async function markPromiseOutcomeAction(formData: FormData) {
 
   revalidateCollectionsViews();
   redirect(`/atrasos?promiseOutcome=${outcome}`);
+}
+
+export async function recordOverdueContributionAction(formData: FormData) {
+  const session = await requireTreasurer();
+  let paymentPayload: Record<string, unknown> | undefined;
+  let confirmationPath: string | undefined;
+
+  try {
+    const values = formDataToObject(formData);
+    const clientRequestId = String(values.clientRequestId ?? "");
+    const memberId = String(values.memberId ?? "");
+    const cycleId = String(values.cycleId ?? "");
+    if (!uuidPattern.test(clientRequestId) || !uuidPattern.test(memberId) || !uuidPattern.test(cycleId)) {
+      throw new Error("collections_obligation_not_found");
+    }
+
+    const agingRows = await createCollectionsService().listAgingRows(session.orgId, "aporte");
+    const agingRow = agingRows.find((row) => row.memberId === memberId && row.cycleId === cycleId);
+    if (!agingRow) {
+      throw new Error("collections_obligation_not_found");
+    }
+
+    const parsed = memberPaymentFormSchema.parse({
+      clientRequestId,
+      memberId,
+      targetCycleId: cycleId,
+      amount: String(agingRow.amountDue),
+      datedOn: currentEcuadorDateString(),
+      paymentSource: "cash_in_meeting",
+      slipPhotoId: "",
+      notes: `Pago desde atrasos: ${agingRow.periodLabel}`,
+    });
+    paymentPayload = parsed;
+
+    const paymentService = createPaymentService();
+    const preview = await paymentService.previewMemberPayment({
+      ...parsed,
+      orgId: session.orgId,
+      actorId: session.actorId,
+    });
+    if (!startsWithTargetCycle(preview, cycleId)) {
+      confirmationPath = memberPaymentConfirmationRedirect(parsed);
+    } else {
+      await paymentService.recordMemberPayment({
+        ...parsed,
+        orgId: session.orgId,
+        actorId: session.actorId,
+      });
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message === "payment_extra_decision_required") {
+      redirect(memberPaymentConfirmationRedirect(paymentPayload ?? formDataToObject(formData)));
+    }
+    redirect(`/atrasos?error=${encodeURIComponent(validationMessage(error))}`);
+  }
+
+  if (confirmationPath) {
+    redirect(confirmationPath);
+  }
+
+  revalidateCollectionsViews();
+  redirect("/atrasos?payment=1");
 }
 
 export async function recordChaseAttemptAction(formData: FormData) {

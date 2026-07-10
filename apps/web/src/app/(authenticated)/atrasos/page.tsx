@@ -73,6 +73,7 @@ export default async function ScrArAgingPage({
   const sort = sortKey(searchValue(query.sort));
   const error = searchValue(query.error);
   const promiseSaved = searchValue(query.promise) === "1";
+  const paymentSaved = searchValue(query.payment) === "1";
   const promiseOutcome = searchValue(query.promiseOutcome);
   const promiseOutcomeMessage = promiseOutcome === "kept"
     ? copy.promiseKept
@@ -98,6 +99,11 @@ export default async function ScrArAgingPage({
       {promiseSaved ? (
         <p className="rounded-md border border-success bg-success/10 p-4 text-text-primary" role="status">
           {copy.promiseSaved}
+        </p>
+      ) : null}
+      {paymentSaved ? (
+        <p className="rounded-md border border-success bg-success/10 p-4 text-text-primary" role="status">
+          {copy.paymentSaved}
         </p>
       ) : null}
       {promiseOutcomeMessage ? (

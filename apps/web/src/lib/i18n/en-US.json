@@ -185,7 +185,8 @@
       "groupConfigVersion": "Reglas actualizadas",
       "businessRulesView": "Reglas consultadas",
       "adjustmentPeriodOpen": "Período de ajuste",
-      "baseFundQuotaPayment": "Cuota base pagada"
+      "baseFundQuotaPayment": "Cuota base pagada",
+      "paymentReceiptRecorded": "Pago agrupado"
     }
   },
   "atrasos": {
@@ -221,8 +222,10 @@
     "promiseSaved": "Promesa guardada.",
     "promiseKept": "Promesa marcada como cumplida.",
     "promiseBroken": "Promesa marcada como pendiente.",
+    "paymentSaved": "Pago de atraso registrado.",
     "promiseKeptAction": "Cumplida",
     "promiseBrokenAction": "Sigue pendiente",
+    "recordPayment": "Registrar pago",
     "whatsapp": "Avisar por WhatsApp",
     "recordChase": "Registrar aviso",
     "missingContact": "Sin WhatsApp registrado",
@@ -339,6 +342,25 @@
   },
   "statementPdf": {
     "monthlyMemberTitle": "Estado de cuenta",
+    "monthlyMember": {
+      "monthlySectionTitle": "Estado mensual",
+      "openingBalance": "Saldo inicial",
+      "contribution": "Aporte {{date}}",
+      "withdrawal": "Retiro {{date}}",
+      "closingBalance": "Saldo final",
+      "treasurer": "Tesorera",
+      "groupAccount": "Cuenta del grupo",
+      "noGroupAccount": "Sin cuenta registrada",
+      "receivedPaymentsTitle": "Pagos recibidos",
+      "receivedPayment": "Pago recibido de {{member}}",
+      "loanFee": "Mora/comisión préstamo",
+      "loanInterest": "Interés préstamo",
+      "loanPrincipal": "Capital préstamo",
+      "contributionAllocation": "Aporte {{cycle}}",
+      "fallbackAllocation": "Aplicación",
+      "unknownCycle": "sin período",
+      "unknownMember": "socia"
+    },
     "yearEndMemberTitle": "Estado fin de año",
     "yearEndShareOutTitle": "Reparto fin de año",
     "yearEndSnapshotTitle": "Balance fin de año",
@@ -505,6 +527,10 @@
       "cashInMeeting": "Efectivo en reunión",
       "pettyCashDeposit": "Depósito desde caja chica",
       "slip": "Comprobante",
+      "extraDecisionTitle": "Queda dinero sin aplicar",
+      "extraDecisionSavings": "Aporte extra / ahorro",
+      "extraDecisionFuture": "Prepagar aporte futuro",
+      "extraDecisionPrincipal": "Abonar a capital",
       "slipRequired": "Para transferencia bancaria o depósito desde caja chica, registra un comprobante antes de guardar el aporte.",
       "invalid": "Revisa los datos del aporte antes de continuar.",
       "failed": "No se pudo registrar el aporte. Revisa los datos e intenta nuevamente.",
@@ -599,6 +625,7 @@
       "mode": "Tipo de pago",
       "nextInstallment": "Pagar próxima cuota",
       "principalPayment": "Abonar a capital",
+      "waterfallWarning": "BR-26 puede aplicar este pago primero a mora, intereses o aportes vencidos antes de abonar al préstamo seleccionado.",
       "slip": "Comprobante",
       "notes": "Notas",
       "submit": "Registrar pago"

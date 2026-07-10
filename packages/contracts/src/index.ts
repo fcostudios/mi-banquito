@@ -129,6 +129,7 @@ export const insertYearEndBalanceSnapshotLineSchema = createInsertSchema(yearEnd
 export const selectYearEndBalanceSnapshotLineSchema = createSelectSchema(yearEndBalanceSnapshotLine);
 
 const moneyString = z.string().regex(/^\d+(\.\d{1,4})?$/, "Use a non-negative decimal amount");
+const positiveMoneyString = moneyString.refine((value) => Number(value) > 0, "Use a positive decimal amount");
 const signedMoneyString = z.string().regex(/^-?\d+(\.\d{1,4})?$/, "Use a decimal amount");
 const uuidString = z.string().uuid();
 const optionalUuidString = uuidString.optional().or(z.literal(""));
@@ -227,6 +228,7 @@ export const contributionKindSchema = z.enum(["regular", "partial"]);
 export const contributionFormSchema = z.object({
   clientRequestId: uuidString,
   memberId: uuidString,
+  cycleId: uuidString.optional().or(z.literal("")),
   amount: moneyString,
   datedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   paymentSource: contributionSourceSchema.default("cash_in_meeting"),
@@ -311,6 +313,42 @@ export const loanRepaymentFormSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
+export const paymentExtraDecisionSchema = z.enum([
+  "extra_savings",
+  "future_contribution",
+  "loan_principal",
+]);
+
+export const memberPaymentFormSchema = z.object({
+  clientRequestId: uuidString,
+  memberId: uuidString,
+  amount: positiveMoneyString,
+  datedOn: dateString,
+  paymentSource: contributionSourceSchema.default("cash_in_meeting"),
+  slipPhotoId: uuidString.optional().or(z.literal("")),
+  notes: z.string().max(500).optional(),
+  targetLoanId: optionalUuidString,
+  targetCycleId: optionalUuidString,
+  extraDecision: paymentExtraDecisionSchema.optional().or(z.literal("")),
+  overrideReason: z.string().max(500).optional(),
+}).superRefine((value, ctx) => {
+  if (value.paymentSource !== "cash_in_meeting" && !value.slipPhotoId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["slipPhotoId"],
+      message: "Slip photo is required for bank and petty-cash deposits",
+    });
+  }
+
+  if (value.extraDecision === "loan_principal" && !value.targetLoanId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["extraDecision"],
+      message: "A loan target is required to apply extra money to principal",
+    });
+  }
+});
+
 export const markPromiseFormSchema = z.object({
   memberId: uuidString,
   loanId: optionalUuidString,
@@ -392,6 +430,8 @@ export type ReverseContributionForm = z.infer<typeof reverseContributionFormSche
 export type BaseFundQuotaPaymentForm = z.infer<typeof baseFundQuotaPaymentFormSchema>;
 export type LoanOriginationForm = z.infer<typeof loanOriginationFormSchema>;
 export type LoanRepaymentForm = z.infer<typeof loanRepaymentFormSchema>;
+export type PaymentExtraDecision = z.infer<typeof paymentExtraDecisionSchema>;
+export type MemberPaymentForm = z.infer<typeof memberPaymentFormSchema>;
 export type MarkPromiseForm = z.infer<typeof markPromiseFormSchema>;
 export type ChaseAttemptForm = z.infer<typeof chaseAttemptFormSchema>;
 export type LiquiditySandbox = z.infer<typeof liquiditySandboxSchema>;

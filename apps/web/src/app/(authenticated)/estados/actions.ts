@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createReportingService } from "@mi-banquito/domain";
 
 import { requireTreasurer } from "@/lib/auth/require-session";
+import messages from "@/lib/i18n/en-US.json";
 import { uploadMonthlyMemberArtifact } from "@/lib/monthly-member-artifact";
 
 export async function generateMemberStatementsAction(formData: FormData) {
@@ -16,6 +17,7 @@ export async function generateMemberStatementsAction(formData: FormData) {
     actorId: session.actorId,
     periodCloseId,
     memberId: String(formData.get("memberId") ?? "") || undefined,
+    statementCopy: messages.statementPdf.monthlyMember,
     createArtifact: uploadMonthlyMemberArtifact,
   });
   revalidatePath("/estados");

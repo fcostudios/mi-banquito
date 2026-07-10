@@ -1,6 +1,6 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
-import { auditLogEntry } from "@mi-banquito/db/schema";
+import { auditLogEntry, member } from "@mi-banquito/db/schema";
 
 export type AuditRow = typeof auditLogEntry.$inferSelect;
 
@@ -45,6 +45,12 @@ export type AuditNarratedEntry = {
   memberId: string | null;
   at: Date;
   text: string;
+  details: AuditNarratedDetail[];
+};
+
+export type AuditNarratedDetail = {
+  label: string;
+  value: string;
 };
 
 export type AuditPdfPayload = {
@@ -99,6 +105,16 @@ function money(value: string | number | undefined): string {
   return Number(value ?? 0).toFixed(2);
 }
 
+function moneyValue(value: unknown): string | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value.toFixed(2);
+  }
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+    return Number(value).toFixed(2);
+  }
+  return undefined;
+}
+
 function memberName(payload: PayloadObject): string {
   return stringField(payload, "memberName")
     ?? stringField(payload, "borrowerName")
@@ -110,6 +126,100 @@ function memberIdFromPayload(payload: PayloadObject): string | undefined {
   return stringField(payload, "memberId")
     ?? stringField(payload, "borrowerMemberId")
     ?? stringField(payload, "subjectMemberId");
+}
+
+function paymentSourceLabel(value: string | undefined): string | undefined {
+  if (value === "cash_in_meeting") {
+    return "Efectivo en reunión";
+  }
+  if (value === "bank_transfer") {
+    return "Transferencia bancaria";
+  }
+  if (value === "petty_cash_deposit") {
+    return "Depósito de caja chica";
+  }
+  return value;
+}
+
+function detail(label: string, value: string | undefined): AuditNarratedDetail[] {
+  return value ? [{ label, value }] : [];
+}
+
+function periodFromNote(value: string | undefined): string | undefined {
+  return value?.match(/\b\d{4}-\d{2}\b/)?.[0];
+}
+
+function contributionDetails(payload: PayloadObject): AuditNarratedDetail[] {
+  const notes = stringField(payload, "notes");
+  return [
+    ...detail("Nota", notes),
+    ...detail("Aplicado a", stringField(payload, "cycleLabel") ?? periodFromNote(notes)),
+    ...detail("Fuente", paymentSourceLabel(stringField(payload, "paymentSource"))),
+  ];
+}
+
+function extraDecisionLabel(value: string | undefined): string | undefined {
+  if (value === "extra_savings") return "Aporte extra / ahorro";
+  if (value === "future_contribution") return "Prepagar aporte futuro";
+  if (value === "loan_principal") return "Abonar a capital";
+  return value;
+}
+
+function allocationKindLabel(value: string | undefined, payload: PayloadObject): string {
+  if (value === "loan_fee") return "Aplicado a mora/comisión";
+  if (value === "loan_interest") return "Aplicado a interés";
+  if (value === "loan_principal") return "Aplicado a capital";
+  if (value === "contribution_overdue" || value === "contribution_current" || value === "contribution_future") {
+    return `Aporte ${stringField(payload, "cycleLabel") ?? stringField(payload, "cycleId") ?? ""}`.trim();
+  }
+  if (value === "extra_savings") return "Aporte extra / ahorro";
+  return "Aplicación";
+}
+
+function allocationDetails(payload: PayloadObject): AuditNarratedDetail[] {
+  const allocations = payload.allocations;
+  if (!Array.isArray(allocations)) {
+    return [];
+  }
+  return allocations
+    .filter((entry): entry is PayloadObject => Boolean(entry) && typeof entry === "object" && !Array.isArray(entry))
+    .flatMap((entry) => {
+      const amount = moneyValue(entry.amount);
+      if (!amount) {
+        return [];
+      }
+      return [{
+        label: allocationKindLabel(stringField(entry, "kind"), entry),
+        value: `$${amount}`,
+      }];
+    });
+}
+
+function receiptDetails(payload: PayloadObject): AuditNarratedDetail[] {
+  return [
+    ...detail("Decisión extra", extraDecisionLabel(stringField(payload, "extraDecision"))),
+    ...allocationDetails(payload),
+  ];
+}
+
+function auditDetails(input: AuditNarrationInput): AuditNarratedDetail[] {
+  const payload = payloadObject(input.payloadSnapshot);
+  if (input.actionKind === "contribution.create") {
+    return contributionDetails(payload);
+  }
+  if (input.actionKind === "payment.receipt.recorded") {
+    return receiptDetails(payload);
+  }
+  if (input.actionKind === "contribution.reverse") {
+    return [
+      ...detail("Razón", stringField(payload, "reverseReason") ?? input.reason ?? undefined),
+      ...detail("Aplicado a", stringField(payload, "cycleLabel")),
+    ];
+  }
+  return [
+    ...detail("Nota", stringField(payload, "notes")),
+    ...detail("Razón", input.reason ?? undefined),
+  ];
 }
 
 const templates: Record<string, (input: AuditNarrationInput) => string> = {
@@ -152,6 +262,10 @@ const templates: Record<string, (input: AuditNarrationInput) => string> = {
     const payload = payloadObject(input.payloadSnapshot);
     return `${memberName(payload)} registró una cuota base de $${money(stringField(payload, "amount"))} el ${stringField(payload, "paidOn") ?? dateOnly(input.at)}.`;
   },
+  "payment.receipt.recorded": (input) => {
+    const payload = payloadObject(input.payloadSnapshot);
+    return `${memberName(payload)} registró un pago agrupado de $${money(stringField(payload, "receivedAmount"))} el ${stringField(payload, "datedOn") ?? dateOnly(input.at)}.`;
+  },
 };
 
 export const narratedAuditActionKinds = Object.freeze(Object.keys(templates));
@@ -185,8 +299,13 @@ export function filterAuditRows<T extends AuditFilterableRow>(input: {
   });
 }
 
-function narratedEntry(row: AuditRow): AuditNarratedEntry {
+function narratedEntry(row: AuditRow, memberNames = new Map<string, string>()): AuditNarratedEntry {
   const payload = payloadObject(row.payloadSnapshot);
+  const payloadMemberId = memberIdFromPayload(payload) ?? (row.subjectKind === "member" ? row.subjectId ?? undefined : undefined);
+  const enrichedPayload = payloadMemberId && !stringField(payload, "memberName") && memberNames.has(payloadMemberId)
+    ? { ...payload, memberName: memberNames.get(payloadMemberId) }
+    : payload;
+  const enrichedRow = enrichedPayload === payload ? row : { ...row, payloadSnapshot: enrichedPayload };
   return {
     id: row.id,
     orgId: row.orgId,
@@ -195,10 +314,31 @@ function narratedEntry(row: AuditRow): AuditNarratedEntry {
     actionKind: row.actionKind,
     subjectKind: row.subjectKind,
     subjectId: row.subjectId,
-    memberId: memberIdFromPayload(payload) ?? (row.subjectKind === "member" ? row.subjectId ?? undefined : undefined) ?? null,
+    memberId: payloadMemberId ?? null,
     at: dateValue(row.at),
-    text: narrateAuditRow(row),
+    text: narrateAuditRow(enrichedRow),
+    details: auditDetails(enrichedRow),
   };
+}
+
+async function memberNameMap(orgId: string, rows: AuditRow[]): Promise<Map<string, string>> {
+  const memberIds = [...new Set(rows.flatMap((row) => {
+    const payload = payloadObject(row.payloadSnapshot);
+    if (stringField(payload, "memberName")) {
+      return [];
+    }
+    const id = memberIdFromPayload(payload) ?? (row.subjectKind === "member" ? row.subjectId ?? undefined : undefined);
+    return id ? [id] : [];
+  }))];
+  if (memberIds.length === 0) {
+    return new Map();
+  }
+  const members = await db.select({
+    id: member.id,
+    displayName: member.displayName,
+  }).from(member)
+    .where(and(eq(member.orgId, orgId), inArray(member.id, memberIds)));
+  return new Map(members.map((row) => [row.id, row.displayName]));
 }
 
 export function buildAuditPdfPayload(entries: AuditNarratedEntry[]): AuditPdfPayload {
@@ -219,8 +359,9 @@ export const createAuditService = (): AuditService => ({
     const rows = await db.select().from(auditLogEntry)
       .where(and(eq(auditLogEntry.orgId, filters.orgId)))
       .orderBy(desc(auditLogEntry.at));
+    const names = await memberNameMap(filters.orgId, rows);
     return filterAuditRows({
-      rows: rows.map(narratedEntry),
+      rows: rows.map((row) => narratedEntry(row, names)),
       filters,
     });
   },

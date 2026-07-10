@@ -32,6 +32,7 @@
 | sprint-10 | [r1_chg_us_100.md](sprint-10/r1_chg_us_100.md) | R1-CHG-US-100 |
 | sprint-10 | [r1_chg_us_101.md](sprint-10/r1_chg_us_101.md) | R1-CHG-US-101 |
 | sprint-10 | [r1_chg_us_105.md](sprint-10/r1_chg_us_105.md) | R1-CHG-US-105 |
+| sprint-10 | [r1_chg_us_126.md](sprint-10/r1_chg_us_126.md) | R1-CHG-US-126 |
 | sprint-10 | [r1_misc_us_102.md](sprint-10/r1_misc_us_102.md) | R1-MISC-US-102 |
 | sprint-10 | [r1_misc_us_103.md](sprint-10/r1_misc_us_103.md) | R1-MISC-US-103 |
 | sprint-10 | [r1_misc_us_104.md](sprint-10/r1_misc_us_104.md) | R1-MISC-US-104 |

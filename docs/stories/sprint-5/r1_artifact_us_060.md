@@ -25,11 +25,7 @@ As the president (P02, artifact-only, no app login in R1), I want to receive the
 - [ ] AC-1: From the `SCR-monthly-close` preview, the treasurer can invoke a WhatsApp share-intent that attaches the generated monthly-close PDF (US-047) and delivers it to the president.
 - [ ] AC-2: This is artifact-only for R1 — the president needs no app login; receipt happens entirely inside WhatsApp (no in-app inbox is built).
 - [ ] AC-3: The share-intent reuses the canonical share pattern (`pattern.share-via-whatsapp`, same as US-049) — a single tap opens the OS/WhatsApp share sheet with the PDF blob URL.
-- [x] AC-4: The system records the share-attempt as an `AuditLogEntry` (actor = treasurer, target = the `StatementArchive`/PDF), consistent with the WhatsApp-share audit behavior in US-049.
-
-## Closeout
-
-Carry over to Sprint 6. Sprint 5 shipped the monthly-close archive and audited WhatsApp share attempt, but the shared PDF URL is currently an authenticated app route. US-060 is not complete until the president can open the monthly-close PDF without an app login, either through a public hash route or a signed expiring URL.
+- [ ] AC-4: The system records the share-attempt as an `AuditLogEntry` (actor = treasurer, target = the `StatementArchive`/PDF), consistent with the WhatsApp-share audit behavior in US-049.
 
 ## Technical Notes
 - **Data model:** no new entity — consumes the `StatementArchive` (`kind = monthly_close`) row and blob URL produced by US-047. Share-attempt recorded as an `AuditLogEntry`.

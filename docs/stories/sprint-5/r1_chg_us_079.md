@@ -24,15 +24,11 @@ As the platform operator, I want the FcoStudios platform-org in place with my `a
 
 ## Acceptance Criteria
 
-- [x] AC-1: A one-time seed script at `packages/db/seed/platform-bootstrap.ts` creates the FcoStudios platform organization (Auth0 Organization, or the single-tenant fallback per OQ-ARCH-2), the `PlatformOperator` row for Francisco Lomas with his `auth_subject` linked, and the operator role grant.
-- [x] AC-2: The script runs once at first deploy and requires manual confirmation before mutating any state (no silent re-seed).
-- [x] AC-3: The script is idempotent — re-running it does not create duplicate `Organization`/`PlatformOperator`/role-grant rows; it detects the existing bootstrap and exits cleanly (addresses F29 idempotency for the Auth0 + DB two-write path).
-- [x] AC-4: After a successful run, the linked operator can authenticate and reach `/admin` (the platform-scope surface) with operator role.
-- [x] AC-5: The bootstrap writes an `AuditLogEntry` (`created_by_kind = platform_operator` / `system`) recording the seed action and the actor.
-
-## Closeout
-
-Closed in Sprint 5. Verified by `packages/db/seed/platform-bootstrap.ts`, live `/admin` access, and platform org presence in production.
+- [ ] AC-1: A one-time seed script at `packages/db/seed/platform-bootstrap.ts` creates the FcoStudios platform organization (Auth0 Organization, or the single-tenant fallback per OQ-ARCH-2), the `PlatformOperator` row for Francisco Lomas with his `auth_subject` linked, and the operator role grant.
+- [ ] AC-2: The script runs once at first deploy and requires manual confirmation before mutating any state (no silent re-seed).
+- [ ] AC-3: The script is idempotent — re-running it does not create duplicate `Organization`/`PlatformOperator`/role-grant rows; it detects the existing bootstrap and exits cleanly (addresses F29 idempotency for the Auth0 + DB two-write path).
+- [ ] AC-4: After a successful run, the linked operator can authenticate and reach `/admin` (the platform-scope surface) with operator role.
+- [ ] AC-5: The bootstrap writes an `AuditLogEntry` (`created_by_kind = platform_operator` / `system`) recording the seed action and the actor.
 
 ## Technical Notes
 - **Data model:** seeds platform-scope rows — `Organization` (the FcoStudios platform org), `PlatformOperator` (Francisco Lomas, `auth_subject`), operator role grant, optional initial `GroupConfig`. No tenant ledger data. These are existing entities from US-008/US-016; no new migration expected.
