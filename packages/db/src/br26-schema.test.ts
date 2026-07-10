@@ -83,6 +83,10 @@ describe("BR-26 payment receipt schema", () => {
   });
 
   it("models allocation-to-child composite integrity in Drizzle", () => {
+    expect(uniqueConstraintSummary(paymentAllocation)).toContainEqual({
+      columns: ["org_id", "receipt_id", "sort_order"],
+      name: "uq_payment_allocation_receipt_order",
+    });
     expect(uniqueConstraintSummary(contribution)).toContainEqual({
       columns: ["org_id", "member_id", "payment_receipt_id", "id"],
       name: "uq_contribution_org_member_receipt_id",
