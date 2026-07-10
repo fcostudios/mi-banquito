@@ -121,6 +121,29 @@ export function monthlyMemberStatementPayload(input: {
 
 export type MonthlyMemberStatementPayload = ReturnType<typeof monthlyMemberStatementPayload>;
 
+export type MemberStatementContributionSource = {
+  id: string;
+  amount: string;
+  datedOn: string;
+  slipPhotoUri: string | null;
+  sourceKind?: "contribution" | "payment_receipt";
+};
+
+export function monthlyMemberStatementContributions(
+  rows: MemberStatementContributionSource[],
+): Array<{ id: string; amount: string; datedOn: string; slipPhotoUri: string | null }> {
+  return rows
+    .filter((row) => row.sourceKind !== "payment_receipt")
+    .map((row) => ({
+      id: row.id,
+      amount: row.amount,
+      datedOn: row.datedOn,
+      slipPhotoUri: row.slipPhotoUri,
+    }));
+}
+
+export type MonthlyMemberStatementContribution = ReturnType<typeof monthlyMemberStatementContributions>[number];
+
 export type MonthlyMemberStatementArtifactInput = {
   orgId: string;
   canonicalPayloadHash: string;
@@ -256,12 +279,13 @@ export function createReportingService(): ReportingService {
             member: { id: row.id, displayName: row.displayName },
             openingBalance: money4(openingBalance),
             closingBalance: money4(closingBalance),
-            contributions: contributions.map((item) => ({
+            contributions: monthlyMemberStatementContributions(contributions.map((item) => ({
               id: item.id,
               amount: item.amount,
               datedOn: dateOnly(item.datedOn),
               slipPhotoUri: null,
-            })),
+              sourceKind: "contribution",
+            }))),
             withdrawals: withdrawals.map((item) => ({
               id: item.id,
               amount: item.amount,

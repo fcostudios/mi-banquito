@@ -36,6 +36,7 @@ const actionLabels: Record<(typeof narratedAuditActionKinds)[number], string> = 
   "business_rules.view": copy.actions.businessRulesView,
   "adjustment_period.open": copy.actions.adjustmentPeriodOpen,
   "base_fund_quota.payment": copy.actions.baseFundQuotaPayment,
+  "payment.receipt.recorded": copy.actions.paymentReceiptRecorded,
 };
 
 function actionLabel(actionKind: string) {
