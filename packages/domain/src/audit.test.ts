@@ -552,6 +552,7 @@ describe("audit narration", () => {
       "business_rules.view",
       "adjustment_period.open",
       "base_fund_quota.payment",
+      "payment.receipt.recorded",
     ]));
   });
 
@@ -614,6 +615,57 @@ describe("audit narration", () => {
 
     expect(text).toBe("Se corrigió el registro de pago de Pancho por $16.00 el 2026-07-02.");
     expect(text).not.toContain("loan.repayment.data_correction");
+  });
+
+  it("narrates BR-26 grouped payment receipts with allocation details", async () => {
+    const fakeDb = new FakeDb([
+      [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          orgId: "11111111-1111-4111-8111-111111111111",
+          actorKind: "member",
+          actorId: "33333333-3333-4333-8333-333333333333",
+          actionKind: "payment.receipt.recorded",
+          subjectKind: "payment_receipt",
+          subjectId: "44444444-4444-4444-8444-444444444444",
+          payloadSnapshot: {
+            memberId: "m1",
+            receivedAmount: "45.0000",
+            datedOn: "2026-07-09",
+            extraDecision: "future_contribution",
+            allocations: [
+              { kind: "loan_interest", amount: "5.0000", loanId: "loan-1" },
+              { kind: "contribution_overdue", amount: "20.0000", cycleId: "cycle-1" },
+              { kind: "contribution_current", amount: "20.0000", cycleId: "cycle-2" },
+            ],
+          },
+          reason: null,
+          at: new Date("2026-07-09T03:17:00.000Z"),
+          createdAt: new Date("2026-07-09T03:17:00.000Z"),
+        },
+      ],
+      [
+        {
+          id: "m1",
+          displayName: "Toitq",
+        },
+      ],
+    ]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createAuditService: createDynamicAuditService } = await import("./audit");
+      const [entry] = await createDynamicAuditService().listNarratedEntries({
+        orgId: "11111111-1111-4111-8111-111111111111",
+      });
+
+      expect(entry).toEqual(expect.objectContaining({
+        text: "Toitq registró un pago agrupado de $45.00 el 2026-07-09.",
+        details: [
+          { label: "Decisión extra", value: "future_contribution" },
+          { label: "Aplicaciones", value: "loan_interest: $5.00, contribution_overdue: $20.00, contribution_current: $20.00" },
+        ],
+      }));
+    });
   });
 
   it("filters by member, action kind, and date range with AND semantics", () => {

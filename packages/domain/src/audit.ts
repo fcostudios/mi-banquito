@@ -148,10 +148,34 @@ function contributionDetails(payload: PayloadObject): AuditNarratedDetail[] {
   ];
 }
 
+function allocationSummary(payload: PayloadObject): string | undefined {
+  const allocations = payload.allocations;
+  if (!Array.isArray(allocations)) {
+    return undefined;
+  }
+  return allocations
+    .filter((entry): entry is PayloadObject => Boolean(entry) && typeof entry === "object" && !Array.isArray(entry))
+    .map((entry) => {
+      const kind = stringField(entry, "kind") ?? "asignación";
+      return `${kind}: $${money(stringField(entry, "amount"))}`;
+    })
+    .join(", ");
+}
+
+function receiptDetails(payload: PayloadObject): AuditNarratedDetail[] {
+  return [
+    ...detail("Decisión extra", stringField(payload, "extraDecision")),
+    ...detail("Aplicaciones", allocationSummary(payload)),
+  ];
+}
+
 function auditDetails(input: AuditNarrationInput): AuditNarratedDetail[] {
   const payload = payloadObject(input.payloadSnapshot);
   if (input.actionKind === "contribution.create") {
     return contributionDetails(payload);
+  }
+  if (input.actionKind === "payment.receipt.recorded") {
+    return receiptDetails(payload);
   }
   if (input.actionKind === "contribution.reverse") {
     return [
@@ -204,6 +228,10 @@ const templates: Record<string, (input: AuditNarrationInput) => string> = {
   "base_fund_quota.payment": (input) => {
     const payload = payloadObject(input.payloadSnapshot);
     return `${memberName(payload)} registró una cuota base de $${money(stringField(payload, "amount"))} el ${stringField(payload, "paidOn") ?? dateOnly(input.at)}.`;
+  },
+  "payment.receipt.recorded": (input) => {
+    const payload = payloadObject(input.payloadSnapshot);
+    return `${memberName(payload)} registró un pago agrupado de $${money(stringField(payload, "receivedAmount"))} el ${stringField(payload, "datedOn") ?? dateOnly(input.at)}.`;
   },
 };
 

@@ -49,6 +49,28 @@ describe("public statement verification", () => {
     expect(sha256Hex(canonicalJson(payload))).toHaveLength(64);
   });
 
+  it("keeps grouped BR-26 contribution child rows as statement rows without receipt duplication", () => {
+    const payload = monthlyMemberStatementPayload({
+      orgName: "Mi Banquito",
+      periodLabel: "2026-07",
+      member: { id: "m1", displayName: "Ana Mora" },
+      openingBalance: "100.0000",
+      closingBalance: "140.0000",
+      contributions: [
+        { id: "child-overdue", amount: "20.0000", datedOn: "2026-07-09", slipPhotoUri: null },
+        { id: "child-current", amount: "20.0000", datedOn: "2026-07-09", slipPhotoUri: null },
+      ],
+      withdrawals: [],
+      treasurerName: "Pancho",
+      bankLast4: null,
+    });
+    const rows = payload.sections[0].rows;
+
+    expect(rows.filter((row) => row.label === "Aporte 2026-07-09")).toHaveLength(2);
+    expect(rows).not.toContainEqual(expect.objectContaining({ label: expect.stringContaining("payment_receipt") }));
+    expect(sha256Hex(canonicalJson(payload))).toHaveLength(64);
+  });
+
   it("builds a WhatsApp share URL for archived statements", () => {
     expect(buildStatementShareUrl({
       whatsappNumber: "+593 99 123 4567",
