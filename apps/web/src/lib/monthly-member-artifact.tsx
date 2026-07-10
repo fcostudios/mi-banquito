@@ -47,6 +47,11 @@ const styles = StyleSheet.create({
   value: {
     flex: 1,
   },
+  detail: {
+    flex: 1,
+    color: "#4B5563",
+    marginTop: 2,
+  },
   footer: {
     position: "absolute",
     bottom: 32,
@@ -56,6 +61,16 @@ const styles = StyleSheet.create({
     color: "#6B7280",
   },
 });
+
+type StatementRow = MonthlyMemberStatementArtifactInput["payload"]["sections"][number]["rows"][number];
+
+function statementRowValue(row: StatementRow): string {
+  return "value" in row ? row.value : row.amount;
+}
+
+function statementRowDetails(row: StatementRow): string[] {
+  return "details" in row ? row.details : [];
+}
 
 function MonthlyMemberDocument({ input }: { input: MonthlyMemberStatementArtifactInput }) {
   return (
@@ -68,9 +83,14 @@ function MonthlyMemberDocument({ input }: { input: MonthlyMemberStatementArtifac
           <View key={section.id} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
             {section.rows.map((row) => (
-              <View key={`${row.label}-${row.value}`} style={styles.row}>
+              <View key={`${row.label}-${statementRowValue(row)}`} style={styles.row}>
                 <Text style={styles.label}>{row.label}</Text>
-                <Text style={styles.value}>{row.value}</Text>
+                <Text style={styles.value}>
+                  {statementRowValue(row)}
+                  {statementRowDetails(row).map((detail) => (
+                    <Text key={detail} style={styles.detail}>{"\n"}{detail}</Text>
+                  ))}
+                </Text>
               </View>
             ))}
           </View>
