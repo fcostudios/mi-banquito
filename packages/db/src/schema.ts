@@ -40,6 +40,20 @@ export const withdrawal_created_by_kind_enum = pgEnum("withdrawal_created_by_kin
 export const withdrawal_kind_enum = pgEnum("withdrawal_kind_enum", ["member_refund", "year_end_share_out", "other", "referral_commission_credit", "treasurer_compensation_disbursement", "year_end_reversal"]);
 export const year_end_share_out_status_enum = pgEnum("year_end_share_out_status_enum", ["draft", "approved", "distributed", "locked", "reversed"]);
 export const loan_disbursement_source_enum = pgEnum("loan_disbursement_source_enum", ["bank_transfer", "petty_cash"]);
+export const payment_extra_decision_enum = pgEnum("payment_extra_decision_enum", [
+  "extra_savings",
+  "future_contribution",
+  "loan_principal",
+]);
+export const payment_allocation_kind_enum = pgEnum("payment_allocation_kind_enum", [
+  "loan_fee",
+  "loan_interest",
+  "loan_principal",
+  "contribution_overdue",
+  "contribution_current",
+  "contribution_future",
+  "extra_savings",
+]);
 
 export const alert = pgTable("alert", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -179,6 +193,7 @@ export const contribution = pgTable("contribution", {
   reverseReason: text("reverse_reason"),
   adjustmentCycleId: uuid("adjustment_cycle_id").references((): AnyPgColumn => reconciliationCycle.id),
   clientRequestId: uuid("client_request_id"),
+  paymentReceiptId: uuid("payment_receipt_id").references((): AnyPgColumn => paymentReceipt.id),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
@@ -238,6 +253,43 @@ export const slipPhoto = pgTable("slip_photo", {
   uploadedByKind: text("uploaded_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
   contributionId: uuid("contribution_id").references((): AnyPgColumn => contribution.id),
   repaymentId: uuid("repayment_id").references((): AnyPgColumn => repayment.id),
+});
+
+export const paymentReceipt = pgTable("payment_receipt", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  memberId: uuid("member_id").references((): AnyPgColumn => member.id).notNull(),
+  amount: numeric("amount", { precision: 18, scale: 4 }).notNull(),
+  currencyCode: text("currency_code").notNull(),
+  datedOn: date("dated_on").notNull(),
+  receivedVia: text("received_via").notNull(),
+  slipPhotoId: uuid("slip_photo_id").references((): AnyPgColumn => slipPhoto.id),
+  notes: text("notes"),
+  extraDecision: payment_extra_decision_enum("extra_decision"),
+  clientRequestId: uuid("client_request_id").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+  createdBy: uuid("created_by").notNull(),
+  createdByKind: text("created_by_kind").notNull(),
+});
+
+export const paymentAllocation = pgTable("payment_allocation", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  receiptId: uuid("receipt_id").references((): AnyPgColumn => paymentReceipt.id).notNull(),
+  memberId: uuid("member_id").references((): AnyPgColumn => member.id).notNull(),
+  sortOrder: integer("sort_order").notNull(),
+  allocationKind: payment_allocation_kind_enum("allocation_kind").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 4 }).notNull(),
+  currencyCode: text("currency_code").notNull(),
+  loanId: uuid("loan_id").references((): AnyPgColumn => loan.id),
+  loanScheduleId: uuid("loan_schedule_id").references((): AnyPgColumn => loanSchedule.id),
+  loanFeeId: uuid("loan_fee_id").references((): AnyPgColumn => loanFee.id),
+  cycleId: uuid("cycle_id").references((): AnyPgColumn => contributionCycle.id),
+  repaymentId: uuid("repayment_id").references((): AnyPgColumn => repayment.id),
+  contributionId: uuid("contribution_id").references((): AnyPgColumn => contribution.id),
+  brId: text("br_id").notNull(),
+  groupConfigVersion: integer("group_config_version").notNull(),
+  createdAt: timestamp("created_at").notNull(),
 });
 
 export const account = pgTable("account", {
@@ -419,6 +471,7 @@ export const repayment = pgTable("repayment", {
   reverseReason: text("reverse_reason"),
   adjustmentCycleId: uuid("adjustment_cycle_id").references((): AnyPgColumn => reconciliationCycle.id),
   clientRequestId: uuid("client_request_id"),
+  paymentReceiptId: uuid("payment_receipt_id").references((): AnyPgColumn => paymentReceipt.id),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
