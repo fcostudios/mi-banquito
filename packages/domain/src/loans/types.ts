@@ -60,6 +60,7 @@ export type LoanListRow = {
   id: string;
   borrowerName: string;
   borrowerKind: BorrowerKind;
+  borrowerMemberId?: string | null;
   principalAmount: string;
   currencyCode: string;
   status: string;

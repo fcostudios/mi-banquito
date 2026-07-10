@@ -605,6 +605,7 @@
       "mode": "Tipo de pago",
       "nextInstallment": "Pagar próxima cuota",
       "principalPayment": "Abonar a capital",
+      "waterfallWarning": "BR-26 puede aplicar este pago primero a mora, intereses o aportes vencidos antes de abonar al préstamo seleccionado.",
       "slip": "Comprobante",
       "notes": "Notas",
       "submit": "Registrar pago"
