@@ -83,10 +83,11 @@ function memberPaymentConfirmationRedirect(input: Record<string, unknown>): stri
 
 type MemberPaymentPreviewResult = Awaited<ReturnType<ReturnType<typeof createPaymentService>["previewMemberPayment"]>>;
 
-function reachesTargetCycle(preview: MemberPaymentPreviewResult, cycleId: string): boolean {
-  return preview.allocations.some((line) => (
-    (line.kind === "contribution_overdue" || line.kind === "contribution_current" || line.kind === "contribution_future")
-    && line.cycleId === cycleId
+function startsWithTargetCycle(preview: MemberPaymentPreviewResult, cycleId: string): boolean {
+  const [firstAllocation] = preview.allocations;
+  return Boolean(firstAllocation && (
+    (firstAllocation.kind === "contribution_overdue" || firstAllocation.kind === "contribution_current" || firstAllocation.kind === "contribution_future")
+    && firstAllocation.cycleId === cycleId
   ));
 }
 
@@ -186,7 +187,7 @@ export async function recordOverdueContributionAction(formData: FormData) {
       orgId: session.orgId,
       actorId: session.actorId,
     });
-    if (!reachesTargetCycle(preview, cycleId)) {
+    if (!startsWithTargetCycle(preview, cycleId)) {
       confirmationPath = memberPaymentConfirmationRedirect(parsed);
     } else {
       await paymentService.recordMemberPayment({
