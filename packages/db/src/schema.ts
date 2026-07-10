@@ -278,6 +278,7 @@ export const paymentReceipt = pgTable("payment_receipt", {
   createdBy: uuid("created_by").notNull(),
   createdByKind: text("created_by_kind").notNull(),
 }, (table) => [
+  unique("uq_payment_receipt_org_client_request").on(table.orgId, table.clientRequestId),
   unique("uq_payment_receipt_org_member_id").on(table.orgId, table.memberId, table.id),
 ]);
 
