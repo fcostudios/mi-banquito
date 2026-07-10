@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
-import { createLoanService } from "@mi-banquito/domain";
+import { createLoanService, createPaymentService } from "@mi-banquito/domain";
 import { ButtonPrimary, FormField, InputNumber, InputText, Radio } from "@mi-banquito/ui";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import { todayISO } from "@/lib/format/es-ec";
@@ -11,6 +11,12 @@ export const dynamic = "force-dynamic";
 
 const copy = messages.sprint2.repayment;
 
+type PreviewAllocation = Awaited<ReturnType<ReturnType<typeof createPaymentService>["previewMemberPayment"]>>["allocations"][number];
+
+function hasHigherPriorityAllocation(allocations: PreviewAllocation[], targetLoanId: string): boolean {
+  return allocations.some((line) => line.kind !== "loan_principal" || line.loanId !== targetLoanId);
+}
+
 export default async function ScrRecordRepaymentPage({
   params,
 }: {
@@ -20,6 +26,20 @@ export default async function ScrRecordRepaymentPage({
   const { id } = await params;
   const detail = await createLoanService().getLoanDetail(session.orgId, id);
   if (!detail) notFound();
+  const preview = detail.borrowerMemberId
+    ? await createPaymentService().previewMemberPayment({
+      orgId: session.orgId,
+      actorId: session.actorId,
+      clientRequestId: randomUUID(),
+      memberId: detail.borrowerMemberId,
+      amount: "1.0000",
+      datedOn: todayISO(),
+      paymentSource: "cash_in_meeting",
+      targetLoanId: detail.id,
+      extraDecision: "loan_principal",
+    }).catch(() => undefined)
+    : undefined;
+  const showWaterfallWarning = preview ? hasHigherPriorityAllocation(preview.allocations, detail.id) : false;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6" data-screen="SCR-record-repayment">
@@ -28,6 +48,11 @@ export default async function ScrRecordRepaymentPage({
         <p className="text-text-secondary">{detail.borrowerName}</p>
       </div>
       <form action={recordRepaymentAction} className="grid gap-4 rounded-md border border-border bg-surface p-5">
+        {showWaterfallWarning ? (
+          <div className="rounded-md border border-warning bg-surface p-3 text-sm text-text-secondary" role="status">
+            {copy.waterfallWarning}
+          </div>
+        ) : null}
         <input type="hidden" name="clientRequestId" value={randomUUID()} />
         <input type="hidden" name="loanId" value={detail.id} />
         <FormField labelKey={copy.amount}>

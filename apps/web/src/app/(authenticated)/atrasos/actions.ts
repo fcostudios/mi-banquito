@@ -4,13 +4,13 @@ import { redirect } from "next/navigation";
 import { ZodError } from "zod";
 import {
   chaseAttemptFormSchema,
-  contributionFormSchema,
   currentEcuadorDateString,
+  memberPaymentFormSchema,
   markPromiseFormSchema,
 } from "@mi-banquito/contracts";
 import {
   createCollectionsService,
-  createLedgerService,
+  createPaymentService,
   type DateOnlyString,
   type PromiseOutcome,
 } from "@mi-banquito/domain";
@@ -58,6 +58,27 @@ function revalidateCollectionsViews() {
   revalidatePath("/socias");
   revalidatePath("/historial");
   revalidatePath("/aportes");
+}
+
+function memberPaymentConfirmationRedirect(input: Record<string, unknown>): string {
+  const params = new URLSearchParams({ confirm: "1" });
+  for (const key of [
+    "clientRequestId",
+    "memberId",
+    "amount",
+    "datedOn",
+    "paymentSource",
+    "slipPhotoId",
+    "notes",
+    "targetCycleId",
+    "targetLoanId",
+  ]) {
+    const value = input[key];
+    if (typeof value === "string" && value) {
+      params.set(key, value);
+    }
+  }
+  return `/aportes/registrar?${params.toString()}`;
 }
 
 function parsePromiseOutcome(values: Record<string, FormDataEntryValue>): {
@@ -120,6 +141,7 @@ export async function markPromiseOutcomeAction(formData: FormData) {
 
 export async function recordOverdueContributionAction(formData: FormData) {
   const session = await requireTreasurer();
+  let paymentPayload: Record<string, unknown> | undefined;
 
   try {
     const values = formDataToObject(formData);
@@ -136,20 +158,27 @@ export async function recordOverdueContributionAction(formData: FormData) {
       throw new Error("collections_obligation_not_found");
     }
 
-    const parsed = contributionFormSchema.parse({
+    const parsed = memberPaymentFormSchema.parse({
       clientRequestId,
       memberId,
-      cycleId,
+      targetCycleId: cycleId,
       amount: String(agingRow.amountDue),
       datedOn: currentEcuadorDateString(),
       paymentSource: "cash_in_meeting",
-      kind: "regular",
       slipPhotoId: "",
-      notes: `Pago de atraso ${agingRow.periodLabel}`,
+      notes: `Pago desde atrasos: ${agingRow.periodLabel}`,
     });
+    paymentPayload = parsed;
 
-    await createLedgerService().recordContribution(session.orgId, session.actorId, parsed);
+    await createPaymentService().recordMemberPayment({
+      ...parsed,
+      orgId: session.orgId,
+      actorId: session.actorId,
+    });
   } catch (error) {
+    if (error instanceof Error && error.message === "payment_extra_decision_required") {
+      redirect(memberPaymentConfirmationRedirect(paymentPayload ?? formDataToObject(formData)));
+    }
     redirect(`/atrasos?error=${encodeURIComponent(validationMessage(error))}`);
   }
 
