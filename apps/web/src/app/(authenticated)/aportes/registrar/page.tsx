@@ -76,11 +76,11 @@ export default async function ScrRecordContributionPage({
         </FormField>
         {showConfirmation ? (
           <fieldset className="grid gap-2 rounded-md border border-border p-4">
-            <legend className="px-1 text-sm font-semibold text-text-primary">Queda dinero sin aplicar</legend>
-            <Radio name="extraDecision" value="extra_savings" label="Aporte extra / ahorro" defaultChecked />
-            <Radio name="extraDecision" value="future_contribution" label="Prepagar aporte futuro" />
+            <legend className="px-1 text-sm font-semibold text-text-primary">{copy.contributions.extraDecisionTitle}</legend>
+            <Radio name="extraDecision" value="extra_savings" label={copy.contributions.extraDecisionSavings} defaultChecked />
+            <Radio name="extraDecision" value="future_contribution" label={copy.contributions.extraDecisionFuture} />
             {params?.targetLoanId ? (
-              <Radio name="extraDecision" value="loan_principal" label="Abonar a capital" />
+              <Radio name="extraDecision" value="loan_principal" label={copy.contributions.extraDecisionPrincipal} />
             ) : null}
           </fieldset>
         ) : null}
