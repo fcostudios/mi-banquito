@@ -53,8 +53,8 @@ describe("public statement verification", () => {
   it("keeps grouped BR-26 contribution child rows as statement rows without receipt duplication", () => {
     const contributions = monthlyMemberStatementContributions([
       { id: "receipt-1", amount: "40.0000", datedOn: "2026-07-09", slipPhotoUri: null, sourceKind: "payment_receipt" },
-      { id: "child-overdue", amount: "20.0000", datedOn: "2026-07-09", slipPhotoUri: null, sourceKind: "contribution" },
       { id: "child-current", amount: "20.0000", datedOn: "2026-07-09", slipPhotoUri: null, sourceKind: "contribution" },
+      { id: "child-overdue", amount: "20.0000", datedOn: "2026-07-09", slipPhotoUri: null, sourceKind: "contribution" },
     ]);
     const payload = monthlyMemberStatementPayload({
       orgName: "Mi Banquito",
@@ -70,7 +70,7 @@ describe("public statement verification", () => {
     const rows = payload.sections[0].rows;
 
     expect(rows.filter((row) => row.label === "Aporte 2026-07-09")).toHaveLength(2);
-    expect(contributions.map((row) => row.id)).toEqual(["child-overdue", "child-current"]);
+    expect(contributions.map((row) => row.id)).toEqual(["child-current", "child-overdue"]);
     expect(rows).not.toContainEqual(expect.objectContaining({ label: expect.stringContaining("payment_receipt") }));
     expect(sha256Hex(canonicalJson(payload))).toHaveLength(64);
   });

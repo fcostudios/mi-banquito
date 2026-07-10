@@ -648,6 +648,7 @@ export function createPaymentService(): PaymentService {
               amount: line.amount,
               loanId: line.loanId,
               cycleId: line.cycleId,
+              cycleLabel: allocation.allocations.find((source) => source.sortOrder === line.sortOrder)?.cycleLabel ?? null,
               repaymentId: line.repaymentId,
               contributionId: line.contributionId,
             })),
