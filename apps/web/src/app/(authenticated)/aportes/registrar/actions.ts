@@ -21,7 +21,17 @@ function contributionErrorMessage(error: unknown): string {
 
 function confirmationRedirect(input: Record<string, unknown>): string {
   const params = new URLSearchParams({ confirm: "1" });
-  for (const key of ["clientRequestId", "memberId", "amount", "datedOn", "paymentSource", "targetLoanId", "targetCycleId"]) {
+  for (const key of [
+    "clientRequestId",
+    "memberId",
+    "amount",
+    "datedOn",
+    "paymentSource",
+    "slipPhotoId",
+    "notes",
+    "targetLoanId",
+    "targetCycleId",
+  ]) {
     const value = input[key];
     if (typeof value === "string" && value) {
       params.set(key, value);

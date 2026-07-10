@@ -84,11 +84,18 @@ describe("recordContributionAction", () => {
     recordMemberPayment.mockRejectedValue(new Error("payment_extra_decision_required"));
     const { recordContributionAction } = await import("./actions");
     const formData = baseFormData();
+    formData.set("paymentSource", "bank_transfer");
+    formData.set("slipPhotoId", "99999999-9999-4999-8999-999999999999");
+    formData.set("notes", "Comprobante revisado");
 
     await expect(recordContributionAction(formData)).rejects.toThrow(
       "NEXT_REDIRECT:/aportes/registrar?confirm=1",
     );
     expect(redirect.mock.calls[0]?.[0]).toContain("memberId=22222222-2222-4222-8222-222222222222");
     expect(redirect.mock.calls[0]?.[0]).toContain("amount=10.00");
+    expect(redirect.mock.calls[0]?.[0]).toContain("slipPhotoId=99999999-9999-4999-8999-999999999999");
+    const redirectedTo = redirect.mock.calls[0]?.[0] ?? "";
+    const redirectedParams = new URLSearchParams(redirectedTo.split("?")[1]);
+    expect(redirectedParams.get("notes")).toBe("Comprobante revisado");
   });
 });

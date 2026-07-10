@@ -31,6 +31,28 @@ describe("ScrRecordContributionPage", () => {
   });
 
   it("renders one-tap BR-26 extra-money decisions during confirmation", async () => {
+    const { container } = render(await ScrRecordContributionPage({
+      searchParams: Promise.resolve({
+        confirm: "1",
+        clientRequestId: "11111111-1111-4111-8111-111111111111",
+        memberId: "22222222-2222-4222-8222-222222222222",
+        amount: "30.00",
+        datedOn: "2026-07-09",
+        paymentSource: "bank_transfer",
+        slipPhotoId: "99999999-9999-4999-8999-999999999999",
+        notes: "Comprobante revisado",
+        targetLoanId: "44444444-4444-4444-8444-444444444444",
+      }),
+    }));
+
+    expect(screen.getByRole("radio", { name: /Aporte extra/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Prepagar aporte/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Abonar a capital/i })).toBeInTheDocument();
+    expect(container.querySelector('input[name="slipPhotoId"]')).toHaveValue("99999999-9999-4999-8999-999999999999");
+    expect(container.querySelector('input[name="notes"]')).toHaveValue("Comprobante revisado");
+  });
+
+  it("does not show loan-principal decision without a target loan", async () => {
     render(await ScrRecordContributionPage({
       searchParams: Promise.resolve({
         confirm: "1",
@@ -44,6 +66,6 @@ describe("ScrRecordContributionPage", () => {
 
     expect(screen.getByRole("radio", { name: /Aporte extra/i })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Prepagar aporte/i })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Abonar a capital/i })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /Abonar a capital/i })).not.toBeInTheDocument();
   });
 });
