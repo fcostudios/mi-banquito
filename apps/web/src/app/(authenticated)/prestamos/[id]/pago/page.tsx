@@ -26,12 +26,13 @@ export default async function ScrRecordRepaymentPage({
   const { id } = await params;
   const detail = await createLoanService().getLoanDetail(session.orgId, id);
   if (!detail) notFound();
-  const preview = detail.borrowerMemberId
+  const paymentMemberId = detail.borrowerMemberId ?? detail.guarantorMemberId;
+  const preview = paymentMemberId
     ? await createPaymentService().previewMemberPayment({
       orgId: session.orgId,
       actorId: session.actorId,
       clientRequestId: randomUUID(),
-      memberId: detail.borrowerMemberId,
+      memberId: paymentMemberId,
       amount: "1.0000",
       datedOn: todayISO(),
       paymentSource: "cash_in_meeting",

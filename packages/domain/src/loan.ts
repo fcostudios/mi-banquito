@@ -416,6 +416,7 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
       termPeriods: row.termPeriods,
       originatedOn: row.originatedOn,
       guarantorName: guarantorMember?.displayName,
+      guarantorMemberId: guarantorRows[0]?.guarantorMemberId,
       referrerName: referrerMember?.displayName,
       schedule: [...scheduleRows].sort((left, right) => left.periodIndex - right.periodIndex).map((schedule) => ({
         periodIndex: schedule.periodIndex,

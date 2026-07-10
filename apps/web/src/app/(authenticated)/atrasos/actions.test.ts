@@ -11,6 +11,7 @@ const buildChaseAttempt = vi.fn();
 const recordChaseAttempt = vi.fn();
 const listAgingRows = vi.fn();
 const recordMemberPayment = vi.fn();
+const previewMemberPayment = vi.fn();
 const requireTreasurer = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -33,6 +34,7 @@ vi.mock("@mi-banquito/domain", async (importOriginal) => {
       listAgingRows,
     }),
     createPaymentService: () => ({
+      previewMemberPayment,
       recordMemberPayment,
     }),
   };
@@ -94,6 +96,18 @@ describe("atrasos actions", () => {
     recordChaseAttempt.mockReset();
     listAgingRows.mockReset();
     recordMemberPayment.mockReset();
+    previewMemberPayment.mockReset();
+    previewMemberPayment.mockResolvedValue({
+      allocations: [
+        {
+          kind: "contribution_overdue",
+          cycleId: "55555555-5555-4555-8555-555555555555",
+          amount: "20.0000",
+        },
+      ],
+      unappliedAmount: "0.0000",
+      requiresExtraDecision: false,
+    });
     requireTreasurer.mockReset();
     requireTreasurer.mockResolvedValue({ orgId, actorId });
   });
@@ -231,6 +245,10 @@ describe("atrasos actions", () => {
         notes: "Pago desde atrasos: 2026-06",
       }),
     );
+    expect(previewMemberPayment).toHaveBeenCalledWith(expect.objectContaining({
+      targetCycleId: "55555555-5555-4555-8555-555555555555",
+      amount: "20.0000",
+    }));
     expect(listAgingRows).toHaveBeenCalledWith(orgId, "aporte");
     expect(revalidatePath).toHaveBeenCalledWith("/atrasos");
     expect(revalidatePath).toHaveBeenCalledWith("/");
@@ -259,5 +277,36 @@ describe("atrasos actions", () => {
     expect(redirectedParams.get("targetCycleId")).toBe("55555555-5555-4555-8555-555555555555");
     expect(redirectedParams.get("amount")).toBe("20.0000");
     expect(redirectedParams.get("notes")).toBe("Pago desde atrasos: 2026-06");
+  });
+
+  it("routes higher-priority BR-26 allocation before the target cycle to confirmation", async () => {
+    const { recordOverdueContributionAction } = await import("./actions");
+    listAgingRows.mockResolvedValue([
+      {
+        memberId,
+        cycleId: "55555555-5555-4555-8555-555555555555",
+        periodLabel: "2026-06",
+        amountDue: "20.0000",
+      },
+    ]);
+    previewMemberPayment.mockResolvedValue({
+      allocations: [
+        {
+          kind: "loan_interest",
+          loanId,
+          amount: "20.0000",
+        },
+      ],
+      unappliedAmount: "0.0000",
+      requiresExtraDecision: false,
+    });
+
+    await expect(recordOverdueContributionAction(overdueContributionFormData()))
+      .rejects.toThrow("NEXT_REDIRECT:/aportes/registrar?confirm=1");
+
+    expect(recordMemberPayment).not.toHaveBeenCalled();
+    const redirectedTo = redirect.mock.calls[0]?.[0] ?? "";
+    const redirectedParams = new URLSearchParams(redirectedTo.split("?")[1]);
+    expect(redirectedParams.get("targetCycleId")).toBe("55555555-5555-4555-8555-555555555555");
   });
 });

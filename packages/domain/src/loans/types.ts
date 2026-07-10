@@ -72,6 +72,7 @@ export type LoanDetailRow = LoanListRow & {
   termPeriods: number;
   originatedOn: string;
   guarantorName?: string;
+  guarantorMemberId?: string | null;
   referrerName?: string;
   schedule: Array<{
     periodIndex: number;

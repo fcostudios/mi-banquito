@@ -81,6 +81,15 @@ function memberPaymentConfirmationRedirect(input: Record<string, unknown>): stri
   return `/aportes/registrar?${params.toString()}`;
 }
 
+type MemberPaymentPreviewResult = Awaited<ReturnType<ReturnType<typeof createPaymentService>["previewMemberPayment"]>>;
+
+function reachesTargetCycle(preview: MemberPaymentPreviewResult, cycleId: string): boolean {
+  return preview.allocations.some((line) => (
+    (line.kind === "contribution_overdue" || line.kind === "contribution_current" || line.kind === "contribution_future")
+    && line.cycleId === cycleId
+  ));
+}
+
 function parsePromiseOutcome(values: Record<string, FormDataEntryValue>): {
   promiseId: string;
   outcome: PromiseOutcome;
@@ -142,6 +151,7 @@ export async function markPromiseOutcomeAction(formData: FormData) {
 export async function recordOverdueContributionAction(formData: FormData) {
   const session = await requireTreasurer();
   let paymentPayload: Record<string, unknown> | undefined;
+  let confirmationPath: string | undefined;
 
   try {
     const values = formDataToObject(formData);
@@ -170,16 +180,30 @@ export async function recordOverdueContributionAction(formData: FormData) {
     });
     paymentPayload = parsed;
 
-    await createPaymentService().recordMemberPayment({
+    const paymentService = createPaymentService();
+    const preview = await paymentService.previewMemberPayment({
       ...parsed,
       orgId: session.orgId,
       actorId: session.actorId,
     });
+    if (!reachesTargetCycle(preview, cycleId)) {
+      confirmationPath = memberPaymentConfirmationRedirect(parsed);
+    } else {
+      await paymentService.recordMemberPayment({
+        ...parsed,
+        orgId: session.orgId,
+        actorId: session.actorId,
+      });
+    }
   } catch (error) {
     if (error instanceof Error && error.message === "payment_extra_decision_required") {
       redirect(memberPaymentConfirmationRedirect(paymentPayload ?? formDataToObject(formData)));
     }
     redirect(`/atrasos?error=${encodeURIComponent(validationMessage(error))}`);
+  }
+
+  if (confirmationPath) {
+    redirect(confirmationPath);
   }
 
   revalidateCollectionsViews();
