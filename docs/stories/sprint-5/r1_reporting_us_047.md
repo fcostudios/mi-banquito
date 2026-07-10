@@ -22,17 +22,13 @@ As the system (P14), I want to produce a defensible monthly-close artifact with 
 | Blocked By | US-046 |
 ## Acceptance Criteria
 
-- [x] AC-1: Post-commit on a `PeriodClose` (US-046), the system generates a `monthly_close` PDF with `@react-pdf/renderer` using the design-system tokens and the org's branding logo.
-- [x] AC-2: The PDF payload is serialized to canonical JSON (deterministic key ordering) and a SHA-256 hash is computed over that canonical JSON and stored on the `StatementArchive` row (`canonical_payload_hash`).
-- [x] AC-3: The rendered PDF is uploaded to Vercel Blob and a `StatementArchive` row is inserted referencing the `PeriodClose`, the blob URL, the hash, `kind = monthly_close`, and `generated_at`.
-- [x] AC-4: Generation is idempotent — re-running for the same `PeriodClose` UPSERTs on the natural key (`period_close_id`, `kind`) rather than inserting a duplicate `StatementArchive` (F28); identical inputs produce an identical canonical payload and hash.
-- [x] AC-5: The payload aggregates the cycle's data: `PeriodClose`, `ReconciliationCycle` (incl. annotated discrepancy + `resolution_note`), ledger entries for the cycle, all member balances at close, all open loans, and branding.
-- [x] AC-6: The treasurer can preview the generated PDF on `SCR-monthly-close` and share it via WhatsApp; the archive is listed on `SCR-statements-archive`.
-- [x] AC-7: The `StatementArchive` insert and its `AuditLogEntry` occur in one DB transaction; an injected audit-write failure rolls back the archive row (NFR-SEC-04).
-
-## Closeout
-
-Closed in Sprint 5 monthly-close slice. Verified by monthly-close artifact tests, reconciliation domain tests, schema tests, live June 2026 archive, and live PDF content-type check.
+- [ ] AC-1: Post-commit on a `PeriodClose` (US-046), the system generates a `monthly_close` PDF with `@react-pdf/renderer` using the design-system tokens and the org's branding logo.
+- [ ] AC-2: The PDF payload is serialized to canonical JSON (deterministic key ordering) and a SHA-256 hash is computed over that canonical JSON and stored on the `StatementArchive` row (`canonical_payload_hash`).
+- [ ] AC-3: The rendered PDF is uploaded to Vercel Blob and a `StatementArchive` row is inserted referencing the `PeriodClose`, the blob URL, the hash, `kind = monthly_close`, and `generated_at`.
+- [ ] AC-4: Generation is idempotent — re-running for the same `PeriodClose` UPSERTs on the natural key (`period_close_id`, `kind`) rather than inserting a duplicate `StatementArchive` (F28); identical inputs produce an identical canonical payload and hash.
+- [ ] AC-5: The payload aggregates the cycle's data: `PeriodClose`, `ReconciliationCycle` (incl. annotated discrepancy + `resolution_note`), ledger entries for the cycle, all member balances at close, all open loans, and branding.
+- [ ] AC-6: The treasurer can preview the generated PDF on `SCR-monthly-close` and share it via WhatsApp; the archive is listed on `SCR-statements-archive`.
+- [ ] AC-7: The `StatementArchive` insert and its `AuditLogEntry` occur in one DB transaction; an injected audit-write failure rolls back the archive row (NFR-SEC-04).
 
 ## Technical Notes
 - **Data model:** `StatementArchive` (from `PeriodClose` via `produces`): `period_close_id`, `kind`, `blob_url`, `canonical_payload_hash`, `generated_at`, recipient. Append-only, written by a system actor (`created_by_kind = system`). UNIQUE natural key `(period_close_id, kind)` for idempotency. New columns/table via timestamp-slug migration per HR-25 (`slug=statement_archive`) if not present from US-008.

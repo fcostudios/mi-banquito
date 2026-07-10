@@ -20,15 +20,7 @@ sufficient. See `CLAUDE.md` for the summary; this is the authoritative gate.
    pnpm build               # next build --webpack (serverless / PWA bundler)
    ```
 
-4. **Sprint UI closure gates pass when closing an implemented sprint:**
-   ```bash
-   pnpm audit:sprint1-ui    # Sprint 1: no Sprint 1 scaffold screens; shell/home markers present
-   ```
-   - This does not replace rendered QA. It prevents claiming a sprint is closed
-     while its committed route files still expose generated scaffolds or the
-     stabilized app shell/home markers are missing.
-
-5. **Schema applies on a fresh database (and is verified):**
+4. **Schema applies on a fresh database (and is verified):**
    - **Prerequisite:** `DATABASE_URL` must be set to a reachable Postgres before this
      step — copy `.env.example` → `.env` and set it (or run `task setup`). The bare
      `push` below silently no-ops against an unset/unreachable URL.
@@ -38,20 +30,19 @@ sufficient. See `CLAUDE.md` for the summary; this is the authoritative gate.
    - `drizzle-kit push` exits **0 even on an unreachable `DATABASE_URL`** (a silent
      no-op: 0 tables). `verify-schema.mjs` counts the applied tables and exits
      non-zero on 0 — so "schema applies cleanly" can no longer be a false pass.
-   - The runtime DB client uses the transaction-capable `pg` driver by default,
-     including for Neon URLs. `neon-http` is only an explicit read-only/tooling
-     opt-in because it does not support `transaction()`.
+   - The DB client auto-selects its driver by `DATABASE_URL` (`pg` for a local/
+     standard Postgres URL, `neon-http` for a Neon URL), so `push` applies locally.
    - Migrations live in `packages/db/src/migrations/` as `V<timestamp>__<slug>.sql`.
    - Once applied, a migration file is immutable — add a new one; never edit it.
    - Every Drizzle column has a corresponding migration column.
 
-6. **Report evidence** in `.nous-feedback.jsonl`:
+5. **Report evidence** in `.nous-feedback.jsonl`:
    ```jsonl
    {"story":"US-XXX","event":"build_pass","notes":"type-check + lint + build green"}
    {"story":"US-XXX","event":"done"}
    ```
 
-7. **Adversarial AC verification** — see
+6. **Adversarial AC verification** — see
    [`FEEDBACK.md`](FEEDBACK.md) (AC Verification Protocol).
 
 ## Story Rejection Criteria

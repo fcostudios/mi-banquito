@@ -1,0 +1,886 @@
+{
+  "synced_at": "2026-07-10T05:54:43.083596+00:00",
+  "project_id": "fcostudios__mi-banquito",
+  "files": {
+    "docs/stories/sprint-1/r1_admin_us_016.md": {
+      "hash": "2290026794c5afb4",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_admin_us_016.md"
+    },
+    "docs/stories/sprint-1/r1_admin_us_017.md": {
+      "hash": "74da93dd306f411b",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_admin_us_017.md"
+    },
+    "docs/stories/sprint-7/r1_admin_us_018.md": {
+      "hash": "b0449af688c29dde",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_admin_us_018.md"
+    },
+    "docs/stories/sprint-8/r1_admin_us_019.md": {
+      "hash": "49cc3ab23b35c743",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_admin_us_019.md"
+    },
+    "docs/stories/sprint-8/r1_admin_us_020.md": {
+      "hash": "ff0f9e7e175db862",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_admin_us_020.md"
+    },
+    "docs/stories/sprint-8/r1_admin_us_021.md": {
+      "hash": "be68e26ec0f0d952",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_admin_us_021.md"
+    },
+    "docs/stories/sprint-8/r1_admin_us_022.md": {
+      "hash": "582d2b3e77a5d042",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_admin_us_022.md"
+    },
+    "docs/stories/sprint-8/r1_admin_us_023.md": {
+      "hash": "504ef01f1d8715cf",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_admin_us_023.md"
+    },
+    "docs/stories/sprint-3/r1_admin_us_024.md": {
+      "hash": "10ef25636d61d624",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_admin_us_024.md"
+    },
+    "docs/stories/sprint-4/r1_alerts_us_043.md": {
+      "hash": "69c9b1cc77099361",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_alerts_us_043.md"
+    },
+    "docs/stories/sprint-3/r1_alerts_us_055.md": {
+      "hash": "bbde5254d45bd59c",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_alerts_us_055.md"
+    },
+    "docs/stories/sprint-6/r1_alerts_us_061.md": {
+      "hash": "e461f916d630552f",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_alerts_us_061.md"
+    },
+    "docs/stories/sprint-6/r1_alerts_us_062.md": {
+      "hash": "9c07375a53bf28d5",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_alerts_us_062.md"
+    },
+    "docs/stories/sprint-6/r1_alerts_us_063.md": {
+      "hash": "5df4b5e9697c4797",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_alerts_us_063.md"
+    },
+    "docs/stories/sprint-7/r1_alerts_us_064.md": {
+      "hash": "1ddb75f20646e44e",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_alerts_us_064.md"
+    },
+    "docs/stories/sprint-7/r1_alerts_us_065.md": {
+      "hash": "cd3bc1749df097e3",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_alerts_us_065.md"
+    },
+    "docs/stories/sprint-7/r1_alerts_us_066.md": {
+      "hash": "b1b57ea37b9600b8",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_alerts_us_066.md"
+    },
+    "docs/stories/sprint-5/r1_alerts_us_067.md": {
+      "hash": "2529ad7cc885c9b3",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_alerts_us_067.md"
+    },
+    "docs/stories/sprint-7/r1_alerts_us_068.md": {
+      "hash": "05c3e8cf0286bc60",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_alerts_us_068.md"
+    },
+    "docs/stories/sprint-6/r1_artifact_us_059.md": {
+      "hash": "cb2bb84b5181fe3b",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_artifact_us_059.md"
+    },
+    "docs/stories/sprint-5/r1_artifact_us_060.md": {
+      "hash": "bd2ee217338d0664",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_artifact_us_060.md"
+    },
+    "docs/stories/sprint-3/r1_audit_us_056.md": {
+      "hash": "5b6b267c08794f5a",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_audit_us_056.md"
+    },
+    "docs/stories/sprint-3/r1_audit_us_057.md": {
+      "hash": "2aa7360d6bf81d04",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_audit_us_057.md"
+    },
+    "docs/stories/sprint-2/r1_chg_us_074.md": {
+      "hash": "e243d3d70945f247",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_074.md"
+    },
+    "docs/stories/sprint-2/r1_chg_us_075.md": {
+      "hash": "caa3a8656d9bdb0d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_075.md"
+    },
+    "docs/stories/sprint-4/r1_chg_us_076.md": {
+      "hash": "e86f8254ece2d5ec",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_076.md"
+    },
+    "docs/stories/sprint-4/r1_chg_us_077.md": {
+      "hash": "73bcc4cccba1c121",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_077.md"
+    },
+    "docs/stories/sprint-7/r1_chg_us_078.md": {
+      "hash": "9bc39105d8a512f5",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_078.md"
+    },
+    "docs/stories/sprint-5/r1_chg_us_079.md": {
+      "hash": "687017fbb3fd7263",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_079.md"
+    },
+    "docs/stories/sprint-5/r1_chg_us_080.md": {
+      "hash": "dd0681f3932fabd6",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_080.md"
+    },
+    "docs/stories/sprint-2/r1_chg_us_081.md": {
+      "hash": "0eac2b09baf80f0c",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_081.md"
+    },
+    "docs/stories/sprint-7/r1_chg_us_082.md": {
+      "hash": "2078660c386bdb44",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_082.md"
+    },
+    "docs/stories/sprint-3/r1_chg_us_083.md": {
+      "hash": "bca5cb2ef7b85497",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_083.md"
+    },
+    "docs/stories/sprint-7/r1_chg_us_084.md": {
+      "hash": "bf9f750d6406bcae",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_084.md"
+    },
+    "docs/stories/sprint-4/r1_chg_us_085.md": {
+      "hash": "a79d9241ca24db3d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_085.md"
+    },
+    "docs/stories/sprint-5/r1_chg_us_086.md": {
+      "hash": "92f7bd4665716898",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_086.md"
+    },
+    "docs/stories/sprint-4/r1_chg_us_087.md": {
+      "hash": "42c0c980755c8775",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_087.md"
+    },
+    "docs/stories/sprint-5/r1_chg_us_088.md": {
+      "hash": "4ce6eb82b7bfb483",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_088.md"
+    },
+    "docs/stories/sprint-7/r1_chg_us_089.md": {
+      "hash": "c0c7ed1f1031b885",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_089.md"
+    },
+    "docs/stories/sprint-7/r1_chg_us_090.md": {
+      "hash": "87fb2ec4d5136309",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_090.md"
+    },
+    "docs/stories/sprint-8/r1_chg_us_091.md": {
+      "hash": "679bc7167861b675",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_091.md"
+    },
+    "docs/stories/sprint-8/r1_chg_us_092.md": {
+      "hash": "3de44ee6414b6bb5",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_092.md"
+    },
+    "docs/stories/sprint-8/r1_chg_us_093.md": {
+      "hash": "4084c41e33e5178f",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_093.md"
+    },
+    "docs/stories/sprint-8/r1_chg_us_094.md": {
+      "hash": "1faa014d71f872ee",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_094.md"
+    },
+    "docs/stories/sprint-8/r1_chg_us_095.md": {
+      "hash": "c9ece6b5dffc7fa3",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_095.md"
+    },
+    "docs/stories/sprint-10/r1_chg_us_100.md": {
+      "hash": "846ef1473f9f2109",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_100.md"
+    },
+    "docs/stories/sprint-10/r1_chg_us_101.md": {
+      "hash": "b42cc84716f59909",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_101.md"
+    },
+    "docs/stories/sprint-10/r1_chg_us_105.md": {
+      "hash": "9f7f96e1f942e6bb",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_105.md"
+    },
+    "docs/stories/sprint-11/r1_chg_us_110.md": {
+      "hash": "aaeea1bc2830dd72",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_110.md"
+    },
+    "docs/stories/sprint-11/r1_chg_us_111.md": {
+      "hash": "197d909af44fad10",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_111.md"
+    },
+    "docs/stories/sprint-11/r1_chg_us_112.md": {
+      "hash": "73bc0a6c0dc7d9ad",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_112.md"
+    },
+    "docs/stories/sprint-11/r1_chg_us_113.md": {
+      "hash": "3919b71032af5ae8",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_113.md"
+    },
+    "docs/stories/sprint-11/r1_chg_us_114.md": {
+      "hash": "35c72ea962df6e54",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_114.md"
+    },
+    "docs/stories/sprint-11/r1_chg_us_115.md": {
+      "hash": "a7c0a48c7e1ccc2d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_115.md"
+    },
+    "docs/stories/sprint-12/r1_chg_us_116.md": {
+      "hash": "407a47aa115e9a28",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_116.md"
+    },
+    "docs/stories/sprint-12/r1_chg_us_118.md": {
+      "hash": "44d20f8b36a03ff0",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_118.md"
+    },
+    "docs/stories/sprint-12/r1_chg_us_119.md": {
+      "hash": "c8418444cabb4211",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_119.md"
+    },
+    "docs/stories/sprint-12/r1_chg_us_120.md": {
+      "hash": "2c7e3b53716f8a0c",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_120.md"
+    },
+    "docs/stories/sprint-12/r1_chg_us_121.md": {
+      "hash": "28c63bd1b30065a2",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_121.md"
+    },
+    "docs/stories/sprint-12/r1_chg_us_122.md": {
+      "hash": "5e3578fdc93f0762",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_122.md"
+    },
+    "docs/stories/sprint-12/r1_chg_us_124.md": {
+      "hash": "c653bccdb9152e67",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_chg_us_124.md"
+    },
+    "docs/stories/sprint-4/r1_collections_us_040.md": {
+      "hash": "47e45be16f20b781",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_collections_us_040.md"
+    },
+    "docs/stories/sprint-4/r1_collections_us_041.md": {
+      "hash": "7d648b2b9ee3d19c",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_collections_us_041.md"
+    },
+    "docs/stories/sprint-4/r1_collections_us_042.md": {
+      "hash": "d64017a19b777826",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_collections_us_042.md"
+    },
+    "docs/stories/sprint-1/r1_config_us_028.md": {
+      "hash": "c9055ce8d8ec60f4",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_config_us_028.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_001.md": {
+      "hash": "8b26b6ca19a99987",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_001.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_002.md": {
+      "hash": "326c654a0e710dd8",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_002.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_003.md": {
+      "hash": "96ac11158625d55d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_003.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_004.md": {
+      "hash": "56eb98f5c0d1996d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_004.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_005.md": {
+      "hash": "21039180ab5b159a",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_005.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_006.md": {
+      "hash": "719dd897603bcbff",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_006.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_007.md": {
+      "hash": "ca82ad9f75d08acb",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_007.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_008.md": {
+      "hash": "dccce896a90ed9be",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_008.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_009.md": {
+      "hash": "5d98b063da05c520",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_009.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_010.md": {
+      "hash": "6b6f23b39c37031d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_010.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_011.md": {
+      "hash": "d4bbb8cbc3910ce4",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_011.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_012.md": {
+      "hash": "f9f2d93d7303f751",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_012.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_013.md": {
+      "hash": "0036ed7dfffad228",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_013.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_014.md": {
+      "hash": "ed4301b06bd72f36",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_014.md"
+    },
+    "docs/stories/sprint-0/r1_foundation_us_015.md": {
+      "hash": "e8b9bb846312efb4",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_foundation_us_015.md"
+    },
+    "docs/stories/sprint-1/r1_ledger_us_026.md": {
+      "hash": "baa8dc917f4e434f",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_ledger_us_026.md"
+    },
+    "docs/stories/sprint-1/r1_ledger_us_027.md": {
+      "hash": "d22cf77fe04b77c5",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_ledger_us_027.md"
+    },
+    "docs/stories/sprint-1/r1_ledger_us_029.md": {
+      "hash": "d4cc24501565c41d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_ledger_us_029.md"
+    },
+    "docs/stories/sprint-1/r1_ledger_us_030.md": {
+      "hash": "bbe75aa5658d8d4f",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_ledger_us_030.md"
+    },
+    "docs/stories/sprint-1/r1_ledger_us_031.md": {
+      "hash": "ba6b74245431c535",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_ledger_us_031.md"
+    },
+    "docs/stories/sprint-1/r1_ledger_us_032.md": {
+      "hash": "ccde638bd8d3f012",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_ledger_us_032.md"
+    },
+    "docs/stories/sprint-6/r1_ledger_us_058.md": {
+      "hash": "16cff3b1bfc50eb8",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_ledger_us_058.md"
+    },
+    "docs/stories/sprint-4/r1_liquidity_us_054.md": {
+      "hash": "d0f8f3cd07058725",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_liquidity_us_054.md"
+    },
+    "docs/stories/sprint-2/r1_loans_us_033.md": {
+      "hash": "c0a780434f168986",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_loans_us_033.md"
+    },
+    "docs/stories/sprint-2/r1_loans_us_034.md": {
+      "hash": "59c4c5d3fed63b42",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_loans_us_034.md"
+    },
+    "docs/stories/sprint-2/r1_loans_us_035.md": {
+      "hash": "6d16a2f4e03c086a",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_loans_us_035.md"
+    },
+    "docs/stories/sprint-2/r1_loans_us_036.md": {
+      "hash": "86e30df7cdb0750c",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_loans_us_036.md"
+    },
+    "docs/stories/sprint-2/r1_loans_us_037.md": {
+      "hash": "eebee64ec113124e",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_loans_us_037.md"
+    },
+    "docs/stories/sprint-2/r1_loans_us_038.md": {
+      "hash": "b2d17001c61d8a4a",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_loans_us_038.md"
+    },
+    "docs/stories/sprint-2/r1_loans_us_039.md": {
+      "hash": "c41a056adbf6c09a",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_loans_us_039.md"
+    },
+    "docs/stories/sprint-10/r1_misc_us_102.md": {
+      "hash": "a8c0ad36a09860ca",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_misc_us_102.md"
+    },
+    "docs/stories/sprint-10/r1_misc_us_103.md": {
+      "hash": "cd18c9cfd35b5c86",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_misc_us_103.md"
+    },
+    "docs/stories/sprint-10/r1_misc_us_104.md": {
+      "hash": "b95b2cbbdda08c67",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_misc_us_104.md"
+    },
+    "docs/stories/sprint-11/r1_misc_us_106.md": {
+      "hash": "be943b2489389ad7",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_misc_us_106.md"
+    },
+    "docs/stories/sprint-11/r1_misc_us_107.md": {
+      "hash": "aca2fbd0169c97a9",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_misc_us_107.md"
+    },
+    "docs/stories/sprint-10/r1_misc_us_108.md": {
+      "hash": "dcbf3e95016ce69f",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_misc_us_108.md"
+    },
+    "docs/stories/sprint-11/r1_misc_us_109.md": {
+      "hash": "ec833048b0138cb1",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_misc_us_109.md"
+    },
+    "docs/stories/sprint-12/r1_misc_us_123.md": {
+      "hash": "b213d542b3a78e7d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_misc_us_123.md"
+    },
+    "docs/stories/sprint-12/r1_misc_us_125.md": {
+      "hash": "45661404723177a8",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_misc_us_125.md"
+    },
+    "docs/stories/sprint-3/r1_observability_us_073.md": {
+      "hash": "4e1c05aabdcfa998",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_observability_us_073.md"
+    },
+    "docs/stories/sprint-1/r1_onboarding_us_025.md": {
+      "hash": "99e7bd53fbf4cf60",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_onboarding_us_025.md"
+    },
+    "docs/stories/sprint-5/r1_reconciliation_us_044.md": {
+      "hash": "c822f5b37291c563",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reconciliation_us_044.md"
+    },
+    "docs/stories/sprint-5/r1_reconciliation_us_045.md": {
+      "hash": "876c214a076b1f34",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reconciliation_us_045.md"
+    },
+    "docs/stories/sprint-5/r1_reconciliation_us_046.md": {
+      "hash": "eae1de4c69c3f8d5",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reconciliation_us_046.md"
+    },
+    "docs/stories/sprint-5/r1_reporting_us_047.md": {
+      "hash": "ea3ff5e700242560",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reporting_us_047.md"
+    },
+    "docs/stories/sprint-6/r1_reporting_us_048.md": {
+      "hash": "df27303a88ae366d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reporting_us_048.md"
+    },
+    "docs/stories/sprint-6/r1_reporting_us_049.md": {
+      "hash": "b61dda7729d748e7",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reporting_us_049.md"
+    },
+    "docs/stories/sprint-4/r1_reporting_us_050.md": {
+      "hash": "327f0acc11dd75a0",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reporting_us_050.md"
+    },
+    "docs/stories/sprint-6/r1_reporting_us_051.md": {
+      "hash": "5a29db9b2e7992a6",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reporting_us_051.md"
+    },
+    "docs/stories/sprint-6/r1_reporting_us_052.md": {
+      "hash": "8d071b5109026aab",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reporting_us_052.md"
+    },
+    "docs/stories/sprint-6/r1_reporting_us_053.md": {
+      "hash": "5d650f00fe87dbde",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reporting_us_053.md"
+    },
+    "docs/stories/sprint-3/r1_substrate_us_069.md": {
+      "hash": "c98ad6389d85f7cd",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_substrate_us_069.md"
+    },
+    "docs/stories/sprint-3/r1_substrate_us_070.md": {
+      "hash": "9dbc8c34fc9f1b40",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_substrate_us_070.md"
+    },
+    "docs/stories/sprint-3/r1_substrate_us_071.md": {
+      "hash": "20ad1259e4694c6b",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_substrate_us_071.md"
+    },
+    "docs/stories/sprint-3/r1_substrate_us_072.md": {
+      "hash": "4bb7f283cb80a9f5",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_substrate_us_072.md"
+    },
+    "docs/stories/sprint-9/r2_chg_us_096.md": {
+      "hash": "947eabf38d816c80",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r2_chg_us_096.md"
+    },
+    "docs/stories/sprint-9/r2_chg_us_097.md": {
+      "hash": "330710d09c95a21e",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r2_chg_us_097.md"
+    },
+    "docs/stories/sprint-9/r2_chg_us_098.md": {
+      "hash": "8913a1b2f376e65a",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r2_chg_us_098.md"
+    },
+    "docs/stories/sprint-9/r2_chg_us_099.md": {
+      "hash": "575128509fd1dfdb",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r2_chg_us_099.md"
+    },
+    "docs/stories/sprint-12/r3_misc_us_117.md": {
+      "hash": "1622b7954adf4ae8",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r3_misc_us_117.md"
+    },
+    "docs/specs/01_research.md": {
+      "hash": "33775893c5a2eba2",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/01_research.md"
+    },
+    "docs/specs/02_cx_personas.md": {
+      "hash": "fdef5aa3a459b4a8",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/02_cx_personas.md"
+    },
+    "docs/specs/03_cx_journeys.md": {
+      "hash": "7d3ad796d57f6803",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/03_cx_journeys.md"
+    },
+    "docs/specs/04_er_model.md": {
+      "hash": "57f5f56e9f922f33",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/04_er_model.md"
+    },
+    "docs/specs/05_brand.md": {
+      "hash": "a93aed9273d14c3c",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/05_brand.md"
+    },
+    "docs/specs/06_design_system.md": {
+      "hash": "f7206c699ca18aed",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/06_design_system.md"
+    },
+    "docs/specs/07_screens.md": {
+      "hash": "4aaab47bd5260c4d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/07_screens.md"
+    },
+    "docs/specs/07b_features_backlog.md": {
+      "hash": "b04d92d8ef297bb6",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/07b_features_backlog.md"
+    },
+    "docs/specs/07c_navigation_map.json": {
+      "hash": "4a41705160cc795e",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/07c_navigation_map.json"
+    },
+    "docs/specs/08_scope.md": {
+      "hash": "f196717b65e88eb9",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/08_scope.md"
+    },
+    "docs/specs/09_architecture.md": {
+      "hash": "0ac05c7fcc4648d7",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/09_architecture.md"
+    },
+    "docs/specs/10_plan.md": {
+      "hash": "6a8c813dc20ca023",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/10_plan.md"
+    },
+    "docs/dashboard.html": {
+      "hash": "3eb9eabff875eac0",
+      "source": "/Users/fcolomas/Projects/nous/Nous/dashboard.html"
+    },
+    "docs/screens/SCR-accounts.json": {
+      "hash": "eed32e4c7db3cf3f",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-accounts.json"
+    },
+    "docs/screens/SCR-add-member.json": {
+      "hash": "dca33599be87a7b3",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-add-member.json"
+    },
+    "docs/screens/SCR-admin-audit.json": {
+      "hash": "130cc1e1a6197817",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-admin-audit.json"
+    },
+    "docs/screens/SCR-admin-business-rules.json": {
+      "hash": "b72e03a72e96941c",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-admin-business-rules.json"
+    },
+    "docs/screens/SCR-admin-cron-runs.json": {
+      "hash": "77097c0bcc0185f7",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-admin-cron-runs.json"
+    },
+    "docs/screens/SCR-admin-drift.json": {
+      "hash": "3e0bbdd291f6a4d2",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-admin-drift.json"
+    },
+    "docs/screens/SCR-admin-export.json": {
+      "hash": "0057ac649f82b94c",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-admin-export.json"
+    },
+    "docs/screens/SCR-admin-home.json": {
+      "hash": "5a7c0df5d393e402",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-admin-home.json"
+    },
+    "docs/screens/SCR-admin-impersonation.json": {
+      "hash": "a072247530fc0cf9",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-admin-impersonation.json"
+    },
+    "docs/screens/SCR-admin-org-config.json": {
+      "hash": "dcff6a5f3ae5d96d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-admin-org-config.json"
+    },
+    "docs/screens/SCR-admin-org-detail.json": {
+      "hash": "60872c7c126cc9dc",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-admin-org-detail.json"
+    },
+    "docs/screens/SCR-admin-orgs-new.json": {
+      "hash": "f6135ebe4b6ef179",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-admin-orgs-new.json"
+    },
+    "docs/screens/SCR-admin-pilot-log.json": {
+      "hash": "0289ad53b91c2d9d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-admin-pilot-log.json"
+    },
+    "docs/screens/SCR-ar-aging.json": {
+      "hash": "a74526847f37b49b",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-ar-aging.json"
+    },
+    "docs/screens/SCR-balance-banquito.json": {
+      "hash": "c84ce370cffd40c7",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-balance-banquito.json"
+    },
+    "docs/screens/SCR-cash-flow-projection.json": {
+      "hash": "41d089a9d6721331",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-cash-flow-projection.json"
+    },
+    "docs/screens/SCR-contributions-cycle.json": {
+      "hash": "f6827d785621ff41",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-contributions-cycle.json"
+    },
+    "docs/screens/SCR-first-run-wizard.json": {
+      "hash": "674758839125677a",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-first-run-wizard.json"
+    },
+    "docs/screens/SCR-group-config.json": {
+      "hash": "00fc3938c99f54fa",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-group-config.json"
+    },
+    "docs/screens/SCR-group-picker.json": {
+      "hash": "57ca7bc2f10ded71",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-group-picker.json"
+    },
+    "docs/screens/SCR-history.json": {
+      "hash": "db6cba404fac85ee",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-history.json"
+    },
+    "docs/screens/SCR-loan-detail.json": {
+      "hash": "8282ad241d28ac1b",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-loan-detail.json"
+    },
+    "docs/screens/SCR-loans-list.json": {
+      "hash": "88e156577ca9d55d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-loans-list.json"
+    },
+    "docs/screens/SCR-member-detail.json": {
+      "hash": "ee2d4b6b64228acc",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-member-detail.json"
+    },
+    "docs/screens/SCR-members-list.json": {
+      "hash": "3b095033bb6dac40",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-members-list.json"
+    },
+    "docs/screens/SCR-monthly-close.json": {
+      "hash": "6f0baaa4f6d99f06",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-monthly-close.json"
+    },
+    "docs/screens/SCR-originate-loan.json": {
+      "hash": "bb96510ae86f0953",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-originate-loan.json"
+    },
+    "docs/screens/SCR-public-verify-pdf.json": {
+      "hash": "efd367617e5b9a74",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-public-verify-pdf.json"
+    },
+    "docs/screens/SCR-record-base-fund-quota.json": {
+      "hash": "d06a7d975517a83d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-record-base-fund-quota.json"
+    },
+    "docs/screens/SCR-record-contribution.json": {
+      "hash": "1c64f67c0d56295c",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-record-contribution.json"
+    },
+    "docs/screens/SCR-record-movement.json": {
+      "hash": "8c25df998208e207",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-record-movement.json"
+    },
+    "docs/screens/SCR-record-repayment.json": {
+      "hash": "27a6ca7d29878045",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-record-repayment.json"
+    },
+    "docs/screens/SCR-solidarity-collection.json": {
+      "hash": "941cecafd9709d43",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-solidarity-collection.json"
+    },
+    "docs/screens/SCR-statements-archive.json": {
+      "hash": "3609e91ff6bbc09d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-statements-archive.json"
+    },
+    "docs/screens/SCR-treasurer-home.json": {
+      "hash": "d510993c1059b917",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-treasurer-home.json"
+    },
+    "docs/screens/SCR-year-end-share-out.json": {
+      "hash": "bfeb5ca493b7d4f7",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-year-end-share-out.json"
+    },
+    "docs/screens/SCR-accounts.html": {
+      "hash": "1ca0e5469cfa3070",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-accounts.html"
+    },
+    "docs/screens/SCR-add-member.html": {
+      "hash": "3e61867724cbda3f",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-add-member.html"
+    },
+    "docs/screens/SCR-admin-audit.html": {
+      "hash": "1d09c3186358142a",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-admin-audit.html"
+    },
+    "docs/screens/SCR-admin-business-rules.html": {
+      "hash": "f8d56bc420ccca6b",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-admin-business-rules.html"
+    },
+    "docs/screens/SCR-admin-cron-runs.html": {
+      "hash": "8130a7359585fd81",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-admin-cron-runs.html"
+    },
+    "docs/screens/SCR-admin-drift.html": {
+      "hash": "8381e0dfc472a2d4",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-admin-drift.html"
+    },
+    "docs/screens/SCR-admin-export.html": {
+      "hash": "bcbfeece43cdbd8d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-admin-export.html"
+    },
+    "docs/screens/SCR-admin-home.html": {
+      "hash": "9517c7b264ff8b83",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-admin-home.html"
+    },
+    "docs/screens/SCR-admin-impersonation.html": {
+      "hash": "3c3ec0f722d24458",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-admin-impersonation.html"
+    },
+    "docs/screens/SCR-admin-org-config.html": {
+      "hash": "0bba801cc5502a1c",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-admin-org-config.html"
+    },
+    "docs/screens/SCR-admin-org-detail.html": {
+      "hash": "84effd9b2d4ce138",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-admin-org-detail.html"
+    },
+    "docs/screens/SCR-admin-orgs-new.html": {
+      "hash": "95dd2a3f5712e39f",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-admin-orgs-new.html"
+    },
+    "docs/screens/SCR-admin-pilot-log.html": {
+      "hash": "e1ed8d82d4168f7a",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-admin-pilot-log.html"
+    },
+    "docs/screens/SCR-ar-aging.html": {
+      "hash": "789c77382c333caa",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-ar-aging.html"
+    },
+    "docs/screens/SCR-balance-banquito.html": {
+      "hash": "147b2777307b2e60",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-balance-banquito.html"
+    },
+    "docs/screens/SCR-cash-flow-projection.html": {
+      "hash": "c1faf95b87bb65d3",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-cash-flow-projection.html"
+    },
+    "docs/screens/SCR-contributions-cycle.html": {
+      "hash": "83e2fedee3e757e4",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-contributions-cycle.html"
+    },
+    "docs/screens/SCR-first-run-wizard.html": {
+      "hash": "a7fc714889c9d963",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-first-run-wizard.html"
+    },
+    "docs/screens/SCR-group-config.html": {
+      "hash": "5cfb1df83ff5876b",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-group-config.html"
+    },
+    "docs/screens/SCR-group-picker.html": {
+      "hash": "05edc2057e88a70d",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-group-picker.html"
+    },
+    "docs/screens/SCR-history.html": {
+      "hash": "3e0cb8873ee1fcd9",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-history.html"
+    },
+    "docs/screens/SCR-loan-detail.html": {
+      "hash": "d21d7cd5f49a3c17",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-loan-detail.html"
+    },
+    "docs/screens/SCR-loans-list.html": {
+      "hash": "254759204b5d826f",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-loans-list.html"
+    },
+    "docs/screens/SCR-member-detail.html": {
+      "hash": "316bd79856dc61dd",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-member-detail.html"
+    },
+    "docs/screens/SCR-members-list.html": {
+      "hash": "fc8f8f9b11bdf05b",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-members-list.html"
+    },
+    "docs/screens/SCR-monthly-close.html": {
+      "hash": "af18fdd5c2cac839",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-monthly-close.html"
+    },
+    "docs/screens/SCR-originate-loan.html": {
+      "hash": "9e7bf6dc30fbab08",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-originate-loan.html"
+    },
+    "docs/screens/SCR-public-verify-pdf.html": {
+      "hash": "1850e3963a6f80a0",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-public-verify-pdf.html"
+    },
+    "docs/screens/SCR-record-base-fund-quota.html": {
+      "hash": "4d7bebfb7532d623",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-record-base-fund-quota.html"
+    },
+    "docs/screens/SCR-record-contribution.html": {
+      "hash": "dc24a390f1c7dd37",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-record-contribution.html"
+    },
+    "docs/screens/SCR-record-movement.html": {
+      "hash": "b054c4f48ca5cf39",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-record-movement.html"
+    },
+    "docs/screens/SCR-record-repayment.html": {
+      "hash": "920d665e1792b399",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-record-repayment.html"
+    },
+    "docs/screens/SCR-solidarity-collection.html": {
+      "hash": "2aeb187c0e89c717",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-solidarity-collection.html"
+    },
+    "docs/screens/SCR-statements-archive.html": {
+      "hash": "cbcc531eb42532e7",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-statements-archive.html"
+    },
+    "docs/screens/SCR-treasurer-home.html": {
+      "hash": "e0628c1f3659c608",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-treasurer-home.html"
+    },
+    "docs/screens/SCR-year-end-share-out.html": {
+      "hash": "02d8d754e80ac14f",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/SCR-year-end-share-out.html"
+    },
+    "docs/screens/journey_player.html": {
+      "hash": "89b0eb08c935d72a",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/journey_player.html"
+    },
+    "docs/stories/SPRINT_PLAN.md": {
+      "hash": "6a3d852eb1a04d6b",
+      "source": "generated"
+    },
+    "docs/stories/CHANGES.md": {
+      "hash": "0dabea77c18cb439",
+      "source": "generated"
+    },
+    "docs/stories/ASSIGNMENTS.md": {
+      "hash": "1c26417d3bf26a2a",
+      "source": "generated"
+    },
+    "testing/critical-paths.md": {
+      "hash": "62760de2f75268ad",
+      "source": "generated"
+    },
+    ".nous-project.json": {
+      "hash": "e33775644925c60d",
+      "source": "generated"
+    },
+    "docs/stories/INDEX.md": {
+      "hash": "e8b8e975cee04adb",
+      "source": "generated"
+    },
+    "infra/scripts/allowed_lucide_icons.json": {
+      "hash": "88b4e3d029bccd86",
+      "source": "/Users/fcolomas/Projects/nous/Nous/dev_package_staging/infra/scripts/allowed_lucide_icons.json"
+    },
+    "infra/scripts/regenerate-sidebar.py": {
+      "hash": "45138d83a457dd4b",
+      "source": "/Users/fcolomas/Projects/nous/Nous/dev_package_staging/infra/scripts/regenerate-sidebar.py"
+    },
+    "apps/web/src/components/shell/nav-items.gen.ts": {
+      "hash": "c0b576869945249e",
+      "source": "/Users/fcolomas/Projects/nous/Nous/dev_package_staging/apps/web/src/components/shell/nav-items.gen.ts"
+    }
+  }
+}

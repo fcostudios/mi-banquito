@@ -14,7 +14,7 @@
 | **CHG-007** | 📦 delivered | Year-end reporting: BALANCE BANQUITO balance sheet + economic summaries (EOY cluster C7) | — | — |
 | **CHG-008** | 📦 delivered | Multi-group management: one treasurer manages multiple banquito groups (cluster C8) | — | — |
 | **CHG-009** | 🟡 proposed | Rewrite mi-banquito sprint-0 foundation stories to the single-serverless architecture (drop Turborepo monorepo/5-package scaffold US-001; correct 29->34 entity-table count; align to dispatched Next.js/Drizzle/Auth0/Vercel stack) | — | — |
-| **CHG-010** | 🔷 spec_applied | Organization.id as per-group uuid: decouple runtime tenant key from the IMP-198 Nous substrate project key (drop org_slug/project_slug) | — | — |
+| **CHG-010** | 📦 delivered | Organization.id as per-group uuid: decouple runtime tenant key from the IMP-198 Nous substrate project key (drop org_slug/project_slug) | — | — |
 
 ---
 
@@ -136,7 +136,7 @@ _No stories linked to this change yet._
 
 ### CHG-010: Organization.id as per-group uuid: decouple runtime tenant key from the IMP-198 Nous substrate project key (drop org_slug/project_slug)
 
-**Status:** 🔷 `spec_applied`
+**Status:** 📦 `delivered`
 **Source:** code_review
 **Requested by:** Francisco
 **Notes:** # CHG-010 — Organization.id as a per-group `uuid`; decouple the runtime tenant key from the Nous substrate project key

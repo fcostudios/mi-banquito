@@ -24,16 +24,12 @@ As the platform operator, I want to pause or archive a tenant org cleanly, so th
 
 ## Acceptance Criteria
 
-- [x] AC-1: An operator lifecycle action at `/admin/orgs/[id]/lifecycle` (section on `SCR-admin-org-detail`) offers `freeze` and `archive`.
-- [x] AC-2: `freeze` sets `Organization.status = paused` — RLS reads remain allowed but all tenant writes are rejected while paused.
-- [x] AC-3: `archive` sets `Organization.status = archived` — paused semantics plus admin-export is available and treasurer login is disabled for that org.
-- [x] AC-4: Both actions require operator-entered reason text; submission without a reason is rejected.
-- [x] AC-5: Both transitions write an `AuditLogEntry` (`created_by_kind = platform_operator`) capturing the prior status, new status, reason, and actor; no tenant data is deleted (read-only, not destructive).
-- [x] AC-6: Write-rejection while paused/archived is enforced server-side (not merely UI-hidden) so queued/offline tenant writes also fail closed.
-
-## Closeout
-
-Closed in Sprint 5. Verified by admin org detail implementation and platform business-rule tests.
+- [ ] AC-1: An operator lifecycle action at `/admin/orgs/[id]/lifecycle` (section on `SCR-admin-org-detail`) offers `freeze` and `archive`.
+- [ ] AC-2: `freeze` sets `Organization.status = paused` — RLS reads remain allowed but all tenant writes are rejected while paused.
+- [ ] AC-3: `archive` sets `Organization.status = archived` — paused semantics plus admin-export is available and treasurer login is disabled for that org.
+- [ ] AC-4: Both actions require operator-entered reason text; submission without a reason is rejected.
+- [ ] AC-5: Both transitions write an `AuditLogEntry` (`created_by_kind = platform_operator`) capturing the prior status, new status, reason, and actor; no tenant data is deleted (read-only, not destructive).
+- [ ] AC-6: Write-rejection while paused/archived is enforced server-side (not merely UI-hidden) so queued/offline tenant writes also fail closed.
 
 ## Technical Notes
 - **Data model:** `Organization.status` enum extended with `paused` and `archived` (alongside the active default). If the enum lacks these values, a timestamp-slug migration per HR-25 (`slug=org_lifecycle_status`). No new table.

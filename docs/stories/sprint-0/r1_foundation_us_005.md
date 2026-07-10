@@ -28,7 +28,7 @@ As an operator, I want object storage, error tracking, and uptime monitoring pro
 
 ## Technical Notes
 - **Data model / infra:** Vercel Blob (object store for slip/receipt photos referenced by later movement-evidence stories). Sentry (error + performance telemetry). Better Stack (external uptime ping).
-- **API / surface:** `BLOB_READ_WRITE_TOKEN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN` are the surface; consumed by US-006. Monitor targets `/api/health`.
+- **API / surface:** `VERCEL_BLOB_READ_WRITE_TOKEN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN` are the surface; consumed by US-006. Monitor targets `/api/health`.
 - **Business-rule execution:** None.
 - **Multi-tenancy / audit:** Blob object keys should be namespaced per org when slip uploads land in later stories; observability is platform-wide.
 

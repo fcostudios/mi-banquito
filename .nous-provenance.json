@@ -1,0 +1,9 @@
+{
+  "dirty": true,
+  "dirty_paths": [
+    "Nous/System/nous_db_schema.py"
+  ],
+  "git_sha": "93e83a74e93a",
+  "project_id": "fcostudios__mi-banquito",
+  "schema_version": 1
+}

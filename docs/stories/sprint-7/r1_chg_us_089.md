@@ -20,11 +20,11 @@
 As a treasurer, I want a low-severity confirmation alert whenever I change a group-config setting, so that I have a clear record of what changed and what it affects.
 
 ## Acceptance Criteria
-- [x] AC-1: The emitter runs **post-commit on any new `GroupConfig` version** (created via the HR-1 / `EntityVersion` versioning path).
-- [x] AC-2: An `Alert` is written with `kind = A9`, `severity = low`, `audience = treasurer`, `dedup_window = none` (every config-version change is surfaced — no suppression window).
-- [x] AC-3: The Spanish copy is **specific to which field changed**, e.g. for an interest-rate change: *"Cambiaste la tasa de interés de {old}% a {new}%. Préstamos nuevos usarán la nueva tasa; los existentes mantienen la anterior (per OQ-BR2-1)."*
-- [x] AC-4: The old/new values are read from the diff between the new `GroupConfig` `EntityVersion` and its predecessor, so the copy reflects the actual change.
-- [x] AC-5: A config save that produces no effective field change does not emit (no spurious A9).
+- [ ] AC-1: The emitter runs **post-commit on any new `GroupConfig` version** (created via the HR-1 / `EntityVersion` versioning path).
+- [ ] AC-2: An `Alert` is written with `kind = A9`, `severity = low`, `audience = treasurer`, `dedup_window = none` (every config-version change is surfaced — no suppression window).
+- [ ] AC-3: The Spanish copy is **specific to which field changed**, e.g. for an interest-rate change: *"Cambiaste la tasa de interés de {old}% a {new}%. Préstamos nuevos usarán la nueva tasa; los existentes mantienen la anterior (per OQ-BR2-1)."*
+- [ ] AC-4: The old/new values are read from the diff between the new `GroupConfig` `EntityVersion` and its predecessor, so the copy reflects the actual change.
+- [ ] AC-5: A config save that produces no effective field change does not emit (no spurious A9).
 
 ## Technical Notes
 - **Data model:** Append-only `Alert`; `subject_id = group_config_version_id`. Reads the new vs. prior `GroupConfig` `EntityVersion` (HR-1 / IMP-105 version sink) to compute the changed-field diff. No migration (A9 exists in the catalogue; added as a new emit story per Verifier F2).

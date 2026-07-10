@@ -260,7 +260,7 @@ Duración total estimada del MVP (S0-S8): **18-20 semanas**; con S9 (CHG-001): ~
 
 ## SEC5b — Matriz de Cobertura de Reglas de Negocio (BR Coverage Guarantee)
 
-> Garantía original (clon de la garantía de cobertura de NFR): **cada una de las 11 reglas base de negocio está cubierta por ≥1 historia**. Las historias que tocan una entidad gobernada por una BR declaran esa BR en su fila `Business Rules` del Meta (Step 10b), materializada como arista `governed_by` en `nous.db` (IMP-223). Reglas posteriores de feedback piloto se agregan como deltas y deben recibir historia implementadora antes de cerrarse.
+> Garantía (clon de la garantía de cobertura de NFR): **cada una de las 11 reglas de negocio de `09b_business_rules.md` está cubierta por ≥1 historia**. Las historias que tocan una entidad gobernada por una BR declaran esa BR en su fila `Business Rules` del Meta (Step 10b), materializada como arista `governed_by` en `nous.db` (IMP-223).
 
 | BR | Regla | Capa | Historias que la implementan | Sprint(s) |
 |---|---|---|---|---|
@@ -275,9 +275,8 @@ Duración total estimada del MVP (S0-S8): **18-20 semanas**; con S9 (CHG-001): ~
 | BR-09 | Time-weighted interest on savings for share-out | 2 | US-051, US-053 | S6 |
 | BR-10 | Fiscal year configuration | 2 | US-028, US-051 | S1, S6 |
 | BR-11 | Treasurer-overridable share-out with breakdown by source | 2 | US-052, US-053 | S6 |
-| BR-26 | Member payment allocation waterfall: loan mora/fees, loan interest, loan principal, overdue aportes, current aporte, then one-tap extra decision | 2 | US-100 substrate intake; implementation story pending | S10+ |
 
-**Cobertura base:** 11/11 reglas base con ≥1 historia implementadora. **Delta piloto:** BR-26 queda registrado como intake de substrate en US-100; falta crear/asignar su historia implementadora. Las reglas BR-05 y BR-06 tienen aristas `enforces` a `entity_Loan`/`entity_Withdrawal`, por lo que el ready-check `118_business_rule_coverage.py` exige que toda historia que toque esas entidades declare la BR correspondiente; el resto se verifica por la vía de aristas `governed_by` (drift `[Business Rule Coverage]`).
+**Cobertura:** 11/11 reglas con ≥1 historia implementadora. Las reglas BR-05 y BR-06 tienen aristas `enforces` a `entity_Loan`/`entity_Withdrawal`, por lo que el ready-check `118_business_rule_coverage.py` exige que toda historia que toque esas entidades declare la BR correspondiente; el resto se verifica por la vía de aristas `governed_by` (drift `[Business Rule Coverage]`).
 
 ## SEC19 — Notas de Validación de Estructura
 

@@ -20,12 +20,12 @@
 As a treasurer, I want the system to alert me the moment a loan falls into arrears, so that I can chase the borrower (or their guarantor) before the situation worsens.
 
 ## Acceptance Criteria
-- [x] AC-1: The emitter runs **post-commit on `EvaluateLoanEligibility` (P10)** and fires when a loan transitions into `en_mora` (overdue per `GroupConfig.config.mora_threshold_days`).
-- [x] AC-2: An `Alert` is written with `kind = A6`, `severity = high`, `audience = treasurer`.
-- [x] AC-3: For a **member** borrower the Spanish copy is: *"El préstamo de {member} entró en mora ({n} cuotas vencidas)."* where `{n}` is the count of overdue installments.
-- [x] AC-4: For a **non-member** borrower (per BR-05) the copy names the guarantor: *"El préstamo de {non-member} entró en mora — garante: {member}."*
-- [x] AC-5: De-dup honors `dedup_window = 24h` on `(org_id, A6, subject_id=loan_id, window)` — a re-evaluation of the same already-`en_mora` loan within 24h does not re-emit.
-- [x] AC-6: The alert fires only on the **transition into** `en_mora` (not on every subsequent evaluation while it stays overdue), within the 24h de-dup window.
+- [ ] AC-1: The emitter runs **post-commit on `EvaluateLoanEligibility` (P10)** and fires when a loan transitions into `en_mora` (overdue per `GroupConfig.config.mora_threshold_days`).
+- [ ] AC-2: An `Alert` is written with `kind = A6`, `severity = high`, `audience = treasurer`.
+- [ ] AC-3: For a **member** borrower the Spanish copy is: *"El préstamo de {member} entró en mora ({n} cuotas vencidas)."* where `{n}` is the count of overdue installments.
+- [ ] AC-4: For a **non-member** borrower (per BR-05) the copy names the guarantor: *"El préstamo de {non-member} entró en mora — garante: {member}."*
+- [ ] AC-5: De-dup honors `dedup_window = 24h` on `(org_id, A6, subject_id=loan_id, window)` — a re-evaluation of the same already-`en_mora` loan within 24h does not re-emit.
+- [ ] AC-6: The alert fires only on the **transition into** `en_mora` (not on every subsequent evaluation while it stays overdue), within the 24h de-dup window.
 
 ## Technical Notes
 - **Data model:** Append-only `Alert`; `subject_id = loan_id`. Reads `Loan.status` transition + overdue installment count from the schedule; `GroupConfig.config.mora_threshold_days` defines the overdue cutoff. No migration (A6 exists in the 14-kind catalogue, `03b §6`).

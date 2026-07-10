@@ -20,14 +20,14 @@ As an operator, I want a single source of truth for environment variables across
 | Backstage Process | — |
 | Blocked By | US-003, US-004, US-005 |
 ## Acceptance Criteria
-- [ ] AC-1: `DATABASE_URL`, `AUTH0_*` (domain, client id, client secret, base URL, secret), `CRON_SECRET`, `SENTRY_DSN`, `BLOB_READ_WRITE_TOKEN`, and `NEXT_PUBLIC_SENTRY_DSN` are set in each environment (local, preview, production).
+- [ ] AC-1: `DATABASE_URL`, `AUTH0_*` (domain, client id, client secret, base URL, secret), `CRON_SECRET`, `SENTRY_DSN`, `VERCEL_BLOB_READ_WRITE_TOKEN`, and `NEXT_PUBLIC_SENTRY_DSN` are set in each environment (local, preview, production).
 - [ ] AC-2: `.env.example` is checked into source listing every required key with placeholder values (no secrets).
 - [ ] AC-3: `.env.local` is gitignored and never committed.
 - [ ] AC-4: A boot-time env validation (e.g. typed env schema) fails fast with a clear message when a required variable is missing.
 - [ ] AC-5: Public (`NEXT_PUBLIC_*`) vs server-only variables are correctly partitioned so secrets are never exposed to the client bundle.
 
 ## Technical Notes
-- **Data model / infra:** No DB. Env values originate from US-003 (`DATABASE_URL`), US-004 (`AUTH0_*`), US-005 (`SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `BLOB_READ_WRITE_TOKEN`); `CRON_SECRET` is generated here and consumed by US-012.
+- **Data model / infra:** No DB. Env values originate from US-003 (`DATABASE_URL`), US-004 (`AUTH0_*`), US-005 (`SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `VERCEL_BLOB_READ_WRITE_TOKEN`); `CRON_SECRET` is generated here and consumed by US-012.
 - **API / surface:** `.env.example` (committed), `.env.local` (gitignored), Vercel project env settings per environment, and a typed-env module (aligns with US-007's `next.config.ts` typed env).
 - **Business-rule execution:** None.
 - **Multi-tenancy / audit:** No tenant data; secret hygiene only.
