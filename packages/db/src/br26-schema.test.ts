@@ -49,6 +49,10 @@ describe("BR-26 payment receipt schema", () => {
   });
 
   it("enforces org and member integrity for receipt child links", () => {
+    expect(uniqueConstraintSummary(paymentReceipt)).toContainEqual({
+      columns: ["org_id", "client_request_id"],
+      name: "uq_payment_receipt_org_client_request",
+    });
     expect(migration).toContain("uq_payment_receipt_org_member_id");
     expect(migration).toContain("FOREIGN KEY (org_id, member_id, receipt_id)");
     expect(migration).toContain("FOREIGN KEY (org_id, member_id, payment_receipt_id)");

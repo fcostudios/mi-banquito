@@ -5,6 +5,7 @@ import {
   canonicalJson,
   monthlyMemberStatementContributions,
   monthlyMemberStatementPayload,
+  monthlyMemberStatementReceivedPayments,
   publicStatementPdfUrl,
   publicVerifyUrl,
   sha256Hex,
@@ -51,11 +52,13 @@ describe("public statement verification", () => {
   });
 
   it("keeps grouped BR-26 contribution child rows as statement rows without receipt duplication", () => {
-    const contributions = monthlyMemberStatementContributions([
+    const forward = [
       { id: "receipt-1", amount: "40.0000", datedOn: "2026-07-09", slipPhotoUri: null, sourceKind: "payment_receipt" },
       { id: "child-current", amount: "20.0000", datedOn: "2026-07-09", slipPhotoUri: null, sourceKind: "contribution" },
       { id: "child-overdue", amount: "20.0000", datedOn: "2026-07-09", slipPhotoUri: null, sourceKind: "contribution" },
-    ]);
+    ] as const;
+    const contributions = monthlyMemberStatementContributions([...forward]);
+    const reversedContributions = monthlyMemberStatementContributions([...forward].reverse());
     const payload = monthlyMemberStatementPayload({
       orgName: "Mi Banquito",
       periodLabel: "2026-07",
@@ -67,12 +70,114 @@ describe("public statement verification", () => {
       treasurerName: "Pancho",
       bankLast4: null,
     });
+    const reversedPayload = monthlyMemberStatementPayload({
+      orgName: "Mi Banquito",
+      periodLabel: "2026-07",
+      member: { id: "m1", displayName: "Ana Mora" },
+      openingBalance: "100.0000",
+      closingBalance: "140.0000",
+      contributions: reversedContributions,
+      withdrawals: [],
+      treasurerName: "Pancho",
+      bankLast4: null,
+    });
     const rows = payload.sections[0].rows;
 
     expect(rows.filter((row) => row.label === "Aporte 2026-07-09")).toHaveLength(2);
     expect(contributions.map((row) => row.id)).toEqual(["child-current", "child-overdue"]);
     expect(rows).not.toContainEqual(expect.objectContaining({ label: expect.stringContaining("payment_receipt") }));
+    expect(canonicalJson(reversedPayload)).toBe(canonicalJson(payload));
     expect(sha256Hex(canonicalJson(payload))).toHaveLength(64);
+  });
+
+  it("renders grouped BR-26 receipt statements once with allocation split details", () => {
+    const rows = [
+      {
+        receiptId: "receipt-1",
+        receiptAmount: "80.0000",
+        receiptDatedOn: "2026-07-09",
+        memberName: "Toitq",
+        allocationKind: "contribution_current",
+        allocationAmount: "20.0000",
+        cycleLabel: "2026-07",
+        sortOrder: 4,
+      },
+      {
+        receiptId: "receipt-1",
+        receiptAmount: "80.0000",
+        receiptDatedOn: "2026-07-09",
+        memberName: "Toitq",
+        allocationKind: "loan_interest",
+        allocationAmount: "10.0000",
+        cycleLabel: null,
+        sortOrder: 1,
+      },
+      {
+        receiptId: "receipt-1",
+        receiptAmount: "80.0000",
+        receiptDatedOn: "2026-07-09",
+        memberName: "Toitq",
+        allocationKind: "loan_principal",
+        allocationAmount: "30.0000",
+        cycleLabel: null,
+        sortOrder: 2,
+      },
+      {
+        receiptId: "receipt-1",
+        receiptAmount: "80.0000",
+        receiptDatedOn: "2026-07-09",
+        memberName: "Toitq",
+        allocationKind: "contribution_overdue",
+        allocationAmount: "20.0000",
+        cycleLabel: "2026-06",
+        sortOrder: 3,
+      },
+    ];
+    const payload = monthlyMemberStatementPayload({
+      orgName: "Mi Banquito",
+      periodLabel: "2026-07",
+      member: { id: "m1", displayName: "Toitq" },
+      openingBalance: "100.0000",
+      closingBalance: "140.0000",
+      contributions: [],
+      receivedPayments: monthlyMemberStatementReceivedPayments(rows),
+      withdrawals: [],
+      treasurerName: "Pancho",
+      bankLast4: null,
+    });
+    const reversedPayload = monthlyMemberStatementPayload({
+      orgName: "Mi Banquito",
+      periodLabel: "2026-07",
+      member: { id: "m1", displayName: "Toitq" },
+      openingBalance: "100.0000",
+      closingBalance: "140.0000",
+      contributions: [],
+      receivedPayments: monthlyMemberStatementReceivedPayments([...rows].reverse()),
+      withdrawals: [],
+      treasurerName: "Pancho",
+      bankLast4: null,
+    });
+
+    expect(payload).toMatchObject({
+      sections: expect.arrayContaining([
+        expect.objectContaining({
+          title: "Pagos recibidos",
+          rows: [
+            expect.objectContaining({
+              label: "Pago recibido de Toitq",
+              amount: "80.0000",
+              details: [
+                "Interés préstamo: 10.0000",
+                "Capital préstamo: 30.0000",
+                "Aporte 2026-06: 20.0000",
+                "Aporte 2026-07: 20.0000",
+              ],
+            }),
+          ],
+        }),
+      ]),
+    });
+    expect(canonicalJson(reversedPayload)).toBe(canonicalJson(payload));
   });
 
   it("builds a WhatsApp share URL for archived statements", () => {
