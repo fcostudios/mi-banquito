@@ -301,6 +301,7 @@ export const paymentAllocation = pgTable("payment_allocation", {
   groupConfigVersion: integer("group_config_version").notNull(),
   createdAt: timestamp("created_at").notNull(),
 }, (table) => [
+  unique("uq_payment_allocation_receipt_order").on(table.orgId, table.receiptId, table.sortOrder),
   foreignKey({
     name: "fk_payment_allocation_receipt_org_member",
     columns: [table.orgId, table.memberId, table.receiptId],

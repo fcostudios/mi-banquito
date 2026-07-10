@@ -12,6 +12,26 @@ import {
   verifierResultText,
 } from "./reporting";
 
+const statementCopy = {
+  monthlySectionTitle: "Estado mensual",
+  openingBalance: "Saldo inicial",
+  contribution: "Aporte {{date}}",
+  withdrawal: "Retiro {{date}}",
+  closingBalance: "Saldo final",
+  treasurer: "Tesorera",
+  groupAccount: "Cuenta del grupo",
+  noGroupAccount: "Sin cuenta registrada",
+  receivedPaymentsTitle: "Pagos recibidos",
+  receivedPayment: "Pago recibido de {{member}}",
+  loanFee: "Mora/comisión préstamo",
+  loanInterest: "Interés préstamo",
+  loanPrincipal: "Capital préstamo",
+  contributionAllocation: "Aporte {{cycle}}",
+  fallbackAllocation: "Aplicación",
+  unknownCycle: "sin período",
+  unknownMember: "socia",
+};
+
 describe("public statement verification", () => {
   it("orders object keys deterministically before hashing", () => {
     const left = canonicalJson({ b: 2, a: { d: 4, c: 3 } });
@@ -45,6 +65,7 @@ describe("public statement verification", () => {
       withdrawals: [],
       treasurerName: "Pancho",
       bankLast4: "1234",
+      copy: statementCopy,
     });
 
     expect(payload.sections[0].rows).toContainEqual({ label: "Saldo inicial", value: "USD 100.00" });
@@ -69,6 +90,7 @@ describe("public statement verification", () => {
       withdrawals: [],
       treasurerName: "Pancho",
       bankLast4: null,
+      copy: statementCopy,
     });
     const reversedPayload = monthlyMemberStatementPayload({
       orgName: "Mi Banquito",
@@ -80,6 +102,7 @@ describe("public statement verification", () => {
       withdrawals: [],
       treasurerName: "Pancho",
       bankLast4: null,
+      copy: statementCopy,
     });
     const rows = payload.sections[0].rows;
 
@@ -140,10 +163,11 @@ describe("public statement verification", () => {
       openingBalance: "100.0000",
       closingBalance: "140.0000",
       contributions: [],
-      receivedPayments: monthlyMemberStatementReceivedPayments(rows),
+      receivedPayments: monthlyMemberStatementReceivedPayments(rows, statementCopy),
       withdrawals: [],
       treasurerName: "Pancho",
       bankLast4: null,
+      copy: statementCopy,
     });
     const reversedPayload = monthlyMemberStatementPayload({
       orgName: "Mi Banquito",
@@ -152,10 +176,11 @@ describe("public statement verification", () => {
       openingBalance: "100.0000",
       closingBalance: "140.0000",
       contributions: [],
-      receivedPayments: monthlyMemberStatementReceivedPayments([...rows].reverse()),
+      receivedPayments: monthlyMemberStatementReceivedPayments([...rows].reverse(), statementCopy),
       withdrawals: [],
       treasurerName: "Pancho",
       bankLast4: null,
+      copy: statementCopy,
     });
 
     expect(payload).toMatchObject({

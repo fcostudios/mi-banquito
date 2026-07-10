@@ -29,6 +29,7 @@ export interface ReportingService {
     actorId: string;
     periodCloseId: string;
     memberId?: string;
+    statementCopy: MonthlyMemberStatementCopy;
     createArtifact: (input: MonthlyMemberStatementArtifactInput) => Promise<MonthlyMemberStatementArtifactResult>;
   }): Promise<{ generated: number; reused: number }>;
   recordStatementShare(input: { orgId: string; actorId: string; statementArchiveId: string }): Promise<{ whatsappUrl: string | null }>;
@@ -81,6 +82,26 @@ export function money(value: string | number): string {
   return `USD ${Number(value).toFixed(2)}`;
 }
 
+export type MonthlyMemberStatementCopy = {
+  monthlySectionTitle: string;
+  openingBalance: string;
+  contribution: string;
+  withdrawal: string;
+  closingBalance: string;
+  treasurer: string;
+  groupAccount: string;
+  noGroupAccount: string;
+  receivedPaymentsTitle: string;
+  receivedPayment: string;
+  loanFee: string;
+  loanInterest: string;
+  loanPrincipal: string;
+  contributionAllocation: string;
+  fallbackAllocation: string;
+  unknownCycle: string;
+  unknownMember: string;
+};
+
 export function monthlyMemberStatementPayload(input: {
   orgName: string;
   periodLabel: string;
@@ -92,7 +113,9 @@ export function monthlyMemberStatementPayload(input: {
   withdrawals: Array<{ id: string; amount: string; datedOn: string }>;
   treasurerName: string;
   bankLast4: string | null;
+  copy: MonthlyMemberStatementCopy;
 }) {
+  const copy = input.copy;
   return {
     kind: "monthly_member",
     orgName: input.orgName,
@@ -101,29 +124,29 @@ export function monthlyMemberStatementPayload(input: {
     sections: [
       {
         id: "member-monthly",
-        title: "Estado mensual",
+        title: copy.monthlySectionTitle,
         rows: [
-          { label: "Saldo inicial", value: money(input.openingBalance) },
+          { label: copy.openingBalance, value: money(input.openingBalance) },
           ...input.contributions.map((row) => ({
-            label: `Aporte ${row.datedOn}`,
+            label: copy.contribution.replace("{{date}}", row.datedOn),
             value: money(row.amount),
             href: row.slipPhotoUri,
           })),
           ...input.withdrawals.map((row) => ({
-            label: `Retiro ${row.datedOn}`,
+            label: copy.withdrawal.replace("{{date}}", row.datedOn),
             value: money(row.amount),
           })),
-          { label: "Saldo final", value: money(input.closingBalance) },
-          { label: "Tesorera", value: input.treasurerName },
-          { label: "Cuenta del grupo", value: input.bankLast4 ? `****${input.bankLast4}` : "Sin cuenta registrada" },
+          { label: copy.closingBalance, value: money(input.closingBalance) },
+          { label: copy.treasurer, value: input.treasurerName },
+          { label: copy.groupAccount, value: input.bankLast4 ? `****${input.bankLast4}` : copy.noGroupAccount },
         ],
       },
       ...(input.receivedPayments && input.receivedPayments.length > 0
         ? [{
             id: "member-received-payments",
-            title: "Pagos recibidos",
+            title: copy.receivedPaymentsTitle,
             rows: input.receivedPayments.map((row) => ({
-              label: `Pago recibido de ${row.memberName}`,
+              label: copy.receivedPayment.replace("{{member}}", row.memberName),
               amount: row.amount,
               datedOn: row.datedOn,
               details: row.details,
@@ -171,26 +194,30 @@ export type MemberStatementReceiptAllocationSource = {
   sortOrder: number;
 };
 
-function allocationStatementLabel(row: Pick<MemberStatementReceiptAllocationSource, "allocationKind" | "cycleLabel">): string {
+function allocationStatementLabel(
+  row: Pick<MemberStatementReceiptAllocationSource, "allocationKind" | "cycleLabel">,
+  copy: MonthlyMemberStatementCopy,
+): string {
   switch (row.allocationKind) {
     case "loan_fee":
-      return "Mora/comisión préstamo";
+      return copy.loanFee;
     case "loan_interest":
-      return "Interés préstamo";
+      return copy.loanInterest;
     case "loan_principal":
-      return "Capital préstamo";
+      return copy.loanPrincipal;
     case "contribution_overdue":
     case "contribution_current":
     case "contribution_future":
     case "extra_savings":
-      return `Aporte ${row.cycleLabel ?? "sin período"}`;
+      return copy.contributionAllocation.replace("{{cycle}}", row.cycleLabel ?? copy.unknownCycle);
     default:
-      return "Aplicación";
+      return copy.fallbackAllocation;
   }
 }
 
 export function monthlyMemberStatementReceivedPayments(
   rows: MemberStatementReceiptAllocationSource[],
+  copy: MonthlyMemberStatementCopy,
 ): Array<{ id: string; amount: string; datedOn: string; memberName: string; details: string[] }> {
   const grouped = new Map<string, MemberStatementReceiptAllocationSource[]>();
   for (const row of [...rows].sort((left, right) =>
@@ -207,8 +234,8 @@ export function monthlyMemberStatementReceivedPayments(
       id: receiptId,
       amount: first?.receiptAmount ?? "0.0000",
       datedOn: dateOnly(first?.receiptDatedOn ?? ""),
-      memberName: first?.memberName ?? "socia",
-      details: allocations.map((row) => `${allocationStatementLabel(row)}: ${row.allocationAmount}`),
+      memberName: first?.memberName ?? copy.unknownMember,
+      details: allocations.map((row) => `${allocationStatementLabel(row, copy)}: ${row.allocationAmount}`),
     };
   });
 }
@@ -383,7 +410,7 @@ export function createReportingService(): ReportingService {
               slipPhotoUri: null,
               sourceKind: item.paymentReceiptId ? "payment_receipt" : "contribution",
             }))),
-            receivedPayments: monthlyMemberStatementReceivedPayments(receiptAllocations),
+            receivedPayments: monthlyMemberStatementReceivedPayments(receiptAllocations, input.statementCopy),
             withdrawals: withdrawals.map((item) => ({
               id: item.id,
               amount: item.amount,
@@ -391,6 +418,7 @@ export function createReportingService(): ReportingService {
             })),
             treasurerName: "member",
             bankLast4: null,
+            copy: input.statementCopy,
           });
           const hash = sha256Hex(canonicalJson(payload));
           const existing = await tx.select({ id: statementArchive.id }).from(statementArchive)
