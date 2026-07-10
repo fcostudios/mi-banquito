@@ -129,6 +129,7 @@ export const insertYearEndBalanceSnapshotLineSchema = createInsertSchema(yearEnd
 export const selectYearEndBalanceSnapshotLineSchema = createSelectSchema(yearEndBalanceSnapshotLine);
 
 const moneyString = z.string().regex(/^\d+(\.\d{1,4})?$/, "Use a non-negative decimal amount");
+const positiveMoneyString = moneyString.refine((value) => Number(value) > 0, "Use a positive decimal amount");
 const signedMoneyString = z.string().regex(/^-?\d+(\.\d{1,4})?$/, "Use a decimal amount");
 const uuidString = z.string().uuid();
 const optionalUuidString = uuidString.optional().or(z.literal(""));
@@ -321,7 +322,7 @@ export const paymentExtraDecisionSchema = z.enum([
 export const memberPaymentFormSchema = z.object({
   clientRequestId: uuidString,
   memberId: uuidString,
-  amount: moneyString,
+  amount: positiveMoneyString,
   datedOn: dateString,
   paymentSource: contributionSourceSchema.default("cash_in_meeting"),
   slipPhotoId: uuidString.optional().or(z.literal("")),

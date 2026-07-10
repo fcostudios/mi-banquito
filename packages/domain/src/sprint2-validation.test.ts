@@ -139,4 +139,14 @@ describe("memberPaymentFormSchema", () => {
       extraDecision: "loan_principal",
     })).toThrow();
   });
+
+  it("rejects a zero member payment before receipt persistence", () => {
+    expect(() => memberPaymentFormSchema.parse({
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      memberId: "22222222-2222-4222-8222-222222222222",
+      amount: "0.0000",
+      datedOn: "2026-07-09",
+      paymentSource: "cash_in_meeting",
+    })).toThrow();
+  });
 });
