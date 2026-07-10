@@ -4,6 +4,7 @@ import {
   cronReplayFormSchema,
   loanOriginationFormSchema,
   loanRepaymentFormSchema,
+  memberPaymentFormSchema,
 } from "@mi-banquito/contracts";
 
 describe("Sprint 2 form validation", () => {
@@ -111,5 +112,31 @@ describe("Sprint 2 form validation", () => {
     });
 
     expect(parsed.endpoint).toBe("accrue-interest");
+  });
+});
+
+describe("memberPaymentFormSchema", () => {
+  it("accepts an untargeted member payment with no extra decision", () => {
+    expect(memberPaymentFormSchema.parse({
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      memberId: "22222222-2222-4222-8222-222222222222",
+      amount: "80.00",
+      datedOn: "2026-07-09",
+      paymentSource: "cash_in_meeting",
+    })).toMatchObject({
+      amount: "80.00",
+      paymentSource: "cash_in_meeting",
+    });
+  });
+
+  it("rejects loan-principal extra decision without an explicit open loan target", () => {
+    expect(() => memberPaymentFormSchema.parse({
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      memberId: "22222222-2222-4222-8222-222222222222",
+      amount: "80.00",
+      datedOn: "2026-07-09",
+      paymentSource: "cash_in_meeting",
+      extraDecision: "loan_principal",
+    })).toThrow();
   });
 });
