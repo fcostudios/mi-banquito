@@ -7,11 +7,10 @@ export type PaymentAllocationKind =
   | "loan_principal"
   | "contribution_overdue"
   | "contribution_current"
-  | "contribution_future";
+  | "contribution_future"
+  | "extra_savings";
 
-export type PaymentExtraDecision = {
-  kind: "leave_unapplied" | "apply_to_future_contribution";
-};
+export type PaymentExtraDecision = "extra_savings" | "future_contribution" | "loan_principal";
 
 export type LoanPaymentObligation = {
   loanId: string;
@@ -75,6 +74,10 @@ type LoanBucket = {
   loan: LoanPaymentObligation;
 };
 
+type LoanBucketKind = LoanBucket["kind"];
+
+const loanBucketKinds: LoanBucketKind[] = ["loan_fee", "loan_interest", "loan_principal"];
+
 const contributionKindOrder: Record<ContributionPaymentObligation["kind"], number> = {
   overdue: 1,
   current: 2,
@@ -128,12 +131,30 @@ function sortedContributions(
     .map(({ contribution }) => contribution);
 }
 
-function loanBuckets(loan: LoanPaymentObligation): LoanBucket[] {
-  return [
-    { kind: "loan_fee", amount: loan.feeDue, loan },
-    { kind: "loan_interest", amount: loan.interestDue, loan },
-    { kind: "loan_principal", amount: loan.principalDue, loan },
-  ];
+function loanBucketAmount(loan: LoanPaymentObligation, kind: LoanBucketKind): string {
+  if (kind === "loan_fee") {
+    return loan.feeDue;
+  }
+  if (kind === "loan_interest") {
+    return loan.interestDue;
+  }
+  return loan.principalDue;
+}
+
+function loanBuckets(loans: readonly LoanPaymentObligation[]): LoanBucket[] {
+  const loansByAge = sortedLoans(loans);
+
+  return loanBucketKinds.flatMap((kind) => (
+    loansByAge.map((loan) => ({
+      kind,
+      amount: loanBucketAmount(loan, kind),
+      loan,
+    }))
+  ));
+}
+
+function principalBucketKey(loan: LoanPaymentObligation): string {
+  return loan.loanScheduleId;
 }
 
 function applyAmount(remaining: bigint, due: bigint): { applied: bigint; remaining: bigint } {
@@ -159,6 +180,7 @@ function baseLine(
 export function allocateMemberPayment(input: AllocateMemberPaymentInput): AllocateMemberPaymentResult {
   let remaining = parseMoney4(input.amount);
   const lines: PaymentAllocationLine[] = [];
+  const principalAllocations = new Map<string, bigint>();
 
   const pushLine = (line: Omit<PaymentAllocationLine, "sortOrder">): void => {
     lines.push({
@@ -167,26 +189,41 @@ export function allocateMemberPayment(input: AllocateMemberPaymentInput): Alloca
     });
   };
 
-  for (const loan of sortedLoans(input.loanObligations)) {
-    for (const bucket of loanBuckets(loan)) {
-      const allocation = applyAmount(remaining, parseMoney4(bucket.amount));
-      remaining = allocation.remaining;
-
-      if (allocation.applied === BigInt(0)) {
-        continue;
-      }
-
-      pushLine({
-        ...baseLine(input, allocation.applied),
-        kind: bucket.kind,
-        ...(bucket.kind === "loan_fee" ? { loanFeeId: bucket.loan.loanFeeId ?? null } : {}),
-        loanId: bucket.loan.loanId,
-        loanScheduleId: bucket.loan.loanScheduleId,
-      });
+  const pushLoanAllocation = (bucket: LoanBucket, amount: bigint): void => {
+    if (bucket.kind === "loan_principal") {
+      const key = principalBucketKey(bucket.loan);
+      principalAllocations.set(key, (principalAllocations.get(key) ?? BigInt(0)) + amount);
     }
+
+    pushLine({
+      ...baseLine(input, amount),
+      kind: bucket.kind,
+      ...(bucket.kind === "loan_fee" ? { loanFeeId: bucket.loan.loanFeeId ?? null } : {}),
+      loanId: bucket.loan.loanId,
+      loanScheduleId: bucket.loan.loanScheduleId,
+    });
+  };
+
+  const allocateLoanBucket = (bucket: LoanBucket): void => {
+    const allocation = applyAmount(remaining, parseMoney4(bucket.amount));
+    remaining = allocation.remaining;
+
+    if (allocation.applied === BigInt(0)) {
+      return;
+    }
+
+    pushLoanAllocation(bucket, allocation.applied);
+  };
+
+  for (const bucket of loanBuckets(input.loanObligations)) {
+    allocateLoanBucket(bucket);
   }
 
-  for (const contribution of sortedContributions(input.contributionObligations)) {
+  const baseContributions = input.contributionObligations.filter(
+    (contribution) => contribution.kind !== "future",
+  );
+
+  for (const contribution of sortedContributions(baseContributions)) {
     const allocation = applyAmount(remaining, parseMoney4(contribution.amountDue));
     remaining = allocation.remaining;
 
@@ -200,6 +237,61 @@ export function allocateMemberPayment(input: AllocateMemberPaymentInput): Alloca
       cycleId: contribution.cycleId,
       cycleLabel: contribution.cycleLabel,
     });
+  }
+
+  if (remaining > BigInt(0) && input.extraDecision === "future_contribution") {
+    const futureContributions = input.contributionObligations.filter(
+      (contribution) => contribution.kind === "future",
+    );
+
+    for (const contribution of sortedContributions(futureContributions)) {
+      const allocation = applyAmount(remaining, parseMoney4(contribution.amountDue));
+      remaining = allocation.remaining;
+
+      if (allocation.applied === BigInt(0)) {
+        continue;
+      }
+
+      pushLine({
+        ...baseLine(input, allocation.applied),
+        kind: "contribution_future",
+        cycleId: contribution.cycleId,
+        cycleLabel: contribution.cycleLabel,
+      });
+    }
+  }
+
+  if (remaining > BigInt(0) && input.extraDecision === "loan_principal") {
+    for (const loan of sortedLoans(input.loanObligations)) {
+      const principalDue = parseMoney4(loan.principalDue);
+      const alreadyAllocated = principalAllocations.get(principalBucketKey(loan)) ?? BigInt(0);
+      const outstandingPrincipal = principalDue - alreadyAllocated;
+
+      if (outstandingPrincipal <= BigInt(0)) {
+        continue;
+      }
+
+      const allocation = applyAmount(remaining, outstandingPrincipal);
+      remaining = allocation.remaining;
+
+      if (allocation.applied === BigInt(0)) {
+        continue;
+      }
+
+      pushLoanAllocation({
+        kind: "loan_principal",
+        amount: formatMoney4(outstandingPrincipal),
+        loan,
+      }, allocation.applied);
+    }
+  }
+
+  if (remaining > BigInt(0) && input.extraDecision === "extra_savings") {
+    pushLine({
+      ...baseLine(input, remaining),
+      kind: "extra_savings",
+    });
+    remaining = BigInt(0);
   }
 
   return {

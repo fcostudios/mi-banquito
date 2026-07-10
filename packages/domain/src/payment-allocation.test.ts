@@ -77,4 +77,118 @@ describe("BR-26 allocateMemberPayment", () => {
     ]);
     expect(result.unappliedAmount).toBe("0.0000");
   });
+
+  it("allocates loan phases globally before moving to lower-priority loan buckets", () => {
+    const result = allocateMemberPayment({
+      ...baseInput,
+      amount: "20.0000",
+      loanObligations: [
+        {
+          loanId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          loanScheduleId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          dueOn: "2026-05-01",
+          feeDue: "0.0000",
+          interestDue: "0.0000",
+          principalDue: "30.0000",
+        },
+        {
+          loanId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          loanScheduleId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+          loanFeeId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+          dueOn: "2026-06-01",
+          feeDue: "5.0000",
+          interestDue: "7.0000",
+          principalDue: "30.0000",
+        },
+      ],
+      contributionObligations: [],
+    });
+
+    expect(result.lines.map((line) => [line.kind, line.amount, line.loanId])).toEqual([
+      ["loan_fee", "5.0000", "cccccccc-cccc-4ccc-8ccc-cccccccccccc"],
+      ["loan_interest", "7.0000", "cccccccc-cccc-4ccc-8ccc-cccccccccccc"],
+      ["loan_principal", "8.0000", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
+    ]);
+    expect(result.unappliedAmount).toBe("0.0000");
+  });
+
+  it("requires an extra decision before allocating future contributions", () => {
+    const contributionObligations = [
+      {
+        cycleId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        cycleLabel: "2026-06",
+        dueOn: "2026-06-30",
+        amountDue: "10.0000",
+        kind: "overdue" as const,
+      },
+      {
+        cycleId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        cycleLabel: "2026-07",
+        dueOn: "2026-07-31",
+        amountDue: "15.0000",
+        kind: "current" as const,
+      },
+      {
+        cycleId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        cycleLabel: "2026-08",
+        dueOn: "2026-08-31",
+        amountDue: "20.0000",
+        kind: "future" as const,
+      },
+    ];
+
+    const withoutDecision = allocateMemberPayment({
+      ...baseInput,
+      amount: "45.0000",
+      loanObligations: [],
+      contributionObligations,
+    });
+    const withDecision = allocateMemberPayment({
+      ...baseInput,
+      amount: "45.0000",
+      loanObligations: [],
+      contributionObligations,
+      extraDecision: "future_contribution",
+    });
+
+    expect(withoutDecision.lines.map((line) => [line.kind, line.amount])).toEqual([
+      ["contribution_overdue", "10.0000"],
+      ["contribution_current", "15.0000"],
+    ]);
+    expect(withoutDecision.unappliedAmount).toBe("20.0000");
+    expect(withoutDecision.requiresExtraDecision).toBe(true);
+
+    expect(withDecision.lines.map((line) => [line.kind, line.amount])).toEqual([
+      ["contribution_overdue", "10.0000"],
+      ["contribution_current", "15.0000"],
+      ["contribution_future", "20.0000"],
+    ]);
+    expect(withDecision.unappliedAmount).toBe("0.0000");
+    expect(withDecision.requiresExtraDecision).toBe(false);
+  });
+
+  it("uses a string extra-savings decision to emit an extra savings allocation", () => {
+    const result = allocateMemberPayment({
+      ...baseInput,
+      amount: "25.0000",
+      loanObligations: [],
+      contributionObligations: [
+        {
+          cycleId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          cycleLabel: "2026-07",
+          dueOn: "2026-07-31",
+          amountDue: "20.0000",
+          kind: "current",
+        },
+      ],
+      extraDecision: "extra_savings",
+    });
+
+    expect(result.lines.map((line) => [line.kind, line.amount])).toEqual([
+      ["contribution_current", "20.0000"],
+      ["extra_savings", "5.0000"],
+    ]);
+    expect(result.unappliedAmount).toBe("0.0000");
+    expect(result.requiresExtraDecision).toBe(false);
+  });
 });
