@@ -134,6 +134,7 @@ export function monthlyMemberStatementContributions(
 ): Array<{ id: string; amount: string; datedOn: string; slipPhotoUri: string | null }> {
   return rows
     .filter((row) => row.sourceKind !== "payment_receipt")
+    .sort((left, right) => left.datedOn.localeCompare(right.datedOn) || left.id.localeCompare(right.id))
     .map((row) => ({
       id: row.id,
       amount: row.amount,
@@ -255,7 +256,7 @@ export function createReportingService(): ReportingService {
               sql`${contribution.datedOn} >= ${periodStart}`,
               sql`${contribution.datedOn} <= ${periodEnd}`,
             ))
-            .orderBy(contribution.datedOn);
+            .orderBy(contribution.datedOn, contribution.id);
           const withdrawals = await tx.select({
             id: withdrawal.id,
             amount: withdrawal.amount,

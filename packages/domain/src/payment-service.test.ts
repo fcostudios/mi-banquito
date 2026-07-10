@@ -326,6 +326,20 @@ describe("BR-26 payment service", () => {
       expect(insertedRows(fakeDb, auditLogEntry)[0]).toMatchObject({
         actionKind: "payment.receipt.recorded",
         subjectKind: "payment_receipt",
+        payloadSnapshot: {
+          allocations: expect.arrayContaining([
+            expect.objectContaining({
+              kind: "contribution_overdue",
+              cycleId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+              cycleLabel: "2026-06",
+            }),
+            expect.objectContaining({
+              kind: "contribution_current",
+              cycleId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+              cycleLabel: "2026-07",
+            }),
+          ]),
+        },
       });
       expect(fakeDb.executedSql.filter((query) => query.includes("refresh_sprint1_read_models"))).toHaveLength(1);
       expect(fakeDb.selects.filter((entry) => entry.tableName === tableNameOf(groupConfig))).toEqual([
