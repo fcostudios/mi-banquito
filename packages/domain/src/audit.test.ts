@@ -635,8 +635,10 @@ describe("audit narration", () => {
             extraDecision: "future_contribution",
             allocations: [
               { kind: "loan_interest", amount: "5.0000", loanId: "loan-1" },
-              { kind: "contribution_overdue", amount: "20.0000", cycleId: "cycle-1" },
-              { kind: "contribution_current", amount: "20.0000", cycleId: "cycle-2" },
+              { kind: "contribution_overdue", amount: "20.0000", cycleId: "cycle-1", cycleLabel: "2026-06" },
+              { kind: "contribution_current", amount: "20.0000", cycleId: "cycle-2", cycleLabel: "2026-07" },
+              { kind: "extra_savings", amount: 3, contributionId: "contribution-3" },
+              { kind: "loan_fee", loanId: "loan-2" },
             ],
           },
           reason: null,
@@ -661,8 +663,11 @@ describe("audit narration", () => {
       expect(entry).toEqual(expect.objectContaining({
         text: "Toitq registró un pago agrupado de $45.00 el 2026-07-09.",
         details: [
-          { label: "Decisión extra", value: "future_contribution" },
-          { label: "Aplicaciones", value: "loan_interest: $5.00, contribution_overdue: $20.00, contribution_current: $20.00" },
+          { label: "Decisión extra", value: "Prepagar aporte futuro" },
+          { label: "Aplicado a interés", value: "$5.00" },
+          { label: "Aporte 2026-06", value: "$20.00" },
+          { label: "Aporte 2026-07", value: "$20.00" },
+          { label: "Aporte extra / ahorro", value: "$3.00" },
         ],
       }));
     });

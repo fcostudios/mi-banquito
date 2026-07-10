@@ -185,7 +185,8 @@
       "groupConfigVersion": "Reglas actualizadas",
       "businessRulesView": "Reglas consultadas",
       "adjustmentPeriodOpen": "Período de ajuste",
-      "baseFundQuotaPayment": "Cuota base pagada"
+      "baseFundQuotaPayment": "Cuota base pagada",
+      "paymentReceiptRecorded": "Pago agrupado"
     }
   },
   "atrasos": {

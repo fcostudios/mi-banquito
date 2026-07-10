@@ -105,6 +105,16 @@ function money(value: string | number | undefined): string {
   return Number(value ?? 0).toFixed(2);
 }
 
+function moneyValue(value: unknown): string | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value.toFixed(2);
+  }
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+    return Number(value).toFixed(2);
+  }
+  return undefined;
+}
+
 function memberName(payload: PayloadObject): string {
   return stringField(payload, "memberName")
     ?? stringField(payload, "borrowerName")
@@ -148,24 +158,47 @@ function contributionDetails(payload: PayloadObject): AuditNarratedDetail[] {
   ];
 }
 
-function allocationSummary(payload: PayloadObject): string | undefined {
+function extraDecisionLabel(value: string | undefined): string | undefined {
+  if (value === "extra_savings") return "Aporte extra / ahorro";
+  if (value === "future_contribution") return "Prepagar aporte futuro";
+  if (value === "loan_principal") return "Abonar a capital";
+  return value;
+}
+
+function allocationKindLabel(value: string | undefined, payload: PayloadObject): string {
+  if (value === "loan_fee") return "Aplicado a mora/comisión";
+  if (value === "loan_interest") return "Aplicado a interés";
+  if (value === "loan_principal") return "Aplicado a capital";
+  if (value === "contribution_overdue" || value === "contribution_current" || value === "contribution_future") {
+    return `Aporte ${stringField(payload, "cycleLabel") ?? stringField(payload, "cycleId") ?? ""}`.trim();
+  }
+  if (value === "extra_savings") return "Aporte extra / ahorro";
+  return "Aplicación";
+}
+
+function allocationDetails(payload: PayloadObject): AuditNarratedDetail[] {
   const allocations = payload.allocations;
   if (!Array.isArray(allocations)) {
-    return undefined;
+    return [];
   }
   return allocations
     .filter((entry): entry is PayloadObject => Boolean(entry) && typeof entry === "object" && !Array.isArray(entry))
-    .map((entry) => {
-      const kind = stringField(entry, "kind") ?? "asignación";
-      return `${kind}: $${money(stringField(entry, "amount"))}`;
-    })
-    .join(", ");
+    .flatMap((entry) => {
+      const amount = moneyValue(entry.amount);
+      if (!amount) {
+        return [];
+      }
+      return [{
+        label: allocationKindLabel(stringField(entry, "kind"), entry),
+        value: `$${amount}`,
+      }];
+    });
 }
 
 function receiptDetails(payload: PayloadObject): AuditNarratedDetail[] {
   return [
-    ...detail("Decisión extra", stringField(payload, "extraDecision")),
-    ...detail("Aplicaciones", allocationSummary(payload)),
+    ...detail("Decisión extra", extraDecisionLabel(stringField(payload, "extraDecision"))),
+    ...allocationDetails(payload),
   ];
 }
 
