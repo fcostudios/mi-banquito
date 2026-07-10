@@ -8,6 +8,7 @@ export * from "./liquidity";
 export * from "./loan";
 export * from "./pilot";
 export * from "./platform";
+export * from "./payments";
 export * from "./reconciliation";
 export * from "./reporting";
 export * from "./sprint7-alerts";
