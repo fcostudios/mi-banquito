@@ -21,6 +21,8 @@ export default async function ScrRecordContributionPage({
     amount?: string;
     datedOn?: string;
     paymentSource?: string;
+    slipPhotoId?: string;
+    notes?: string;
     targetLoanId?: string;
     targetCycleId?: string;
   }>;
@@ -67,17 +69,19 @@ export default async function ScrRecordContributionPage({
           </Select>
         </FormField>
         <FormField labelKey={copy.contributions.slip}>
-          <InputText labelKey={copy.contributions.slip} name="slipPhotoId" />
+          <InputText labelKey={copy.contributions.slip} name="slipPhotoId" defaultValue={params?.slipPhotoId ?? ""} />
         </FormField>
         <FormField labelKey={copy.common.notes}>
-          <InputText labelKey={copy.common.notes} name="notes" />
+          <InputText labelKey={copy.common.notes} name="notes" defaultValue={params?.notes ?? ""} />
         </FormField>
         {showConfirmation ? (
           <fieldset className="grid gap-2 rounded-md border border-border p-4">
             <legend className="px-1 text-sm font-semibold text-text-primary">Queda dinero sin aplicar</legend>
             <Radio name="extraDecision" value="extra_savings" label="Aporte extra / ahorro" defaultChecked />
             <Radio name="extraDecision" value="future_contribution" label="Prepagar aporte futuro" />
-            <Radio name="extraDecision" value="loan_principal" label="Abonar a capital" />
+            {params?.targetLoanId ? (
+              <Radio name="extraDecision" value="loan_principal" label="Abonar a capital" />
+            ) : null}
           </fieldset>
         ) : null}
         <div>
