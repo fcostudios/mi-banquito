@@ -191,4 +191,88 @@ describe("BR-26 allocateMemberPayment", () => {
     expect(result.unappliedAmount).toBe("0.0000");
     expect(result.requiresExtraDecision).toBe(false);
   });
+
+  it("allocates a loan-principal extra decision to prepayable principal", () => {
+    const result = allocateMemberPayment({
+      ...baseInput,
+      amount: "40.0000",
+      loanObligations: [
+        {
+          loanId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          loanScheduleId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          dueOn: "2026-06-01",
+          feeDue: "0.0000",
+          interestDue: "0.0000",
+          principalDue: "30.0000",
+          prepayablePrincipal: "25.0000",
+        },
+      ],
+      contributionObligations: [],
+      extraDecision: "loan_principal",
+    });
+
+    expect(result.lines.map((line) => [line.kind, line.amount])).toEqual([
+      ["loan_principal", "30.0000"],
+      ["loan_principal", "10.0000"],
+    ]);
+    expect(result.unappliedAmount).toBe("0.0000");
+    expect(result.requiresExtraDecision).toBe(false);
+  });
+
+  it("keeps requiring an extra decision when loan-principal has no prepayable principal", () => {
+    const result = allocateMemberPayment({
+      ...baseInput,
+      amount: "40.0000",
+      loanObligations: [
+        {
+          loanId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          loanScheduleId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          dueOn: "2026-06-01",
+          feeDue: "0.0000",
+          interestDue: "0.0000",
+          principalDue: "30.0000",
+        },
+      ],
+      contributionObligations: [],
+      extraDecision: "loan_principal",
+    });
+
+    expect(result.lines.map((line) => [line.kind, line.amount])).toEqual([
+      ["loan_principal", "30.0000"],
+    ]);
+    expect(result.unappliedAmount).toBe("10.0000");
+    expect(result.requiresExtraDecision).toBe(true);
+  });
+
+  it("keeps requiring an extra decision when future-contribution capacity is insufficient", () => {
+    const result = allocateMemberPayment({
+      ...baseInput,
+      amount: "50.0000",
+      loanObligations: [],
+      contributionObligations: [
+        {
+          cycleId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          cycleLabel: "2026-07",
+          dueOn: "2026-07-31",
+          amountDue: "20.0000",
+          kind: "current",
+        },
+        {
+          cycleId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          cycleLabel: "2026-08",
+          dueOn: "2026-08-31",
+          amountDue: "10.0000",
+          kind: "future",
+        },
+      ],
+      extraDecision: "future_contribution",
+    });
+
+    expect(result.lines.map((line) => [line.kind, line.amount])).toEqual([
+      ["contribution_current", "20.0000"],
+      ["contribution_future", "10.0000"],
+    ]);
+    expect(result.unappliedAmount).toBe("20.0000");
+    expect(result.requiresExtraDecision).toBe(true);
+  });
 });

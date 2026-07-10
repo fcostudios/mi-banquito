@@ -20,6 +20,7 @@ export type LoanPaymentObligation = {
   feeDue: string;
   interestDue: string;
   principalDue: string;
+  prepayablePrincipal?: string;
 };
 
 export type ContributionPaymentObligation = {
@@ -153,10 +154,6 @@ function loanBuckets(loans: readonly LoanPaymentObligation[]): LoanBucket[] {
   ));
 }
 
-function principalBucketKey(loan: LoanPaymentObligation): string {
-  return loan.loanScheduleId;
-}
-
 function applyAmount(remaining: bigint, due: bigint): { applied: bigint; remaining: bigint } {
   const applied = remaining < due ? remaining : due;
   return {
@@ -180,7 +177,6 @@ function baseLine(
 export function allocateMemberPayment(input: AllocateMemberPaymentInput): AllocateMemberPaymentResult {
   let remaining = parseMoney4(input.amount);
   const lines: PaymentAllocationLine[] = [];
-  const principalAllocations = new Map<string, bigint>();
 
   const pushLine = (line: Omit<PaymentAllocationLine, "sortOrder">): void => {
     lines.push({
@@ -190,11 +186,6 @@ export function allocateMemberPayment(input: AllocateMemberPaymentInput): Alloca
   };
 
   const pushLoanAllocation = (bucket: LoanBucket, amount: bigint): void => {
-    if (bucket.kind === "loan_principal") {
-      const key = principalBucketKey(bucket.loan);
-      principalAllocations.set(key, (principalAllocations.get(key) ?? BigInt(0)) + amount);
-    }
-
     pushLine({
       ...baseLine(input, amount),
       kind: bucket.kind,
@@ -263,15 +254,13 @@ export function allocateMemberPayment(input: AllocateMemberPaymentInput): Alloca
 
   if (remaining > BigInt(0) && input.extraDecision === "loan_principal") {
     for (const loan of sortedLoans(input.loanObligations)) {
-      const principalDue = parseMoney4(loan.principalDue);
-      const alreadyAllocated = principalAllocations.get(principalBucketKey(loan)) ?? BigInt(0);
-      const outstandingPrincipal = principalDue - alreadyAllocated;
+      const prepayablePrincipal = parseMoney4(loan.prepayablePrincipal ?? "0.0000");
 
-      if (outstandingPrincipal <= BigInt(0)) {
+      if (prepayablePrincipal <= BigInt(0)) {
         continue;
       }
 
-      const allocation = applyAmount(remaining, outstandingPrincipal);
+      const allocation = applyAmount(remaining, prepayablePrincipal);
       remaining = allocation.remaining;
 
       if (allocation.applied === BigInt(0)) {
@@ -280,7 +269,7 @@ export function allocateMemberPayment(input: AllocateMemberPaymentInput): Alloca
 
       pushLoanAllocation({
         kind: "loan_principal",
-        amount: formatMoney4(outstandingPrincipal),
+        amount: formatMoney4(prepayablePrincipal),
         loan,
       }, allocation.applied);
     }
@@ -303,6 +292,6 @@ export function allocateMemberPayment(input: AllocateMemberPaymentInput): Alloca
     groupConfigVersion: input.groupConfigVersion,
     lines,
     unappliedAmount: formatMoney4(remaining),
-    requiresExtraDecision: remaining > BigInt(0) && !input.extraDecision,
+    requiresExtraDecision: remaining > BigInt(0),
   };
 }
