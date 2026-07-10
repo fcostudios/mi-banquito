@@ -449,6 +449,124 @@ describe("BR-26 payment service", () => {
     });
   });
 
+  it("applies extra principal only to the targeted loan when older loans also have prepayable capacity", async () => {
+    const olderLoanId = "aaaaaaaa-0000-4000-8000-000000000001";
+    const targetLoanId = "bbbbbbbb-0000-4000-8000-000000000002";
+    const fakeDb = new FakeDb([
+      [],
+      [{
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        orgId: recordInput.orgId,
+        version: 7,
+        contributionAmount: "20.0000",
+        currencyCode: "USD",
+      }],
+      [
+        {
+          id: olderLoanId,
+          orgId: recordInput.orgId,
+          borrowerMemberId: recordInput.memberId,
+          principalAmount: "100.0000",
+          currencyCode: "USD",
+          status: "activo",
+        },
+        {
+          id: targetLoanId,
+          orgId: recordInput.orgId,
+          borrowerMemberId: recordInput.memberId,
+          principalAmount: "100.0000",
+          currencyCode: "USD",
+          status: "activo",
+        },
+      ],
+      [
+        {
+          id: "cccccccc-0000-4000-8000-000000000001",
+          orgId: recordInput.orgId,
+          loanId: olderLoanId,
+          dueOn: "2026-06-30",
+          principalDue: "10.0000",
+          interestDue: "0.0000",
+          paidPrincipalToDate: "0.0000",
+          paidInterestToDate: "0.0000",
+          status: "pendiente",
+        },
+        {
+          id: "dddddddd-0000-4000-8000-000000000002",
+          orgId: recordInput.orgId,
+          loanId: targetLoanId,
+          dueOn: "2026-07-09",
+          principalDue: "10.0000",
+          interestDue: "0.0000",
+          paidPrincipalToDate: "0.0000",
+          paidInterestToDate: "0.0000",
+          status: "pendiente",
+        },
+      ],
+      [],
+      [],
+      [],
+      [],
+    ]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createPaymentService } = await import("./payments");
+
+      const result = await createPaymentService().recordMemberPayment({
+        ...recordInput,
+        amount: "50.0000",
+        targetLoanId,
+        extraDecision: "loan_principal",
+      });
+
+      expect(result.requiresExtraDecision).toBe(false);
+      expect(result.unappliedAmount).toBe("0.0000");
+      expect(result.allocations.filter((line) => line.kind === "loan_principal")).toEqual([
+        expect.objectContaining({ loanId: olderLoanId, amount: "10.0000" }),
+        expect.objectContaining({ loanId: targetLoanId, amount: "10.0000" }),
+        expect.objectContaining({ loanId: targetLoanId, amount: "30.0000" }),
+      ]);
+      expect(result.allocations).not.toContainEqual(expect.objectContaining({
+        kind: "loan_principal",
+        loanId: olderLoanId,
+        amount: "30.0000",
+      }));
+      expect(insertedRows(fakeDb, repayment).map((row) => [row.loanId, row.appliedToPrincipal])).toEqual([
+        [olderLoanId, "10.0000"],
+        [targetLoanId, "40.0000"],
+      ]);
+    });
+  });
+
+  it("fails closed when extra principal is requested without a target loan", async () => {
+    const fakeDb = new FakeDb([
+      [],
+      [{
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        orgId: recordInput.orgId,
+        version: 7,
+        contributionAmount: "20.0000",
+        currencyCode: "USD",
+      }],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+    ]);
+
+    await withMockedDb(fakeDb, async () => {
+      const { createPaymentService } = await import("./payments");
+
+      await expect(createPaymentService().recordMemberPayment({
+        ...recordInput,
+        amount: "50.0000",
+        extraDecision: "loan_principal",
+      })).rejects.toThrow("payment_target_loan_required_for_principal_prepayment");
+    });
+  });
+
   it("returns the existing receipt without child inserts when the receipt insert conflicts", async () => {
     const fakeDb = new FakeDb([
       [],
