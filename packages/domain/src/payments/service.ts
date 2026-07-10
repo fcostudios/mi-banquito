@@ -83,6 +83,7 @@ function isLoanRowOpen(row: Row, memberId: string): boolean {
 function loanObligationsForRows(input: {
   memberId: string;
   datedOn: string;
+  principalPrepaymentLoanId: string | null;
   loans: Row[];
   schedules: Row[];
   fees: Row[];
@@ -105,6 +106,7 @@ function loanObligationsForRows(input: {
         0,
         Number(loanRow.principalAmount ?? 0) - paidPrincipalForLoan - unpaidPrincipalDue,
       );
+      const allowsPrincipalPrepayment = input.principalPrepaymentLoanId === loanId;
       let remainingFeePaid = paidForLoan.reduce((total, row) => total + Number(row.appliedToFee ?? 0), 0);
 
       return dueScheduleRows
@@ -117,7 +119,7 @@ function loanObligationsForRows(input: {
           const scheduleFee = feeRows.reduce((total, row) => total + Number(row.amount ?? 0), 0);
           const feePaid = Math.min(scheduleFee, remainingFeePaid);
           remainingFeePaid -= feePaid;
-          const prepayablePrincipal = remainingPrepayablePrincipal;
+          const prepayablePrincipal = allowsPrincipalPrepayment ? remainingPrepayablePrincipal : 0;
           remainingPrepayablePrincipal = 0;
 
           return {
@@ -239,6 +241,19 @@ function sumLines(lines: PaymentAllocationLine[], kind?: PaymentAllocationKind):
     .reduce((total, line) => total + Number(line.amount), 0));
 }
 
+function principalPrepaymentLoanIdForInput(input: RecordMemberPaymentInput): string | null {
+  if (input.extraDecision !== "loan_principal") {
+    return null;
+  }
+
+  const targetLoanId = normalizeNullableText(input.targetLoanId);
+  if (!targetLoanId) {
+    throw new Error("payment_target_loan_required_for_principal_prepayment");
+  }
+
+  return targetLoanId;
+}
+
 function contributionCycleForGroup(key: string, lines: PaymentAllocationLine[], input: RecordMemberPaymentInput): string {
   const lineCycleId = lines.find((line) => line.cycleId)?.cycleId;
   if (lineCycleId) {
@@ -285,6 +300,7 @@ async function allocationContextForInput(query: PaymentQuery, input: RecordMembe
     agingRows: agingRows as Row[],
     cycleRows: cycleRows as Row[],
   });
+  const principalPrepaymentLoanId = principalPrepaymentLoanIdForInput(input);
   const allocation = allocateMemberPayment({
     orgId: input.orgId,
     memberId: input.memberId,
@@ -295,6 +311,7 @@ async function allocationContextForInput(query: PaymentQuery, input: RecordMembe
     loanObligations: loanObligationsForRows({
       memberId: input.memberId,
       datedOn: input.datedOn,
+      principalPrepaymentLoanId,
       loans: loanRows as Row[],
       schedules: scheduleRows as Row[],
       fees: feeRows as Row[],
@@ -463,6 +480,8 @@ export function createPaymentService(): PaymentService {
       };
     },
     async recordMemberPayment(input) {
+      principalPrepaymentLoanIdForInput(input);
+
       const existingReceipt = await findExistingReceipt(db, input);
       if (existingReceipt) {
         return existingReceiptResult(db, existingReceipt);
