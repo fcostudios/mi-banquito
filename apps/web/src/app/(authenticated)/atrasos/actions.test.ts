@@ -296,6 +296,11 @@ describe("atrasos actions", () => {
           loanId,
           amount: "20.0000",
         },
+        {
+          kind: "contribution_overdue",
+          cycleId: "55555555-5555-4555-8555-555555555555",
+          amount: "5.0000",
+        },
       ],
       unappliedAmount: "0.0000",
       requiresExtraDecision: false,
