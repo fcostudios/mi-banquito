@@ -1,16 +1,31 @@
-// SCAFFOLD (SCR-accounts) — generated page stub. Build the real screen per its spec: docs/screens/SCR-accounts.json
-import messages from "@/lib/i18n/en-US.json";
+import { randomUUID } from "node:crypto";
 
-const pages = (messages as { pages?: Record<string, { title?: string }> }).pages ?? {};
+import { createAccountsService } from "@mi-banquito/domain";
+import { requireTreasurer } from "@/lib/auth/require-session";
+import { AccountsRegistry } from "./accounts-registry";
+import { deactivateAccountAction, saveAccountAction } from "./actions";
 
-export default function ScrAccountsPage() {
-  const title = pages["cuentas"]?.title ?? "Cuentas del grupo";
+export const dynamic = "force-dynamic";
+
+type SearchValue = string | string[] | undefined;
+
+export default async function ScrAccountsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, SearchValue>>;
+}) {
+  const session = await requireTreasurer();
+  const [accounts, search] = await Promise.all([
+    createAccountsService().listAccounts(session.orgId),
+    searchParams,
+  ]);
   return (
-    <div className="p-6" data-scaffold={"SCR-accounts"}>
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="mt-2 text-text-secondary">
-        {"SCR-accounts"}
-      </p>
-    </div>
+    <AccountsRegistry
+      accounts={accounts}
+      search={search}
+      saveAction={saveAccountAction}
+      archiveAction={deactivateAccountAction}
+      saveClientRequestId={randomUUID()}
+    />
   );
 }

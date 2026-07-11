@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import {
@@ -16,6 +16,13 @@ const migration = readFileSync(
   new URL("./migrations/V20260711151757__sprint_8_accounts_movements.sql", import.meta.url),
   "utf8",
 );
+const accountIdempotencyMigrationUrl = new URL(
+  "./migrations/V20260711163545__account_client_request_id.sql",
+  import.meta.url,
+);
+const accountIdempotencyMigration = existsSync(accountIdempotencyMigrationUrl)
+  ? readFileSync(accountIdempotencyMigrationUrl, "utf8")
+  : "";
 
 const foreignKeySummary = (table: Parameters<typeof getTableConfig>[0]) =>
   getTableConfig(table).foreignKeys.map((foreignKey) => {
@@ -44,6 +51,8 @@ const uniqueConstraintSummary = (table: Parameters<typeof getTableConfig>[0]) =>
 describe("Sprint 8 account and movement schema", () => {
   it("exposes account and regularization columns required by BR-12 and BR-13", () => {
     expect(account.isGroupFund.name).toBe("is_group_fund");
+    expect(account.clientRequestId.name).toBe("client_request_id");
+    expect(account.clientRequestId.notNull).toBe(false);
     expect(expense.accountId.name).toBe("account_id");
     expect(expense.accountId.notNull).toBe(false);
     expect(expense.category.name).toBe("category");
@@ -150,6 +159,11 @@ describe("Sprint 8 account and movement schema", () => {
       partial: false,
       unique: false,
     });
+    expect(indexSummary(account)).toContainEqual({
+      name: "uq_account_org_client_request",
+      partial: false,
+      unique: true,
+    });
     expect(indexSummary(expense)).toContainEqual({
       name: "idx_expense_org_account_date",
       partial: false,
@@ -180,6 +194,9 @@ describe("Sprint 8 account and movement schema", () => {
     expect(getTableConfig(transfer).checks.map((constraint) => constraint.name))
       .toContain("ck_transfer_distinct_accounts");
     expect(migration).toContain("ON account(org_id, is_group_fund, status)");
+    expect(existsSync(accountIdempotencyMigrationUrl)).toBe(true);
+    expect(accountIdempotencyMigration).toContain("ADD COLUMN IF NOT EXISTS client_request_id uuid");
+    expect(accountIdempotencyMigration).toContain("ON account(org_id, client_request_id)");
     expect(migration).toContain("ON expense(org_id, account_id, incurred_on)");
     expect(migration).toContain(
       "ON contribution(org_id, reconciliation_status, dated_on)",
@@ -201,5 +218,7 @@ describe("Sprint 8 account and movement schema", () => {
       "reconciliation_status extraordinary_collection_line_reconciliation_status_enum",
     );
     expect(migration).not.toContain("uq_expense_org_client_request");
+    expect(migration).not.toContain("ALTER TABLE account");
+    expect(migration).not.toContain("uq_account_org_client_request");
   });
 });

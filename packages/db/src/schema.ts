@@ -355,11 +355,13 @@ export const account = pgTable("account", {
   last4: text("last4"),
   productType: text("product_type"),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
   institutionId: uuid("institution_id").references((): AnyPgColumn => institution.id),
+  clientRequestId: uuid("client_request_id"),
   status: account_status_enum("status").notNull(),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
 }, (table) => [
   index("idx_account_org_group_fund").on(table.orgId, table.isGroupFund, table.status),
+  uniqueIndex("uq_account_org_client_request").on(table.orgId, table.clientRequestId),
 ]);
 
 export const transfer = pgTable("transfer", {
