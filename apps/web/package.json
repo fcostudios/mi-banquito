@@ -9,7 +9,9 @@
     "lint": "eslint . && pnpm lint:ds",
     "type-check": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
+    "test:contract": "vitest run --config vitest.config.ts src/lib/vercel-blob-adapter.pact.test.ts src/lib/vercel-blob-adapter.contract.test.ts",
     "test:e2e": "playwright test",
+    "test:e2e:movements": "playwright test --config playwright.movements.config.ts",
     "lint:ds": "node ../../scripts/check-status-pill.mjs ../.. && node ../../scripts/check-hardcoded-color.mjs ../.. && node ../../scripts/check-hardcoded-string.mjs ../.. && node ../../scripts/check-lucide-allowlist.mjs ../.. && node ../../scripts/sprint1-ui-closure-gate.mjs ../.. && node ../../scripts/sprint2-closure-gate.mjs ../.. && node ../../scripts/sprint3-closure-gate.mjs ../.. && node ../../scripts/sprint4-closure-gate.mjs ../.. && node ../../scripts/sprint5-closure-gate.mjs ../..",
     "lint:a11y": "node ../../scripts/check-a11y.mjs ../.."
   },
@@ -31,11 +33,13 @@
     "pg": "^8.13.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "sharp": "0.34.5",
     "zod": "^3.23.8",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@pact-foundation/pact": "17.0.1",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.10.0",
     "@types/pg": "^8.11.10",

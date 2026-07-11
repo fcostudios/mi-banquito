@@ -7,6 +7,10 @@
   "outputDirectory": "apps/web/.next",
   "crons": [
     {
+      "path": "/api/cron/blob-cleanup",
+      "schedule": "17 3 * * *"
+    },
+    {
       "path": "/api/cron/accrue-interest",
       "schedule": "0 5 * * *"
     },

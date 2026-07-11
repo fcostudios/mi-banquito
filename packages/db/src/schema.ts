@@ -34,7 +34,7 @@ export const organization_status_enum = pgEnum("organization_status_enum", ["act
 export const platform_operator_status_enum = pgEnum("platform_operator_status_enum", ["active", "disabled"]);
 export const promise_status_enum = pgEnum("promise_status_enum", ["open", "kept", "broken", "closed"]);
 export const reconciliation_cycle_resolution_kind_enum = pgEnum("reconciliation_cycle_resolution_kind_enum", ["auto_within_tolerance", "resolved_by_correction", "annotated_acceptance", "adjustment"]);
-export const slip_photo_attached_to_kind_enum = pgEnum("slip_photo_attached_to_kind_enum", ["contribution", "repayment"]);
+export const slip_photo_attached_to_kind_enum = pgEnum("slip_photo_attached_to_kind_enum", ["contribution", "repayment", "expense"]);
 export const statement_archive_kind_enum = pgEnum("statement_archive_kind_enum", ["monthly_close", "monthly_member", "year_end_member", "year_end_share_out", "year_end_snapshot", "balance_banquito", "year_end_economic_summary", "monthly_summary"]);
 export const surplus_governance_decision_status_enum = pgEnum("surplus_governance_decision_status_enum", ["draft", "approved", "locked"]);
 export const user_account_status_enum = pgEnum("user_account_status_enum", ["active", "disabled"]);
@@ -204,6 +204,7 @@ export const contribution = pgTable("contribution", {
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
 }, (table) => [
   index("idx_contribution_org_reconciliation").on(table.orgId, table.reconciliationStatus, table.datedOn),
+  index("idx_contribution_org_account").on(table.orgId, table.accountId),
   unique("uq_contribution_org_member_receipt_id").on(table.orgId, table.memberId, table.paymentReceiptId, table.id),
   foreignKey({
     name: "fk_contribution_account_id",
@@ -242,6 +243,7 @@ export const expense = pgTable("expense", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   orgId: uuid("org_id").notNull(),
   purpose: text("purpose").notNull(),
+  notes: text("notes"),
   amount: numeric("amount", { precision: 18, scale: 4 }).notNull(),
   currencyCode: text("currency_code").notNull(),
   beneficiaryMemberId: uuid("beneficiary_member_id").references((): AnyPgColumn => member.id),
@@ -280,6 +282,7 @@ export const slipPhoto = pgTable("slip_photo", {
   uri: text("uri").notNull(),
   mimeType: text("mime_type").notNull(),
   byteSize: integer("byte_size").notNull(),
+  contentHash: text("content_hash"),
   attachedToKind: slip_photo_attached_to_kind_enum("attached_to_kind").notNull(),
   attachedToId: uuid("attached_to_id").notNull(),
   uploadedAt: timestamp("uploaded_at").notNull(),
@@ -287,7 +290,9 @@ export const slipPhoto = pgTable("slip_photo", {
   uploadedByKind: text("uploaded_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
   contributionId: uuid("contribution_id").references((): AnyPgColumn => contribution.id),
   repaymentId: uuid("repayment_id").references((): AnyPgColumn => repayment.id),
-});
+}, (table) => [
+  index("idx_slip_photo_org_uri").on(table.orgId, table.uri),
+]);
 
 export const paymentReceipt = pgTable("payment_receipt", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -373,6 +378,7 @@ export const transfer = pgTable("transfer", {
   currencyCode: text("currency_code").notNull(),
   datedOn: date("dated_on").notNull(),
   purpose: text("purpose"),
+  notes: text("notes"),
   regularizesKind: text("regularizes_kind"),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
   regularizesId: uuid("regularizes_id"),
   clientRequestId: uuid("client_request_id"),
@@ -382,6 +388,8 @@ export const transfer = pgTable("transfer", {
   createdBy: uuid("created_by").notNull(),
 }, (table) => [
   check("ck_transfer_distinct_accounts", sql`${table.fromAccountId} <> ${table.toAccountId}`),
+  index("idx_transfer_org_from_account").on(table.orgId, table.fromAccountId),
+  index("idx_transfer_org_to_account").on(table.orgId, table.toAccountId),
   uniqueIndex("uq_transfer_org_client_request")
     .on(table.orgId, table.clientRequestId)
     .where(sql`${table.clientRequestId} IS NOT NULL`),
@@ -543,6 +551,7 @@ export const repayment = pgTable("repayment", {
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
 }, (table) => [
   index("idx_repayment_org_reconciliation").on(table.orgId, table.reconciliationStatus, table.datedOn),
+  index("idx_repayment_org_account").on(table.orgId, table.accountId),
   unique("uq_repayment_org_member_receipt_id").on(table.orgId, table.memberId, table.paymentReceiptId, table.id),
   foreignKey({
     name: "fk_repayment_account_id",
