@@ -1,16 +1,34 @@
-// SCAFFOLD (SCR-record-movement) — generated page stub. Build the real screen per its spec: docs/screens/SCR-record-movement.json
-import messages from "@/lib/i18n/en-US.json";
+import { randomUUID } from "node:crypto";
 
-const pages = (messages as { pages?: Record<string, { title?: string }> }).pages ?? {};
+import { createMovementService } from "@mi-banquito/domain";
+import { requireTreasurer } from "@/lib/auth/require-session";
+import { recordExpenseAction, recordTransferAction } from "./actions";
+import { ecuadorTodayISO, MovementForms } from "./movement-forms";
 
-export default function ScrRecordMovementPage() {
-  const title = pages["movimientos/registrar"]?.title ?? "Registrar movimiento";
+export const dynamic = "force-dynamic";
+
+type SearchValue = string | string[] | undefined;
+
+export default async function ScrRecordMovementPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, SearchValue>>;
+}) {
+  const session = await requireTreasurer();
+  const [accounts, search] = await Promise.all([
+    createMovementService().listActiveGroupAccountBalances(session.orgId),
+    searchParams,
+  ]);
+
   return (
-    <div className="p-6" data-scaffold={"SCR-record-movement"}>
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="mt-2 text-text-secondary">
-        {"SCR-record-movement"}
-      </p>
-    </div>
+    <MovementForms
+      accounts={accounts.map(({ id, name, last4, balance }) => ({ id, name, last4, balance }))}
+      search={search}
+      expenseAction={recordExpenseAction}
+      transferAction={recordTransferAction}
+      expenseClientRequestId={randomUUID()}
+      transferClientRequestId={randomUUID()}
+      today={ecuadorTodayISO()}
+    />
   );
 }

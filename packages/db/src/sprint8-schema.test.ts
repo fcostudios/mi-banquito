@@ -23,6 +23,13 @@ const accountIdempotencyMigrationUrl = new URL(
 const accountIdempotencyMigration = existsSync(accountIdempotencyMigrationUrl)
   ? readFileSync(accountIdempotencyMigrationUrl, "utf8")
   : "";
+const liveMovementMigrationUrl = new URL(
+  "./migrations/V20260711234500__expense_notes_and_live_movement_reads.sql",
+  import.meta.url,
+);
+const liveMovementMigration = existsSync(liveMovementMigrationUrl)
+  ? readFileSync(liveMovementMigrationUrl, "utf8")
+  : "";
 
 const foreignKeySummary = (table: Parameters<typeof getTableConfig>[0]) =>
   getTableConfig(table).foreignKeys.map((foreignKey) => {
@@ -60,6 +67,8 @@ describe("Sprint 8 account and movement schema", () => {
     expect(expense.clientRequestId.notNull).toBe(false);
     expect(expense.slipPhotoId.name).toBe("slip_photo_id");
     expect(expense.slipPhotoId.notNull).toBe(false);
+    expect(expense.notes.name).toBe("notes");
+    expect(expense.notes.notNull).toBe(false);
     expect(contribution.accountId.name).toBe("account_id");
     expect(contribution.accountId.notNull).toBe(false);
     expect(contribution.reconciliationStatus.name).toBe("reconciliation_status");
@@ -70,6 +79,12 @@ describe("Sprint 8 account and movement schema", () => {
     expect(transfer.regularizesId.name).toBe("regularizes_id");
     expect(transfer.clientRequestId.name).toBe("client_request_id");
     expect(transfer.clientRequestId.notNull).toBe(false);
+  });
+
+  it("ships an append-only expense notes migration that removes movement MV refresh", () => {
+    expect(liveMovementMigration).toContain("ALTER TABLE expense ADD COLUMN IF NOT EXISTS notes text");
+    expect(liveMovementMigration).toContain("DROP FUNCTION IF EXISTS refresh_movement_read_models()");
+    expect(liveMovementMigration).not.toContain("REFRESH MATERIALIZED VIEW");
   });
 
   it("uses shared PostgreSQL enums with required values and defaults", () => {
