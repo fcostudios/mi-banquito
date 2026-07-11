@@ -399,6 +399,7 @@ export const buildMemberStatusTransitionLedgerPlan = (
     plan.refundExpense = {
       orgId: input.orgId,
       purpose: "member_refund",
+      category: "operating",
       amount: input.refundAmount ?? input.member.accumulatedSavingsBalance ?? input.member.initialSavingsBalance,
       currencyCode: input.currencyCode ?? "USD",
       beneficiaryMemberId: input.member.id,

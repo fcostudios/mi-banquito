@@ -140,6 +140,7 @@ describe("US-027 member status transition ledger plan", () => {
     expect(plan.refundExpense).toMatchObject({
       orgId,
       purpose: "member_refund",
+      category: "operating",
       amount: "42.00",
       currencyCode: "USD",
       beneficiaryMemberId: memberId,
