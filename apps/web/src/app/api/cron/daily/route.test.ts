@@ -32,14 +32,12 @@ vi.mock("@mi-banquito/db", () => ({
 import { GET as accrueInterest } from "../accrue-interest/route";
 import { GET as awardTreasurerCompensation } from "../award-treasurer-compensation/route";
 import { GET as daily } from "./route";
-import { GET as driftCheck } from "../drift-check/route";
 
 const originalSecret = process.env.CRON_SECRET;
 const routes = [
   ["/api/cron/accrue-interest", "accrue-interest", accrueInterest],
   ["/api/cron/award-treasurer-compensation", "award-treasurer-compensation", awardTreasurerCompensation],
   ["/api/cron/daily", "daily", daily],
-  ["/api/cron/drift-check", "drift-check", driftCheck],
 ] as const;
 
 beforeEach(() => {

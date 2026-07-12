@@ -1,5 +1,5 @@
-import { createCronHandler } from "@/lib/cron/handler";
+import { createDriftCheckHandler } from "./handler";
 
 export const runtime = "nodejs";
 
-export const GET = createCronHandler("drift-check");
+export const GET = createDriftCheckHandler();

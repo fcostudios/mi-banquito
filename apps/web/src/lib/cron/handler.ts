@@ -32,7 +32,6 @@ export type CronJobName =
   | "accrue-interest"
   | "award-treasurer-compensation"
   | "daily"
-  | "drift-check"
   | "promise-reminders";
 
 export type CronRunSummary = {
@@ -178,6 +177,10 @@ BEGIN
 
   IF to_regclass('mv_ar_aging') IS NOT NULL THEN
     EXECUTE 'REFRESH MATERIALIZED VIEW mv_ar_aging';
+  END IF;
+
+  IF to_regclass('mv_org_health_snapshot') IS NOT NULL THEN
+    EXECUTE 'REFRESH MATERIALIZED VIEW mv_org_health_snapshot';
   END IF;
 
   IF to_regclass('mv_liquidez_proyectada') IS NOT NULL THEN

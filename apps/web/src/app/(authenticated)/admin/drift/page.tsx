@@ -1,16 +1,22 @@
-// SCAFFOLD (SCR-admin-drift) — generated page stub. Build the real screen per its spec: docs/screens/SCR-admin-drift.json
+import { createPostgresAdminDriftRepository } from "@mi-banquito/domain";
+
+import { AdminDriftView } from "@/components/admin/admin-drift-view";
+import { requirePlatformOperator } from "@/lib/auth/require-session";
+import { getDriftRunnerDeploymentStatus } from "@/lib/drift/runner";
 import messages from "@/lib/i18n/en-US.json";
 
-const pages = (messages as { pages?: Record<string, { title?: string }> }).pages ?? {};
+const copy = messages.adminDrift;
 
-export default function ScrAdminDriftPage() {
-  const title = pages["admin/drift"]?.title ?? "Estado del substrato";
+export default async function ScrAdminDriftPage() {
+  await requirePlatformOperator();
+  const result = await createPostgresAdminDriftRepository().latest();
   return (
-    <div className="p-6" data-scaffold={"SCR-admin-drift"}>
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="mt-2 text-text-secondary">
-        {"SCR-admin-drift"}
-      </p>
-    </div>
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6" data-screen="SCR-admin-drift">
+      <header>
+        <h1 className="text-2xl font-bold text-text-primary">{copy.title}</h1>
+        <p className="mt-2 text-text-secondary">{copy.description}</p>
+      </header>
+      <AdminDriftView result={result} runnerDeployment={getDriftRunnerDeploymentStatus()} />
+    </main>
   );
 }
