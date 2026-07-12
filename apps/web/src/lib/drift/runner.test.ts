@@ -1,21 +1,39 @@
 import { createServer } from "node:http";
 import { once } from "node:events";
-import { describe, expect, it } from "vitest";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { createConfiguredDriftRunner, getDriftRunnerDeploymentStatus } from "./runner";
 
 describe("configured drift runners", () => {
-  it("executes a configured local command without shell interpolation", async () => {
-    const literal = "$(printf interpolated)";
+  const temporaryDirectories: string[] = [];
+  const repoRoot = resolve(process.cwd(), "../..");
+
+  afterEach(async () => {
+    await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+  });
+
+  async function executableNousPackage() {
+    const directory = await mkdtemp(join(tmpdir(), "mi-banquito-drift-"));
+    temporaryDirectories.push(directory);
+    const script = join(directory, "nous_package.py");
+    await writeFile(script, "#!/usr/bin/env node\nprocess.stdout.write(process.argv.slice(2).join('|'))\n");
+    await chmod(script, 0o755);
+    return script;
+  }
+
+  it("executes only a real direct nous_package.py command against this repository", async () => {
+    const script = await executableNousPackage();
     const runner = createConfiguredDriftRunner({
       env: {
-        NOUS_DRIFT_RUNNER_EXECUTABLE: process.execPath,
+        NOUS_DRIFT_RUNNER_EXECUTABLE: script,
         NOUS_DRIFT_RUNNER_ARGS: JSON.stringify([
-          "-e",
-          "process.stdout.write(process.argv.slice(1).join('|')); process.stderr.write('stderr-line\\n')",
-          literal,
           "drift",
           "--strict",
+          "--target",
+          repoRoot,
         ]),
       },
     });
@@ -23,11 +41,57 @@ describe("configured drift runners", () => {
     const result = await runner.run();
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe(`${literal}|drift|--strict`);
-    expect(result.stderr).toBe("stderr-line\n");
-    expect(result.rawText).toContain(literal);
-    expect(result.rawText).toContain("stderr-line\n");
+    expect(result.stdout).toBe(`drift|--strict|--target|${repoRoot}`);
+    expect(result.stderr).toBe("");
     expect(result.runnerKind).toBe("local");
+  });
+
+  it("accepts python only when it receives an existing nous_package.py and the exact target contract", async () => {
+    const script = await executableNousPackage();
+    const env = {
+      NOUS_DRIFT_RUNNER_EXECUTABLE: "python3",
+      NOUS_DRIFT_RUNNER_ARGS: JSON.stringify([script, "drift", "--strict", "--target", repoRoot]),
+    };
+
+    expect(getDriftRunnerDeploymentStatus(env)).toEqual({
+      ready: true,
+      mode: "local",
+      code: "local_runner_ready",
+    });
+  });
+
+  it.each([
+    ["arbitrary executable", "/usr/bin/true", ["drift", "--strict", "--target", repoRoot]],
+    ["missing script", "python3", [join(tmpdir(), "missing-nous_package.py"), "drift", "--strict", "--target", repoRoot]],
+  ])("rejects %s in local readiness", (_case, executable, args) => {
+    expect(getDriftRunnerDeploymentStatus({
+      NOUS_DRIFT_RUNNER_EXECUTABLE: executable,
+      NOUS_DRIFT_RUNNER_ARGS: JSON.stringify(args),
+    })).toEqual({
+      ready: false,
+      mode: "unavailable",
+      code: "local_runner_command_invalid",
+    });
+  });
+
+  it("rejects missing, wrong, and shell-extended targets after validating the real script", async () => {
+    const script = await executableNousPackage();
+    const invalidArguments = [
+      [script, "drift", "--strict"],
+      [script, "drift", "--strict", "--target", tmpdir()],
+      [script, "drift", "--strict", "--target", repoRoot, ";", "true"],
+    ];
+
+    for (const args of invalidArguments) {
+      expect(getDriftRunnerDeploymentStatus({
+        NOUS_DRIFT_RUNNER_EXECUTABLE: "python3",
+        NOUS_DRIFT_RUNNER_ARGS: JSON.stringify(args),
+      })).toEqual({
+        ready: false,
+        mode: "unavailable",
+        code: "local_runner_command_invalid",
+      });
+    }
   });
 
   it("calls the authenticated remote runner in Vercel and preserves its raw response", async () => {
@@ -97,8 +161,8 @@ describe("configured drift runners", () => {
   it("never treats a local executable as deployable inside Vercel", async () => {
     const env = {
       VERCEL: "1",
-      NOUS_DRIFT_RUNNER_EXECUTABLE: process.execPath,
-      NOUS_DRIFT_RUNNER_ARGS: JSON.stringify(["nous_package.py", "drift", "--strict"]),
+      NOUS_DRIFT_RUNNER_EXECUTABLE: "/usr/bin/true",
+      NOUS_DRIFT_RUNNER_ARGS: JSON.stringify(["drift", "--strict", "--target", repoRoot]),
     };
 
     expect(getDriftRunnerDeploymentStatus(env)).toEqual({

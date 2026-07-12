@@ -25,6 +25,36 @@ describe("AdminDriftView", () => {
     expect(screen.getByText("El último chequeo terminó con código 2.")).toBeInTheDocument();
   });
 
+  it("supports roving tab focus, arrow navigation, and owned tab panels", () => {
+    render(<AdminDriftView runnerDeployment={{ ready: true, mode: "remote", code: "remote_runner_ready" }} result={{
+      checkedAt: new Date("2026-07-12T10:00:00.000Z"),
+      exitCode: 2,
+      status: "drift",
+      stdout: "drift",
+      stderr: "",
+      rawText: "drift",
+      runnerKind: "remote",
+    }} />);
+
+    const summary = screen.getByRole("tab", { name: "Resumen" });
+    const full = screen.getByRole("tab", { name: "Reporte completo" });
+    expect(full).toHaveAttribute("tabindex", "0");
+    expect(summary).toHaveAttribute("tabindex", "-1");
+    expect(full).toHaveAttribute("aria-controls", "drift-panel-full");
+
+    full.focus();
+    fireEvent.keyDown(full, { key: "ArrowLeft" });
+    expect(summary).toHaveFocus();
+    expect(summary).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: "Resumen" })).toBeVisible();
+
+    fireEvent.keyDown(summary, { key: "End" });
+    expect(full).toHaveFocus();
+    fireEvent.keyDown(full, { key: "Home" });
+    expect(summary).toHaveFocus();
+    expect(screen.getAllByRole("tabpanel", { hidden: true })).toHaveLength(2);
+  });
+
   it("renders green only for a persisted zero exit code", () => {
     render(<AdminDriftView runnerDeployment={{ ready: false, mode: "unavailable", code: "remote_runner_missing" }} result={{
       checkedAt: new Date("2026-07-12T10:00:00.000Z"),
@@ -75,5 +105,34 @@ describe("AdminDriftView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("traps dialog focus, closes with Escape, and restores the trigger", async () => {
+    render(<AdminDriftView runnerDeployment={{ ready: true, mode: "remote", code: "remote_runner_ready" }} result={{
+      checkedAt: new Date("2026-07-12T10:00:00.000Z"),
+      exitCode: 2,
+      status: "drift",
+      stdout: "drift",
+      stderr: "",
+      rawText: "drift",
+      runnerKind: "remote",
+    }} />);
+
+    const trigger = screen.getByRole("button", { name: "Crear IMP desde este drift" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Plantilla de IMP" });
+    const close = screen.getByRole("button", { name: "Cerrar" });
+    const copy = screen.getByRole("button", { name: "Copiar plantilla" });
+    await waitFor(() => expect(close).toHaveFocus());
+
+    fireEvent.keyDown(close, { key: "Tab", shiftKey: true });
+    expect(copy).toHaveFocus();
+    fireEvent.keyDown(copy, { key: "Tab" });
+    expect(close).toHaveFocus();
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });
