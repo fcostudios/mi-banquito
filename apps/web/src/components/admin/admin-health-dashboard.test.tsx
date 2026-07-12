@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import type { AdminHealthSnapshot } from "@mi-banquito/domain";
 import { AdminHealthDashboard } from "./admin-health-dashboard";
 
+const runnerReady = { ready: true, mode: "remote", code: "remote_runner_ready" } as const;
+
 const base = {
   status: "active" as const,
   currencyCode: "USD",
@@ -43,7 +45,7 @@ const snapshots: AdminHealthSnapshot[] = [
 
 describe("AdminHealthDashboard", () => {
   it("renders isolated health metrics, global drift, and every org action", () => {
-    render(<AdminHealthDashboard snapshots={snapshots} consecutiveCleanMonths={3} drift={{
+    render(<AdminHealthDashboard snapshots={snapshots} consecutiveCleanMonths={3} runnerDeployment={runnerReady} drift={{
       exitCode: 2,
       checkedAt: new Date("2026-07-12T10:00:00.000Z"),
       rawText: "DRIFT routes\n",
@@ -77,7 +79,7 @@ describe("AdminHealthDashboard", () => {
   });
 
   it("renders persisted global drift when there are no organizations", () => {
-    render(<AdminHealthDashboard snapshots={[]} consecutiveCleanMonths={0} drift={{
+    render(<AdminHealthDashboard snapshots={[]} consecutiveCleanMonths={0} runnerDeployment={runnerReady} drift={{
       exitCode: 9,
       checkedAt: new Date("2026-07-12T10:00:00.000Z"),
       rawText: "DRIFT before tenant provisioning\n",
@@ -85,6 +87,32 @@ describe("AdminHealthDashboard", () => {
 
     expect(within(screen.getByTestId("drift_badge")).getByText("Drift detectado")).toBeInTheDocument();
     expect(screen.getByText("Todavía no hay organizaciones registradas.")).toBeInTheDocument();
+  });
+
+  it("fails closed for global and per-organization clean results when the runner is unavailable", () => {
+    const cleanSnapshot: AdminHealthSnapshot = {
+      ...snapshots[1],
+      driftExitCode: 0,
+      driftRawText: "clean\n",
+    };
+
+    render(<AdminHealthDashboard
+      snapshots={[cleanSnapshot]}
+      consecutiveCleanMonths={0}
+      drift={{
+        exitCode: 0,
+        checkedAt: new Date("2026-07-12T10:00:00.000Z"),
+        rawText: "clean\n",
+      }}
+      runnerDeployment={{ ready: false, mode: "unavailable", code: "remote_runner_missing" }}
+    />);
+
+    expect(within(screen.getByTestId("drift_badge")).getByText("Runner no disponible"))
+      .toHaveClass("status-pill--error-bg");
+    expect(within(screen.getByTestId("drift_badge")).queryByText("Sin drift")).not.toBeInTheDocument();
+    const row = screen.getByTestId(`org-row-${cleanSnapshot.orgId}`);
+    expect(within(row).getByText("Runner no disponible")).toHaveClass("status-pill--error-bg");
+    expect(within(row).queryByText("Sin drift")).not.toBeInTheDocument();
   });
 
   it.each([
@@ -111,7 +139,7 @@ describe("AdminHealthDashboard", () => {
       arTotal: freshness === "unknown" ? null : "0.0000",
     };
 
-    render(<AdminHealthDashboard snapshots={[snapshot]} consecutiveCleanMonths={0} drift={null} />);
+    render(<AdminHealthDashboard snapshots={[snapshot]} consecutiveCleanMonths={0} drift={null} runnerDeployment={runnerReady} />);
 
     const row = screen.getByTestId(`org-row-${snapshot.orgId}`);
     expect(within(row).getAllByText(label).length).toBeGreaterThan(0);
