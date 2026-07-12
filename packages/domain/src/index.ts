@@ -1,5 +1,7 @@
 export * from "./alerts";
 export * from "./accounts";
+export * from "./admin-health";
+export * from "./admin-drift";
 export * from "./audit";
 export * from "./blob-cleanup";
 export * from "./collections";

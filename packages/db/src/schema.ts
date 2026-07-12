@@ -794,6 +794,16 @@ export const cashBalances = pgMaterializedView("mv_cash_balances", {
   refreshedAt: timestamp("refreshed_at").notNull(),
 }).existing();
 
+export const adminHealthSnapshot = pgMaterializedView("mv_org_health_snapshot", {
+  orgId: uuid("org_id").notNull(),
+  lastActivityAt: timestamp("last_activity_at"),
+  lastCloseAt: timestamp("last_close_at"),
+  hasPendingReconciliation: boolean("has_pending_reconciliation").notNull(),
+  openLoansCount: integer("open_loans_count").notNull(),
+  arTotal: numeric("ar_total", { precision: 18, scale: 4 }).notNull(),
+  refreshedAt: timestamp("refreshed_at").notNull(),
+}).existing();
+
 export const platformOperator = pgTable("platform_operator", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   displayName: text("display_name").notNull(),
@@ -829,7 +839,9 @@ export const cronRun = pgTable("cron_run", {
   triggeredByKind: text("triggered_by_kind").notNull(),
   triggeredBy: uuid("triggered_by"),
   createdAt: timestamp("created_at").notNull(),
-});
+}, (table) => [
+  index("idx_cron_run_endpoint_finished_at").on(table.endpoint, table.finishedAt.desc()),
+]);
 
 export const userAccount = pgTable("user_account", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
