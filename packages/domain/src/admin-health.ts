@@ -128,33 +128,49 @@ export function createAdminHealthService(options: {
     async getDashboard(): Promise<AdminHealthDashboard> {
       const checkedAt = now();
       const result = await db.execute(sql`
-        WITH RECURSIVE drift_months AS (
+        WITH RECURSIVE completed_month AS (
           SELECT
-            date_trunc('month', finished_at AT TIME ZONE 'UTC') AS month_start,
-            bool_and(
-              CASE
-                WHEN jsonb_typeof(summary -> 'exitCode') = 'number'
-                  THEN (summary ->> 'exitCode')::integer = 0
-                ELSE false
-              END
-            ) AS is_clean
-          FROM cron_run
-          WHERE endpoint = ${endpoint}
-          GROUP BY date_trunc('month', finished_at AT TIME ZONE 'UTC')
+            date_trunc('month', ${checkedAt}::timestamptz AT TIME ZONE 'UTC') - interval '1 month' AS month_start,
+            date_trunc('month', ${checkedAt}::timestamptz AT TIME ZONE 'UTC')::date AS current_month_start
         ),
-        current_month AS (
-          SELECT date_trunc('month', ${checkedAt}::timestamp AT TIME ZONE 'UTC') AS month_start
+        active_orgs AS (
+          SELECT id
+          FROM organization
+          WHERE status = 'active'
+        ),
+        successful_org_months AS (
+          SELECT DISTINCT
+            period_close.org_id,
+            date_trunc('month', contribution_cycle.closes_on::timestamp) AS month_start
+          FROM period_close
+          JOIN active_orgs ON active_orgs.id = period_close.org_id
+          JOIN contribution_cycle
+            ON contribution_cycle.id = period_close.cycle_id
+            AND contribution_cycle.org_id = period_close.org_id
+          JOIN reconciliation_cycle
+            ON reconciliation_cycle.id = period_close.reconciliation_cycle_id
+            AND reconciliation_cycle.org_id = period_close.org_id
+            AND reconciliation_cycle.cycle_id = period_close.cycle_id
+            AND reconciliation_cycle.period_close_id = period_close.id
+            AND reconciliation_cycle.closed_at IS NOT NULL
+          CROSS JOIN completed_month
+          WHERE contribution_cycle.closes_on < completed_month.current_month_start
+        ),
+        clean_months AS (
+          SELECT successful_org_months.month_start
+          FROM successful_org_months
+          GROUP BY successful_org_months.month_start
+          HAVING COUNT(DISTINCT successful_org_months.org_id) = (SELECT COUNT(*) FROM active_orgs)
+            AND (SELECT COUNT(*) FROM active_orgs) > 0
         ),
         clean_streak(month_start) AS (
-          SELECT current_month.month_start
-          FROM current_month
-          JOIN drift_months ON drift_months.month_start = current_month.month_start
-            AND drift_months.is_clean
+          SELECT completed_month.month_start
+          FROM completed_month
+          JOIN clean_months ON clean_months.month_start = completed_month.month_start
           UNION ALL
           SELECT clean_streak.month_start - interval '1 month'
           FROM clean_streak
-          JOIN drift_months ON drift_months.month_start = clean_streak.month_start - interval '1 month'
-            AND drift_months.is_clean
+          JOIN clean_months ON clean_months.month_start = clean_streak.month_start - interval '1 month'
         ),
         consecutive_clean AS (
           SELECT COUNT(*)::integer AS months FROM clean_streak

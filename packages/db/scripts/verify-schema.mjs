@@ -21,7 +21,6 @@ export const REQUIRED_FUNCTIONS = [
   "validate_regularization_transfer",
   "fund_pool_balance",
   "current_cash_balances",
-  "refresh_admin_health_snapshot",
   "admin_read_audit_log",
 ];
 

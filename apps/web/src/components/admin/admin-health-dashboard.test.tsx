@@ -51,7 +51,7 @@ describe("AdminHealthDashboard", () => {
 
     expect(within(screen.getByTestId("orgs_total")).getByText("2")).toBeInTheDocument();
     expect(within(screen.getByTestId("consecutive_clean_months")).getByText("3")).toBeInTheDocument();
-    expect(within(screen.getByTestId("consecutive_clean_months")).getByText("Meses consecutivos sin drift")).toBeInTheDocument();
+    expect(within(screen.getByTestId("consecutive_clean_months")).getByText("Meses con conciliación cero")).toBeInTheDocument();
     expect(within(screen.getByTestId("drift_badge")).getByText("Drift detectado")).toBeInTheDocument();
     const pendingRow = screen.getByTestId(`org-row-${snapshots[0].orgId}`);
     const cleanRow = screen.getByTestId(`org-row-${snapshots[1].orgId}`);

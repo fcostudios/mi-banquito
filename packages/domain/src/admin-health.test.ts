@@ -1,9 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { loadEnvFile } from "node:process";
-import { inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { auditLogEntry, cronRun, organization } from "@mi-banquito/db/schema";
+import {
+  auditLogEntry,
+  contributionCycle,
+  cronRun,
+  organization,
+  periodClose,
+  reconciliationCycle,
+} from "@mi-banquito/db/schema";
 
 if (!process.env.DATABASE_URL) {
   try {
@@ -18,10 +25,6 @@ const ORG_CLEAN = randomUUID();
 const ORG_MISSING = randomUUID();
 const ACTOR_ID = randomUUID();
 const DRIFT_RUN_ID = randomUUID();
-const CLEAN_STREAK_ENDPOINT = `/api/cron/drift-check-clean-${randomUUID()}`;
-const GAP_STREAK_ENDPOINT = `/api/cron/drift-check-gap-${randomUUID()}`;
-const OLD_STREAK_ENDPOINT = `/api/cron/drift-check-old-${randomUUID()}`;
-const STREAK_RUN_IDS = Array.from({ length: 7 }, () => randomUUID());
 let db: typeof import("@mi-banquito/db")["db"];
 let createAdminHealthService: typeof import("./admin-health")["createAdminHealthService"];
 let adminHealthDashboardFromRows: typeof import("./admin-health")["adminHealthDashboardFromRows"];
@@ -101,15 +104,6 @@ describe("admin health service with Postgres", () => {
       triggeredBy: null,
       createdAt: finishedAt,
     });
-    await db.insert(cronRun).values([
-      driftRun(STREAK_RUN_IDS[0], CLEAN_STREAK_ENDPOINT, "2026-07-05T07:00:00.000Z", 0),
-      driftRun(STREAK_RUN_IDS[1], CLEAN_STREAK_ENDPOINT, "2026-06-05T07:00:00.000Z", 0),
-      driftRun(STREAK_RUN_IDS[2], CLEAN_STREAK_ENDPOINT, "2026-05-05T07:00:00.000Z", 3),
-      driftRun(STREAK_RUN_IDS[3], GAP_STREAK_ENDPOINT, "2026-07-05T07:00:00.000Z", 0),
-      driftRun(STREAK_RUN_IDS[4], GAP_STREAK_ENDPOINT, "2026-05-05T07:00:00.000Z", 0),
-      driftRun(STREAK_RUN_IDS[5], OLD_STREAK_ENDPOINT, "2026-06-05T07:00:00.000Z", 0),
-      driftRun(STREAK_RUN_IDS[6], CLEAN_STREAK_ENDPOINT, "2026-06-20T07:00:00.000Z", 0),
-    ]);
     await db.execute(sql`REFRESH MATERIALIZED VIEW mv_org_health_snapshot`);
     await db.insert(organization).values({
       id: ORG_MISSING,
@@ -118,7 +112,7 @@ describe("admin health service with Postgres", () => {
       currencyCode: "USD",
       timezone: "America/Guayaquil",
       defaultLanguage: "es-EC",
-      status: "active",
+      status: "paused",
       createdAt: new Date("2026-07-12T00:00:00.000Z"),
       createdBy: ACTOR_ID,
       createdByKind: "system",
@@ -131,7 +125,7 @@ describe("admin health service with Postgres", () => {
       await tx.execute(sql.raw("SET LOCAL session_replication_role = replica"));
       await tx.delete(auditLogEntry).where(inArray(auditLogEntry.orgId, [ORG_PENDING, ORG_CLEAN]));
       await tx.delete(organization).where(inArray(organization.id, [ORG_PENDING, ORG_CLEAN, ORG_MISSING]));
-      await tx.delete(cronRun).where(inArray(cronRun.id, [DRIFT_RUN_ID, ...STREAK_RUN_IDS]));
+      await tx.delete(cronRun).where(eq(cronRun.id, DRIFT_RUN_ID));
     });
     await db.execute(sql`REFRESH MATERIALIZED VIEW mv_org_health_snapshot`);
   });
@@ -168,15 +162,40 @@ describe("admin health service with Postgres", () => {
     });
   });
 
-  it("counts only uninterrupted clean calendar months anchored to the current month", async () => {
-    const now = () => new Date("2026-07-12T12:00:00.000Z");
+  it("counts completed months closed successfully by both active organizations and deduplicates multiple closes", async () => {
+    await withIsolatedActiveOrganizations([
+      { months: ["2026-05", "2026-06", "2026-06"] },
+      { months: ["2026-05", "2026-06"] },
+    ], async (transactionDb) => {
+      await expect(createAdminHealthService({
+        db: transactionDb,
+        now: () => new Date("2026-07-12T12:00:00.000Z"),
+      }).getDashboard()).resolves.toMatchObject({ consecutiveCleanMonths: 2 });
+    });
+  });
 
-    await expect(createAdminHealthService({ endpoint: CLEAN_STREAK_ENDPOINT, now }).getDashboard())
-      .resolves.toMatchObject({ consecutiveCleanMonths: 2 });
-    await expect(createAdminHealthService({ endpoint: GAP_STREAK_ENDPOINT, now }).getDashboard())
-      .resolves.toMatchObject({ consecutiveCleanMonths: 1 });
-    await expect(createAdminHealthService({ endpoint: OLD_STREAK_ENDPOINT, now }).getDashboard())
-      .resolves.toMatchObject({ consecutiveCleanMonths: 0 });
+  it("ends the streak at the first month where an active organization has no close", async () => {
+    await withIsolatedActiveOrganizations([
+      { months: ["2026-04", "2026-05", "2026-06"] },
+      { months: ["2026-04", "2026-06"] },
+    ], async (transactionDb) => {
+      await expect(createAdminHealthService({
+        db: transactionDb,
+        now: () => new Date("2026-07-12T12:00:00.000Z"),
+      }).getDashboard()).resolves.toMatchObject({ consecutiveCleanMonths: 1 });
+    });
+  });
+
+  it("returns zero when the latest completed month is missing a successful reconciliation", async () => {
+    await withIsolatedActiveOrganizations([
+      { months: ["2026-06"] },
+      { months: ["2026-06"], unsuccessfulMonth: "2026-06" },
+    ], async (transactionDb) => {
+      await expect(createAdminHealthService({
+        db: transactionDb,
+        now: () => new Date("2026-07-12T12:00:00.000Z"),
+      }).getDashboard()).resolves.toMatchObject({ consecutiveCleanMonths: 0 });
+    });
   });
 
   it("marks an old materialized-view row stale instead of treating it as healthy", () => {
@@ -224,23 +243,98 @@ describe("admin health service with Postgres", () => {
   });
 });
 
-function driftRun(id: string, endpoint: string, finishedAtValue: string, exitCode: number) {
-  const finishedAt = new Date(finishedAtValue);
-  return {
-    id,
-    endpoint,
-    startedAt: new Date(finishedAt.getTime() - 1_000),
-    finishedAt,
-    durationMs: 1_000,
-    orgsProcessed: 0,
-    failureCount: exitCode === 0 ? 0 : 1,
-    replayFrom: null,
-    replayTo: null,
-    summary: { kind: "drift_check", exitCode, rawText: "fixture" },
-    triggeredByKind: "system",
-    triggeredBy: null,
-    createdAt: finishedAt,
-  };
+type TransactionDb = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function withIsolatedActiveOrganizations(
+  fixtures: Array<{ months: string[]; unsuccessfulMonth?: string }>,
+  assertion: (transactionDb: TransactionDb) => Promise<void>,
+) {
+  const rollback = new Error("rollback_admin_health_fixture");
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(organization).set({ status: "paused" }).where(eq(organization.status, "active"));
+
+      for (const [orgIndex, fixture] of fixtures.entries()) {
+        const orgId = randomUUID();
+        await tx.insert(organization).values({
+          id: orgId,
+          displayName: `Streak org ${orgIndex}`,
+          countryCode: "EC",
+          currencyCode: "USD",
+          timezone: "America/Guayaquil",
+          defaultLanguage: "es-EC",
+          status: "active",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+          createdBy: ACTOR_ID,
+          createdByKind: "system",
+        });
+
+        for (const [closeIndex, month] of fixture.months.entries()) {
+          const cycleId = randomUUID();
+          const reconciliationId = randomUUID();
+          const periodCloseId = randomUUID();
+          const closesOn = `${month}-28`;
+          const closedAt = new Date(`${month}-28T17:00:00.000Z`);
+          await tx.insert(contributionCycle).values({
+            id: cycleId,
+            orgId,
+            cycleLabel: `${month}-${orgIndex}-${closeIndex}`,
+            kind: "monthly",
+            opensOn: `${month}-01`,
+            closesOn,
+            expectedAmountPerMember: "10.0000",
+            currencyCode: "USD",
+            status: "closed",
+            createdAt: new Date(`${month}-01T00:00:00.000Z`),
+            createdBy: ACTOR_ID,
+            createdByKind: "system",
+          });
+          await tx.insert(reconciliationCycle).values({
+            id: reconciliationId,
+            orgId,
+            cycleId,
+            declaredBankBalance: "100.0000",
+            computedPoolBalance: "100.0000",
+            discrepancyAmount: "0.0000",
+            toleranceAmount: "0.0000",
+            resolutionKind: "auto_within_tolerance",
+            resolutionNote: null,
+            closedAt: null,
+            periodCloseId: null,
+            adjustmentReason: null,
+            adjustmentWindowOpensAt: null,
+            adjustmentWindowClosesAt: null,
+            createdAt: closedAt,
+            createdBy: ACTOR_ID,
+            createdByKind: "system",
+          });
+          await tx.insert(periodClose).values({
+            id: periodCloseId,
+            orgId,
+            cycleId,
+            reconciliationCycleId: reconciliationId,
+            closedAt,
+            closedBy: ACTOR_ID,
+            closedByKind: "system",
+            isYearEnd: false,
+            monthlyCloseStatementId: null,
+            createdAt: closedAt,
+          });
+          if (fixture.unsuccessfulMonth !== month) {
+            await tx.update(reconciliationCycle).set({
+              closedAt,
+              periodCloseId,
+            }).where(eq(reconciliationCycle.id, reconciliationId));
+          }
+        }
+      }
+
+      await assertion(tx);
+      throw rollback;
+    });
+  } catch (error) {
+    if (error !== rollback) throw error;
+  }
 }
 
 function healthQueryRow(overrides: Partial<Parameters<typeof adminHealthDashboardFromRows>[0][number]> = {}) {

@@ -137,7 +137,7 @@ describe("Sprint 8 admin health substrate", () => {
       const refreshFunction = await client.query(`
         SELECT to_regprocedure('refresh_admin_health_snapshot()') IS NOT NULL AS exists
       `);
-      expect(refreshFunction.rows).toEqual([{ exists: true }]);
+      expect(refreshFunction.rows).toEqual([{ exists: false }]);
     } finally {
       await client.query("ROLLBACK").catch(() => undefined);
       client.release();
