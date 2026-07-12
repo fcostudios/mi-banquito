@@ -81,7 +81,12 @@ export function AdminDriftView({ result, runnerDeployment }: {
       </>
     );
   }
-  const clean = result.exitCode === 0;
+  // Runner readiness is authoritative: a historical clean report cannot prove current safety.
+  const historicalDrift = result.exitCode !== 0;
+  const clean = runnerDeployment.ready && !historicalDrift;
+  const statusLabel = !runnerDeployment.ready
+    ? copy.runnerUnavailable
+    : clean ? copy.noDrift : copy.driftDetected;
   const impTemplate = buildDriftImpTemplate(result);
 
   async function copyTemplate() {
@@ -141,7 +146,7 @@ export function AdminDriftView({ result, runnerDeployment }: {
       <RunnerDeploymentIndicator deployment={runnerDeployment} />
       <section className="rounded-md border border-border bg-surface p-4" data-testid="drift_badge">
         <div className="flex flex-wrap items-center gap-3">
-          <StatusPill tone={clean ? "success" : "danger"} label={clean ? copy.noDrift : copy.driftDetected} />
+          <StatusPill tone={clean ? "success" : "danger"} label={statusLabel} />
           <p className="text-sm text-text-secondary">{copy.lastChecked}: {ecDateTime.format(result.checkedAt)}</p>
         </div>
       </section>
@@ -197,7 +202,7 @@ export function AdminDriftView({ result, runnerDeployment }: {
         </div>
       </section>
 
-      {!clean ? (
+      {historicalDrift ? (
         <section className="flex justify-end" data-testid="file_imp">
           <button
             ref={impTriggerRef}

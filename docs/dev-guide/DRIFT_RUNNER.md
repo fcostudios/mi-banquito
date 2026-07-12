@@ -43,19 +43,34 @@ It never synthesizes a clean result.
 ## Local execution
 
 Outside Vercel, configure `NOUS_DRIFT_RUNNER_EXECUTABLE` and a JSON string array
-in `NOUS_DRIFT_RUNNER_ARGS`. For this checkout, the parser-valid configuration
-is:
+in `NOUS_DRIFT_RUNNER_ARGS`. Pin the trusted script bytes with
+`NOUS_DRIFT_SCRIPT_SHA256`. For this checkout, the parser-valid configuration is:
 
 ```dotenv
 NOUS_DRIFT_RUNNER_EXECUTABLE=python3
 NOUS_DRIFT_RUNNER_ARGS=["/Users/fcolomas/Projects/nous/Nous/System/nous_package.py","drift","--strict","--target","/Users/fcolomas/Projects/mi-banquito"]
+NOUS_DRIFT_SCRIPT_SHA256=<64-hex-sha256-of-nous-package-py>
 ```
 
 The validator resolves both paths through the filesystem. The script must be a
 real file named `nous_package.py`, the target must resolve to the workspace root
 containing `pnpm-workspace.yaml`, and the four command arguments must be exactly
 `drift`, `--strict`, `--target`, and that absolute repository path. The command
-is passed directly to `spawn` with `shell: false`.
+is passed directly to `spawn` with `shell: false`. Readiness and execution both
+compute SHA-256 over the resolved script bytes and require an exact match with
+the configured 64-hex digest. A missing, malformed, or stale digest fails closed.
+
+Compute the pin from the reviewed script and update it whenever that script is
+intentionally upgraded:
+
+```bash
+shasum -a 256 /absolute/path/to/nous_package.py
+```
+
+Treat the digest update as a trust decision: review the replacement script,
+then deploy its new digest together with the script change. Remote execution
+does not use this local file pin; its trust boundary remains the authenticated
+runner secret and HTTPS contract described above.
 
 ## Operator indicator
 
@@ -70,3 +85,8 @@ is passed directly to `spawn` with `shell: false`.
 
 Provisioning and operating the external runner is an architectural deployment
 prerequisite and remains outside this single Vercel application's runtime.
+
+Runner readiness is the authoritative safety status on `/admin/drift`. When the
+runner is unavailable, the primary status is red even if the last persisted
+report exited with code `0`; that older report describes historical execution
+only and remains visible separately with its timestamp and exit code.

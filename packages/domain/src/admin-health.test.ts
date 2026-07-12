@@ -162,15 +162,31 @@ describe("admin health service with Postgres", () => {
     });
   });
 
-  it("counts completed months closed successfully by both active organizations and deduplicates multiple closes", async () => {
+  it("counts completed months only when every active organization has an exact numeric zero discrepancy", async () => {
     await withIsolatedActiveOrganizations([
-      { months: ["2026-05", "2026-06", "2026-06"] },
-      { months: ["2026-05", "2026-06"] },
+      { months: ["2026-05", "2026-06", "2026-06"], discrepancyAmounts: ["0", "0.0000", "0.00"] },
+      { months: ["2026-05", "2026-06"], discrepancyAmounts: ["0.000000", "0"] },
     ], async (transactionDb) => {
       await expect(createAdminHealthService({
         db: transactionDb,
         now: () => new Date("2026-07-12T12:00:00.000Z"),
       }).getDashboard()).resolves.toMatchObject({ consecutiveCleanMonths: 2 });
+    });
+  });
+
+  it("does not count an annotated nonzero discrepancy as a clean close", async () => {
+    await withIsolatedActiveOrganizations([
+      { months: ["2026-05", "2026-06"] },
+      {
+        months: ["2026-05", "2026-06", "2026-06"],
+        discrepancyAmounts: ["0", "0", "0.0100"],
+        resolutionNotes: [null, null, "Operator accepted the explained variance"],
+      },
+    ], async (transactionDb) => {
+      await expect(createAdminHealthService({
+        db: transactionDb,
+        now: () => new Date("2026-07-12T12:00:00.000Z"),
+      }).getDashboard()).resolves.toMatchObject({ consecutiveCleanMonths: 0 });
     });
   });
 
@@ -246,7 +262,12 @@ describe("admin health service with Postgres", () => {
 type TransactionDb = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function withIsolatedActiveOrganizations(
-  fixtures: Array<{ months: string[]; unsuccessfulMonth?: string }>,
+  fixtures: Array<{
+    months: string[];
+    unsuccessfulMonth?: string;
+    discrepancyAmounts?: string[];
+    resolutionNotes?: Array<string | null>;
+  }>,
   assertion: (transactionDb: TransactionDb) => Promise<void>,
 ) {
   const rollback = new Error("rollback_admin_health_fixture");
@@ -295,10 +316,10 @@ async function withIsolatedActiveOrganizations(
             cycleId,
             declaredBankBalance: "100.0000",
             computedPoolBalance: "100.0000",
-            discrepancyAmount: "0.0000",
+            discrepancyAmount: fixture.discrepancyAmounts?.[closeIndex] ?? "0.0000",
             toleranceAmount: "0.0000",
-            resolutionKind: "auto_within_tolerance",
-            resolutionNote: null,
+            resolutionKind: fixture.resolutionNotes?.[closeIndex] ? "annotated_acceptance" : "auto_within_tolerance",
+            resolutionNote: fixture.resolutionNotes?.[closeIndex] ?? null,
             closedAt: null,
             periodCloseId: null,
             adjustmentReason: null,
