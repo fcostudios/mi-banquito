@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import type { PersistedDriftResult } from "@mi-banquito/domain";
 import { StatusPill } from "@mi-banquito/ui";
@@ -57,9 +57,21 @@ export function AdminDriftView({ result, runnerDeployment }: {
   const [tab, setTab] = useState<"summary" | "full">("full");
   const [impOpen, setImpOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const summaryTabRef = useRef<HTMLButtonElement>(null);
+  const fullTabRef = useRef<HTMLButtonElement>(null);
+  const impTriggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const templateRef = useRef<HTMLTextAreaElement>(null);
+  const restoreFocusRef = useRef(false);
   useEffect(() => {
-    if (impOpen) templateRef.current?.focus();
+    if (impOpen) {
+      restoreFocusRef.current = true;
+      closeRef.current?.focus();
+    } else if (restoreFocusRef.current) {
+      restoreFocusRef.current = false;
+      impTriggerRef.current?.focus();
+    }
   }, [impOpen]);
   if (!result) {
     return (
@@ -82,6 +94,48 @@ export function AdminDriftView({ result, runnerDeployment }: {
     setCopied(true);
   }
 
+  function selectTab(nextTab: "summary" | "full") {
+    setTab(nextTab);
+    (nextTab === "summary" ? summaryTabRef : fullTabRef).current?.focus();
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const currentIndex = tab === "summary" ? 0 : 1;
+    let nextIndex: number | undefined;
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (currentIndex - 1 + 2) % 2;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (currentIndex + 1) % 2;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = 1;
+    if (nextIndex === undefined) return;
+    event.preventDefault();
+    selectTab(nextIndex === 0 ? "summary" : "full");
+  }
+
+  function handleDialogKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setImpOpen(false);
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+      "button:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex='-1'])",
+    ) ?? []);
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!first || !last) return;
+    if (!dialogRef.current?.contains(document.activeElement)) {
+      event.preventDefault();
+      first.focus();
+    } else if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   return (
     <>
       <RunnerDeploymentIndicator deployment={runnerDeployment} />
@@ -95,36 +149,58 @@ export function AdminDriftView({ result, runnerDeployment }: {
       <section className="overflow-hidden rounded-md border border-border bg-surface" data-testid="raw_report">
         <div className="flex border-b border-border bg-surface-muted p-1" role="tablist" aria-label={copy.reportTabs}>
           <button
+            ref={summaryTabRef}
+            id="drift-tab-summary"
             className="px-4 py-2 text-sm font-medium text-text-primary"
             type="button"
             role="tab"
             aria-selected={tab === "summary"}
-            onClick={() => setTab("summary")}
+            aria-controls="drift-panel-summary"
+            tabIndex={tab === "summary" ? 0 : -1}
+            onClick={() => selectTab("summary")}
+            onKeyDown={handleTabKeyDown}
           >
             {copy.summary}
           </button>
           <button
+            ref={fullTabRef}
+            id="drift-tab-full"
             className="px-4 py-2 text-sm font-medium text-text-primary"
             type="button"
             role="tab"
             aria-selected={tab === "full"}
-            onClick={() => setTab("full")}
+            aria-controls="drift-panel-full"
+            tabIndex={tab === "full" ? 0 : -1}
+            onClick={() => selectTab("full")}
+            onKeyDown={handleTabKeyDown}
           >
             {copy.fullReport}
           </button>
         </div>
-        {tab === "summary" ? (
+        <div
+          id="drift-panel-summary"
+          role="tabpanel"
+          aria-labelledby="drift-tab-summary"
+          hidden={tab !== "summary"}
+        >
           <p className="p-4 text-sm text-text-secondary">{copy.exitCodeSummary.replace("{{code}}", String(result.exitCode))}</p>
-        ) : (
+        </div>
+        <div
+          id="drift-panel-full"
+          role="tabpanel"
+          aria-labelledby="drift-tab-full"
+          hidden={tab !== "full"}
+        >
           <pre className="max-h-[36rem] overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs text-text-primary" data-testid="raw-report">
             {result.rawText}
           </pre>
-        )}
+        </div>
       </section>
 
       {!clean ? (
         <section className="flex justify-end" data-testid="file_imp">
           <button
+            ref={impTriggerRef}
             className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-text-on-primary"
             type="button"
             onClick={() => {
@@ -139,18 +215,17 @@ export function AdminDriftView({ result, runnerDeployment }: {
 
       {impOpen ? (
         <div
+          ref={dialogRef}
           className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="imp-dialog-title"
-          onKeyDown={(event) => {
-            if (event.key === "Escape") setImpOpen(false);
-          }}
+          onKeyDown={handleDialogKeyDown}
         >
           <div className="flex max-h-full w-full max-w-3xl flex-col gap-4 rounded-md border border-border bg-surface p-5 shadow-lg">
             <div className="flex items-start justify-between gap-4">
               <h2 className="text-lg font-semibold text-text-primary" id="imp-dialog-title">{copy.impDialogTitle}</h2>
-              <button className="text-sm font-medium text-primary" type="button" onClick={() => setImpOpen(false)}>
+              <button ref={closeRef} className="text-sm font-medium text-primary" type="button" onClick={() => setImpOpen(false)}>
                 {copy.close}
               </button>
             </div>

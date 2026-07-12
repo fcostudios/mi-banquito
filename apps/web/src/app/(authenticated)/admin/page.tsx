@@ -25,7 +25,11 @@ export default async function ScrAdminHomePage() {
         </Link>
       </header>
 
-      <AdminHealthDashboard snapshots={dashboard.snapshots} drift={dashboard.drift} />
+      <AdminHealthDashboard
+        snapshots={dashboard.snapshots}
+        drift={dashboard.drift}
+        consecutiveCleanMonths={dashboard.consecutiveCleanMonths}
+      />
     </main>
   );
 }

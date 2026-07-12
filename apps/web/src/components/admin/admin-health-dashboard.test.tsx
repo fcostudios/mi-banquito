@@ -14,6 +14,8 @@ const base = {
   driftExitCode: 2,
   driftCheckedAt: new Date("2026-07-12T10:00:00.000Z"),
   driftRawText: "DRIFT routes\n",
+  snapshotStatus: "available" as const,
+  freshness: "current" as const,
 };
 
 const snapshots: AdminHealthSnapshot[] = [
@@ -41,13 +43,15 @@ const snapshots: AdminHealthSnapshot[] = [
 
 describe("AdminHealthDashboard", () => {
   it("renders isolated health metrics, global drift, and every org action", () => {
-    render(<AdminHealthDashboard snapshots={snapshots} drift={{
+    render(<AdminHealthDashboard snapshots={snapshots} consecutiveCleanMonths={3} drift={{
       exitCode: 2,
       checkedAt: new Date("2026-07-12T10:00:00.000Z"),
       rawText: "DRIFT routes\n",
     }} />);
 
     expect(within(screen.getByTestId("orgs_total")).getByText("2")).toBeInTheDocument();
+    expect(within(screen.getByTestId("consecutive_clean_months")).getByText("3")).toBeInTheDocument();
+    expect(within(screen.getByTestId("consecutive_clean_months")).getByText("Meses consecutivos sin drift")).toBeInTheDocument();
     expect(within(screen.getByTestId("drift_badge")).getByText("Drift detectado")).toBeInTheDocument();
     const pendingRow = screen.getByTestId(`org-row-${snapshots[0].orgId}`);
     const cleanRow = screen.getByTestId(`org-row-${snapshots[1].orgId}`);
@@ -73,7 +77,7 @@ describe("AdminHealthDashboard", () => {
   });
 
   it("renders persisted global drift when there are no organizations", () => {
-    render(<AdminHealthDashboard snapshots={[]} drift={{
+    render(<AdminHealthDashboard snapshots={[]} consecutiveCleanMonths={0} drift={{
       exitCode: 9,
       checkedAt: new Date("2026-07-12T10:00:00.000Z"),
       rawText: "DRIFT before tenant provisioning\n",
@@ -81,5 +85,38 @@ describe("AdminHealthDashboard", () => {
 
     expect(within(screen.getByTestId("drift_badge")).getByText("Drift detectado")).toBeInTheDocument();
     expect(screen.getByText("Todavía no hay organizaciones registradas.")).toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      freshness: "unknown" as const,
+      snapshotStatus: "missing" as const,
+      label: "Estado desconocido",
+      refreshedAt: null,
+    },
+    {
+      freshness: "stale" as const,
+      snapshotStatus: "available" as const,
+      label: "Datos vencidos",
+      refreshedAt: new Date("2026-07-10T00:00:00.000Z"),
+    },
+  ])("fails closed for $freshness health data", ({ freshness, snapshotStatus, label, refreshedAt }) => {
+    const snapshot: AdminHealthSnapshot = {
+      ...snapshots[1],
+      freshness,
+      snapshotStatus,
+      refreshedAt,
+      hasPendingReconciliation: freshness === "unknown" ? null : false,
+      openLoansCount: freshness === "unknown" ? null : 0,
+      arTotal: freshness === "unknown" ? null : "0.0000",
+    };
+
+    render(<AdminHealthDashboard snapshots={[snapshot]} consecutiveCleanMonths={0} drift={null} />);
+
+    const row = screen.getByTestId(`org-row-${snapshot.orgId}`);
+    expect(within(row).getAllByText(label).length).toBeGreaterThan(0);
+    expect(within(row).queryByText("Al día")).not.toBeInTheDocument();
+    expect(within(row).queryByText("$0.00")).not.toBeInTheDocument();
+    expect(within(row).queryByText(/^0$/)).not.toBeInTheDocument();
   });
 });

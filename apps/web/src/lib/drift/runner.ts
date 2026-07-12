@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { accessSync, constants, existsSync, realpathSync, statSync } from "node:fs";
+import { basename, delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 
 import type { DriftRunner, DriftRunnerResult } from "@mi-banquito/domain";
 
@@ -39,6 +41,67 @@ function isAllowedRemoteUrl(value: string, allowLocalHttp: boolean): boolean {
   }
 }
 
+function realExecutable(value: string, env: RunnerEnvironment): string | undefined {
+  const candidates = isAbsolute(value) || value.includes("/")
+    ? [resolve(value)]
+    : (env.PATH ?? process.env.PATH ?? "").split(delimiter).filter(Boolean).map((directory) => join(directory, value));
+  for (const candidate of candidates) {
+    try {
+      accessSync(candidate, constants.X_OK);
+      if (statSync(candidate).isFile()) return realpathSync(candidate);
+    } catch {
+      // Keep searching PATH entries.
+    }
+  }
+  return undefined;
+}
+
+function realFile(value: string): string | undefined {
+  try {
+    const path = realpathSync(resolve(value));
+    return statSync(path).isFile() ? path : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function repositoryRoot(start = process.cwd()): string | undefined {
+  let current = resolve(start);
+  while (true) {
+    if (existsSync(join(current, "pnpm-workspace.yaml"))) return realpathSync(current);
+    const parent = dirname(current);
+    if (parent === current) return undefined;
+    current = parent;
+  }
+}
+
+function hasValidLocalCommand(executable: string, args: string[], env: RunnerEnvironment): boolean {
+  const root = repositoryRoot();
+  const executableName = basename(executable);
+  const resolvedExecutable = realExecutable(executable, env);
+  if (!root || !resolvedExecutable) return false;
+
+  let commandArgs: string[];
+  if (executableName === "python" || executableName === "python3") {
+    const script = realFile(args[0] ?? "");
+    if (!script || basename(script) !== "nous_package.py") return false;
+    commandArgs = args.slice(1);
+  } else if (executableName === "nous_package.py" && basename(resolvedExecutable) === "nous_package.py") {
+    commandArgs = args;
+  } else {
+    return false;
+  }
+
+  if (commandArgs.length !== 4) return false;
+  const [command, strict, targetFlag, targetValue] = commandArgs;
+  if (command !== "drift" || strict !== "--strict" || targetFlag !== "--target") return false;
+  try {
+    return realpathSync(resolve(targetValue)) === root;
+  } catch {
+    return false;
+  }
+}
+
 export function getDriftRunnerDeploymentStatus(
   env: RunnerEnvironment = process.env,
 ): DriftRunnerDeploymentStatus {
@@ -59,7 +122,7 @@ export function getDriftRunnerDeploymentStatus(
   }
   try {
     const args = parseArgs(env.NOUS_DRIFT_RUNNER_ARGS);
-    if (args.at(-2) !== "drift" || args.at(-1) !== "--strict") {
+    if (!hasValidLocalCommand(env.NOUS_DRIFT_RUNNER_EXECUTABLE, args, env)) {
       return { ready: false, mode: "unavailable", code: "local_runner_command_invalid" };
     }
   } catch {

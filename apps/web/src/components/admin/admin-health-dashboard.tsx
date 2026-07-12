@@ -7,6 +7,11 @@ import { ecDateTime } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
 
 const copy = messages.adminHealth;
+const healthCopy = {
+  consecutiveCleanMonths: "Meses consecutivos sin drift",
+  stale: "Datos vencidos",
+  unknown: "Estado desconocido",
+} as const;
 
 function money(amount: string, currencyCode: string): string {
   return new Intl.NumberFormat("en-US", {
@@ -21,11 +26,11 @@ function dateTime(value: Date | null, fallback: string): string {
   return value ? ecDateTime.format(value) : fallback;
 }
 
-export function AdminHealthDashboard({ snapshots, drift }: {
+export function AdminHealthDashboard({ snapshots, drift, consecutiveCleanMonths }: {
   snapshots: AdminHealthSnapshot[];
   drift: AdminGlobalDrift | null;
+  consecutiveCleanMonths: number;
 }) {
-  const cleanOrganizations = snapshots.filter((row) => !row.hasPendingReconciliation).length;
   const latestDrift = drift?.exitCode ?? null;
   const driftClean = latestDrift === 0;
 
@@ -36,7 +41,7 @@ export function AdminHealthDashboard({ snapshots, drift }: {
           <KpiTile labelKey={copy.activeOrganizations} value={String(snapshots.filter((row) => row.status === "active").length)} />
         </div>
         <div className="rounded-md border border-border" data-testid="consecutive_clean_months">
-          <KpiTile labelKey={copy.cleanOrganizations} value={String(cleanOrganizations)} />
+          <KpiTile labelKey={healthCopy.consecutiveCleanMonths} value={String(consecutiveCleanMonths)} />
         </div>
         <div className="rounded-md border border-border bg-surface p-4" data-testid="drift_badge">
           <p className="mb-2 text-text-secondary">{copy.substrateStatus}</p>
@@ -67,22 +72,41 @@ export function AdminHealthDashboard({ snapshots, drift }: {
             <tbody>
               {snapshots.map((row) => {
                 const rowDriftClean = row.driftExitCode === 0;
+                const healthReliable = row.snapshotStatus === "available"
+                  && row.freshness === "current"
+                  && row.hasPendingReconciliation !== null
+                  && row.openLoansCount !== null
+                  && row.arTotal !== null;
+                const healthStatusLabel = row.freshness === "stale" ? healthCopy.stale : healthCopy.unknown;
                 return (
                   <tr key={row.orgId} className="border-b border-border align-top last:border-b-0" data-testid={`org-row-${row.orgId}`}>
                     <td className="px-3 py-3">
                       <p className="font-medium text-text-primary">{row.displayName}</p>
                       <p className="mt-1 font-mono text-xs text-text-secondary">{row.orgId}</p>
+                      {!healthReliable ? (
+                        <span className="mt-2 inline-block">
+                          <StatusPill tone="danger" label={healthStatusLabel} />
+                        </span>
+                      ) : null}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-text-secondary">{dateTime(row.lastActivityAt, copy.noActivity)}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-text-secondary">{dateTime(row.lastCloseAt, copy.noClose)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-text-secondary">
+                      {healthReliable ? dateTime(row.lastActivityAt, copy.noActivity) : healthStatusLabel}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-text-secondary">
+                      {healthReliable ? dateTime(row.lastCloseAt, copy.noClose) : healthStatusLabel}
+                    </td>
                     <td className="px-3 py-3">
                       <StatusPill
-                        tone={row.hasPendingReconciliation ? "danger" : "success"}
-                        label={row.hasPendingReconciliation ? copy.pending : copy.current}
+                        tone={!healthReliable || row.hasPendingReconciliation ? "danger" : "success"}
+                        label={!healthReliable ? healthStatusLabel : row.hasPendingReconciliation ? copy.pending : copy.current}
                       />
                     </td>
-                    <td className="px-3 py-3 text-text-primary">{row.openLoansCount}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-text-primary">{money(row.arTotal, row.currencyCode)}</td>
+                    <td className="px-3 py-3 text-text-primary">
+                      {healthReliable && row.openLoansCount !== null ? row.openLoansCount : healthStatusLabel}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-text-primary">
+                      {healthReliable && row.arTotal !== null ? money(row.arTotal, row.currencyCode) : healthStatusLabel}
+                    </td>
                     <td className="px-3 py-3">
                       <StatusPill
                         tone={rowDriftClean ? "success" : row.driftExitCode === null ? "neutral" : "danger"}
