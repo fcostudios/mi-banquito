@@ -41,7 +41,7 @@ const routes = [
 ] as const;
 
 beforeEach(() => {
-  mocks.execute.mockResolvedValue(undefined);
+  mocks.execute.mockResolvedValue({ rows: [] });
   mocks.values.mockResolvedValue(undefined);
   mocks.insert.mockReturnValue({
     values: mocks.values,
