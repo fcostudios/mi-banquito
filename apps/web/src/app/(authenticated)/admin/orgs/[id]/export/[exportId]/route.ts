@@ -1,15 +1,57 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { z } from "zod";
 
 import { requirePlatformOperator } from "@/lib/auth/require-session";
-import { loadTenantExportDownload } from "@/lib/admin-export-service";
+import {
+  loadTenantExportDownload,
+  prepareTenantExport,
+  verifyTenantExportRequest,
+} from "@/lib/admin-export-service";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID = z.string().uuid();
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string; exportId: string }> }) {
-  await requirePlatformOperator();
+export async function GET(request: Request, { params }: { params: Promise<{ id: string; exportId: string }> }) {
+  const session = await requirePlatformOperator();
   const { id, exportId } = await params;
-  if (!UUID_RE.test(id) || !UUID_RE.test(exportId)) {
+  if (!UUID.safeParse(id).success || !UUID.safeParse(exportId).success) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+  const signedRequest = new URL(request.url).searchParams.get("request");
+  if (signedRequest) {
+    try {
+      const verified = verifyTenantExportRequest(signedRequest);
+      if (
+        verified.orgId !== id ||
+        verified.exportId !== exportId ||
+        verified.actorId !== session.actorId ||
+        verified.operatorUserId !== session.userId
+      ) {
+        return NextResponse.json({ error: "export_request_invalid" }, { status: 403 });
+      }
+      const prepared = await prepareTenantExport({
+        orgId: id,
+        exportId,
+        actorId: session.actorId,
+        operatorUserId: session.userId,
+      });
+      after(() => prepared.completion.then(() => undefined, () => undefined));
+      return new NextResponse(prepared.stream, {
+        headers: {
+          "content-type": "application/zip",
+          "content-disposition": `attachment; filename="tenant-export-${id}.zip"`,
+          "cache-control": "private, no-store",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("tenant_export_request_")) {
+        return NextResponse.json({ error: "export_request_invalid" }, { status: 403 });
+      }
+      const code = error instanceof Error && error.message.startsWith("statement_artifact_")
+        ? "statement_artifact"
+        : "generation_failed";
+      return NextResponse.json({ error: code }, { status: 500 });
+    }
   }
   try {
     const result = await loadTenantExportDownload({ orgId: id, exportId });

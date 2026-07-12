@@ -1,5 +1,7 @@
 import { createServer, type IncomingHttpHeaders } from "node:http";
+import { Readable } from "node:stream";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getGlobalDispatcher, MockAgent, setGlobalDispatcher } from "undici";
 
 type CapturedRequest = {
   method: string;
@@ -35,11 +37,12 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (request.method === "PUT") {
+    const pathname = new URL(request.url ?? "/", "http://contract.invalid").searchParams.get("pathname") ?? "expense-slips/receipt.png";
     response.end(JSON.stringify({
-      url: "https://contract.private.blob.vercel-storage.com/expense-slips/receipt.png",
-      downloadUrl: "https://contract.private.blob.vercel-storage.com/expense-slips/receipt.png?download=1",
-      pathname: "expense-slips/receipt.png",
-      contentType: "image/png",
+      url: `https://contract.private.blob.vercel-storage.com/${pathname}`,
+      downloadUrl: `https://contract.private.blob.vercel-storage.com/${pathname}?download=1`,
+      pathname,
+      contentType: request.headers["x-content-type"] ?? "application/octet-stream",
       contentDisposition: "inline",
       etag: "contract-etag",
     }));
@@ -117,6 +120,23 @@ describe("Vercel Blob installed SDK contract", () => {
     }));
   });
 
+  it("uploads a Node Readable without buffering through the installed SDK", async () => {
+    const { uploadPrivateBlob } = await import("./vercel-blob-adapter");
+    const pathname = "tenant-exports/11111111-1111-4111-8111-111111111111/export.zip";
+
+    const result = await uploadPrivateBlob(pathname, Readable.from([Buffer.from("zip-"), Buffer.from("stream")]), "application/zip");
+
+    expect(result).toEqual(expect.objectContaining({ pathname, contentType: "application/zip" }));
+    expect(requests.find((request) => request.url.includes("tenant-exports"))).toEqual(expect.objectContaining({
+      method: "PUT",
+      body: Buffer.from("zip-stream"),
+      headers: expect.objectContaining({
+        "x-vercel-blob-access": "private",
+        "x-content-type": "application/zip",
+      }),
+    }));
+  });
+
   it("maps paginated candidate listing through the installed SDK", async () => {
     const { listPrivateBlobs } = await import("./vercel-blob-adapter");
 
@@ -140,5 +160,48 @@ describe("Vercel Blob installed SDK contract", () => {
         "x-vercel-blob-store-id": "contract",
       }),
     }));
+  });
+
+  it("streams a private get response through the installed SDK", async () => {
+    const originalDispatcher = getGlobalDispatcher();
+    const agent = new MockAgent();
+    agent.disableNetConnect();
+    const bytes = Buffer.from("private-zip-stream");
+    agent.get("https://contract.private.blob.vercel-storage.com").intercept({
+      path: "/tenant-exports/11111111-1111-4111-8111-111111111111/export.zip",
+      method: "GET",
+      headers: { authorization: "Bearer vercel_blob_rw_contract_secret" },
+    }).reply(200, bytes, {
+      headers: {
+        "content-type": "application/zip",
+        "content-length": String(bytes.byteLength),
+        etag: "get-etag",
+        "last-modified": "Sun, 12 Jul 2026 12:00:00 GMT",
+      },
+    });
+    setGlobalDispatcher(agent);
+    try {
+      const { readPrivateBlob } = await import("./vercel-blob-adapter");
+      const result = await readPrivateBlob("tenant-exports/11111111-1111-4111-8111-111111111111/export.zip");
+      if (!result || result.statusCode !== 200) throw new Error("expected_private_blob_stream");
+      expect(result).toEqual(expect.objectContaining({ statusCode: 200 }));
+      expect(result.blob).toEqual(expect.objectContaining({
+        contentType: "application/zip",
+        size: bytes.byteLength,
+        etag: "get-etag",
+      }));
+      const chunks: Buffer[] = [];
+      const reader = result.stream.getReader();
+      for (;;) {
+        const next = await reader.read();
+        if (next.done) break;
+        chunks.push(Buffer.from(next.value));
+      }
+      expect(Buffer.concat(chunks)).toEqual(bytes);
+      agent.assertNoPendingInterceptors();
+    } finally {
+      setGlobalDispatcher(originalDispatcher);
+      await agent.close();
+    }
   });
 });

@@ -1,5 +1,5 @@
-import { Blob as NodeBlob } from "node:buffer";
 import { resolve } from "node:path";
+import { Readable } from "node:stream";
 import { MatchersV3, PactV3 } from "@pact-foundation/pact";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -34,15 +34,12 @@ describe("Vercel Blob Pact consumer contract", () => {
         query: { pathname: "expense-slip-candidates/pact-receipt.png" },
         headers: {
           authorization: "Bearer vercel_blob_rw_contract_secret",
-          "content-type": "image/png",
           "x-vercel-blob-store-id": "contract",
           "x-vercel-blob-access": "private",
           "x-content-type": "image/png",
           "x-add-random-suffix": "0",
           "x-allow-overwrite": "0",
         },
-        contentType: "image/png",
-        body: "contract-body",
       },
       willRespondWith: {
         status: 200,
@@ -66,7 +63,7 @@ describe("Vercel Blob Pact consumer contract", () => {
 
       const result = await uploadPrivateBlob(
         "expense-slip-candidates/pact-receipt.png",
-        new NodeBlob(["contract-body"], { type: "image/png" }) as unknown as Parameters<typeof uploadPrivateBlob>[1],
+        Readable.from([Buffer.from("contract-"), Buffer.from("body")]),
         "image/png",
       );
 
@@ -75,6 +72,38 @@ describe("Vercel Blob Pact consumer contract", () => {
         contentType: "image/png",
         etag: "contract-etag",
       });
+    });
+  });
+
+  it("describes the private streaming get provider contract", async () => {
+    const pathname = "/tenant-exports/11111111-1111-4111-8111-111111111111/export.zip";
+    provider.addInteraction({
+      states: [{ description: "the completed private tenant export exists" }],
+      uponReceiving: "an authenticated private tenant export download",
+      withRequest: {
+        method: "GET",
+        path: pathname,
+        headers: { authorization: "Bearer vercel_blob_rw_contract_secret" },
+      },
+      willRespondWith: {
+        status: 200,
+        headers: {
+          "content-type": "application/zip",
+          "content-length": "18",
+          etag: "get-etag",
+          "last-modified": "Sun, 12 Jul 2026 12:00:00 GMT",
+        },
+        body: "private-zip-stream",
+      },
+    });
+
+    await provider.executeTest(async (mockServer) => {
+      const response = await fetch(`${mockServer.url}${pathname}`, {
+        headers: { authorization: "Bearer vercel_blob_rw_contract_secret" },
+      });
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("application/zip");
+      expect(Buffer.from(await response.arrayBuffer())).toEqual(Buffer.from("private-zip-stream"));
     });
   });
 

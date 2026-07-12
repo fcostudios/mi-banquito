@@ -1,6 +1,8 @@
 import { parseAuditDateRange, type AdminAuditActorKind, type AdminAuditFilters } from "@mi-banquito/domain";
+import { z } from "zod";
 
 const ACTOR_KINDS = new Set<AdminAuditActorKind>(["member", "platform_operator", "system"]);
+const UUID = z.string().uuid();
 
 type SearchValue = string | string[] | undefined;
 
@@ -12,7 +14,7 @@ function scalar(value: SearchValue): string | undefined {
 
 export function auditFiltersFromSearchParams(searchParams: AdminAuditSearchParams): AdminAuditFilters {
   const orgId = scalar(searchParams.org_id);
-  if (orgId && !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(orgId)) throw new Error("audit_org_invalid");
+  if (orgId && !UUID.safeParse(orgId).success) throw new Error("audit_org_invalid");
   const actorValue = scalar(searchParams.actor_kind);
   if (actorValue && !ACTOR_KINDS.has(actorValue as AdminAuditActorKind)) throw new Error("audit_actor_invalid");
   const from = scalar(searchParams.from);
@@ -25,6 +27,16 @@ export function auditFiltersFromSearchParams(searchParams: AdminAuditSearchParam
     cursor: scalar(searchParams.cursor),
     ...parseAuditDateRange({ from, to }),
   };
+}
+
+export function parseAdminAuditFilters(searchParams: AdminAuditSearchParams):
+  | { ok: true; filters: AdminAuditFilters }
+  | { ok: false; error: "invalid_filters" } {
+  try {
+    return { ok: true, filters: auditFiltersFromSearchParams(searchParams) };
+  } catch {
+    return { ok: false, error: "invalid_filters" };
+  }
 }
 
 export function auditQueryString(searchParams: AdminAuditSearchParams, omit: string[] = []): string {

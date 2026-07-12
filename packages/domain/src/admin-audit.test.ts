@@ -184,6 +184,15 @@ describe("US-022 cross-organization audit", () => {
     expect(new Set([...first.rows, ...second.rows].map((row) => row.id)).size).toBe(2);
   });
 
+  it("rejects cursor ids that only resemble UUIDs before querying", async () => {
+    const malformedCursor = Buffer.from(JSON.stringify({
+      at: "2026-07-12T23:59:59.999Z",
+      id: "12345678-1234-1234-1234-12345678901-",
+    }), "utf8").toString("base64url");
+
+    await expect(service.list({ cursor: malformedCursor })).rejects.toThrow("audit_cursor_invalid");
+  });
+
   it("parameterizes hostile filter text and exposes no mutation capability", async () => {
     const hostile = await service.list({ actionKind: "%' OR 1=1; DELETE FROM audit_log_entry; --", limit: 100 });
     expect(hostile.rows).toEqual([]);
