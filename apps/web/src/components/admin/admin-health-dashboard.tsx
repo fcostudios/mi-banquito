@@ -8,7 +8,7 @@ import messages from "@/lib/i18n/en-US.json";
 
 const copy = messages.adminHealth;
 const healthCopy = {
-  consecutiveCleanMonths: "Meses consecutivos sin drift",
+  consecutiveCleanMonths: "Meses con conciliación cero",
   stale: "Datos vencidos",
   unknown: "Estado desconocido",
 } as const;

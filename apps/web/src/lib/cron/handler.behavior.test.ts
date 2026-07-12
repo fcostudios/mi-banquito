@@ -92,10 +92,10 @@ class FakeCronDb {
   readonly updates: UpdateRecord[] = [];
   readonly executedQueries: unknown[] = [];
   private readonly selectResults: unknown[][];
-  private readonly executeResults: unknown[][];
+  private readonly executeResults: Array<unknown[] | Error>;
   private readonly updateReturningResults: Record<string, unknown[][]>;
 
-  constructor(args: { selectResults: unknown[][]; executeResults?: unknown[][]; updateReturningResults?: Record<string, unknown[][]> }) {
+  constructor(args: { selectResults: unknown[][]; executeResults?: Array<unknown[] | Error>; updateReturningResults?: Record<string, unknown[][]> }) {
     this.selectResults = [...args.selectResults];
     this.executeResults = [...(args.executeResults ?? [])];
     this.updateReturningResults = Object.fromEntries(
@@ -118,7 +118,8 @@ class FakeCronDb {
 
   execute(query: unknown) {
     this.executedQueries.push(query);
-    return Promise.resolve({ rows: this.executeResults.shift() ?? [] });
+    const result = this.executeResults.shift() ?? [];
+    return result instanceof Error ? Promise.reject(result) : Promise.resolve({ rows: result });
   }
 
   transaction<T>(callback: (tx: FakeCronDb) => Promise<T>): Promise<T> {
@@ -426,3 +427,67 @@ describe("accrue-interest cron A6 alerts", () => {
     expect(insertedRows(fakeDb, alert)).toHaveLength(0);
   });
 });
+
+describe("derived materialized view refresh", () => {
+  it("checks qualifying unique indexes and refreshes every eligible view concurrently in sequence", async () => {
+    const fakeDb = new FakeCronDb({
+      selectResults: [],
+      executeResults: [[
+        { view_name: "mv_available_capital" },
+        { view_name: "mv_ar_aging" },
+        { view_name: "mv_org_health_snapshot" },
+        { view_name: "mv_liquidez_proyectada" },
+      ]],
+    });
+    const { refreshDerivedViews } = await importCronWithDb(fakeDb);
+
+    await refreshDerivedViews();
+
+    const emittedSql = fakeDb.executedQueries.map(queryText);
+    expect(emittedSql[0]).toContain("indisunique");
+    expect(emittedSql.slice(1)).toEqual([
+      "REFRESH MATERIALIZED VIEW CONCURRENTLY mv_available_capital",
+      "REFRESH MATERIALIZED VIEW CONCURRENTLY mv_ar_aging",
+      "REFRESH MATERIALIZED VIEW CONCURRENTLY mv_org_health_snapshot",
+      "REFRESH MATERIALIZED VIEW CONCURRENTLY mv_liquidez_proyectada",
+    ]);
+    expect(emittedSql.join("\n")).not.toMatch(/REFRESH MATERIALIZED VIEW mv_org_health_snapshot/);
+  });
+
+  it("stops the refresh sequence at the first failure", async () => {
+    const fakeDb = new FakeCronDb({
+      selectResults: [],
+      executeResults: [
+        [
+          { view_name: "mv_available_capital" },
+          { view_name: "mv_ar_aging" },
+          { view_name: "mv_org_health_snapshot" },
+        ],
+        [],
+        new Error("refresh failed"),
+      ],
+    });
+    const { refreshDerivedViews } = await importCronWithDb(fakeDb);
+
+    await expect(refreshDerivedViews()).rejects.toThrow("refresh failed");
+
+    expect(fakeDb.executedQueries.map(queryText).slice(1)).toEqual([
+      "REFRESH MATERIALIZED VIEW CONCURRENTLY mv_available_capital",
+      "REFRESH MATERIALIZED VIEW CONCURRENTLY mv_ar_aging",
+    ]);
+  });
+});
+
+function queryText(query: unknown): string {
+  if (!query || typeof query !== "object") return String(query);
+  const chunks = (query as { queryChunks?: unknown[] }).queryChunks;
+  if (!chunks) return String(query);
+  return chunks.map((chunk) => {
+    if (typeof chunk === "string") return chunk;
+    if (chunk && typeof chunk === "object" && "value" in chunk) {
+      const value = (chunk as { value: unknown }).value;
+      return Array.isArray(value) ? value.join("") : String(value);
+    }
+    return queryText(chunk);
+  }).join("").trim();
+}

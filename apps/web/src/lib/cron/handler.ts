@@ -167,27 +167,47 @@ function priorMoraScheduleStatus(value: string | null): (typeof MORA_TRANSITIONA
     : "atrasado";
 }
 
-async function refreshDerivedViews() {
-  await db.execute(sql.raw(`
-DO $$
-BEGIN
-  IF to_regclass('mv_available_capital') IS NOT NULL THEN
-    EXECUTE 'REFRESH MATERIALIZED VIEW mv_available_capital';
-  END IF;
+const DERIVED_MATERIALIZED_VIEWS = [
+  "mv_available_capital",
+  "mv_ar_aging",
+  "mv_org_health_snapshot",
+  "mv_liquidez_proyectada",
+] as const;
 
-  IF to_regclass('mv_ar_aging') IS NOT NULL THEN
-    EXECUTE 'REFRESH MATERIALIZED VIEW mv_ar_aging';
-  END IF;
+export async function refreshDerivedViews() {
+  const result = await db.execute(sql`
+    SELECT materialized_view.relname AS view_name
+    FROM pg_class materialized_view
+    JOIN pg_namespace namespace ON namespace.oid = materialized_view.relnamespace
+    WHERE namespace.nspname = current_schema()
+      AND materialized_view.relkind = 'm'
+      AND materialized_view.relname IN (
+        'mv_available_capital',
+        'mv_ar_aging',
+        'mv_org_health_snapshot',
+        'mv_liquidez_proyectada'
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM pg_index unique_index
+        WHERE unique_index.indrelid = materialized_view.oid
+          AND unique_index.indisunique
+          AND unique_index.indisvalid
+          AND unique_index.indisready
+          AND unique_index.indpred IS NULL
+          AND unique_index.indexprs IS NULL
+      )
+  `);
+  const eligibleViews = new Set(
+    executeRows<Record<string, unknown>>(result)
+      .map((row) => row.view_name)
+      .filter((viewName): viewName is string => typeof viewName === "string"),
+  );
 
-  IF to_regclass('mv_org_health_snapshot') IS NOT NULL THEN
-    EXECUTE 'REFRESH MATERIALIZED VIEW mv_org_health_snapshot';
-  END IF;
-
-  IF to_regclass('mv_liquidez_proyectada') IS NOT NULL THEN
-    EXECUTE 'REFRESH MATERIALIZED VIEW mv_liquidez_proyectada';
-  END IF;
-END $$;
-`));
+  for (const viewName of DERIVED_MATERIALIZED_VIEWS) {
+    if (!eligibleViews.has(viewName)) continue;
+    await db.execute(sql.raw(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${viewName}`));
+  }
 }
 
 async function recordCronRun(input: {
