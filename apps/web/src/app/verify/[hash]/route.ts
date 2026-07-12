@@ -21,6 +21,9 @@ function escapeHtml(value: string): string {
 
 function renderVerifierHtml(result: VerifyResult): string {
   const text = verifierResultText(result);
+  const movements = result.matched && result.movements.length > 0
+    ? `<section aria-label="Movimientos transparentes"><h2>Movimientos transparentes</h2><ul>${result.movements.map((row) => `<li>${escapeHtml(row.datedOn)} · ${escapeHtml(row.label)} · USD ${escapeHtml(row.amount)} · ${escapeHtml(row.status)}</li>`).join("")}</ul></section>`
+    : "";
   return `<!doctype html>
 <html lang="es-EC">
   <head>
@@ -33,6 +36,7 @@ function renderVerifierHtml(result: VerifyResult): string {
       <p>${escapeHtml(messages.app_name)}</p>
       <h1>${escapeHtml(messages.verifier.title)}</h1>
       <p>${escapeHtml(text)}</p>
+      ${movements}
     </main>
   </body>
 </html>`;

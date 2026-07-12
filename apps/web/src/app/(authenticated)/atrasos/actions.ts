@@ -65,6 +65,7 @@ function memberPaymentConfirmationRedirect(input: Record<string, unknown>): stri
   for (const key of [
     "clientRequestId",
     "memberId",
+    "accountId",
     "amount",
     "datedOn",
     "paymentSource",
@@ -158,8 +159,9 @@ export async function recordOverdueContributionAction(formData: FormData) {
     const values = formDataToObject(formData);
     const clientRequestId = String(values.clientRequestId ?? "");
     const memberId = String(values.memberId ?? "");
+    const accountId = String(values.accountId ?? "");
     const cycleId = String(values.cycleId ?? "");
-    if (!uuidPattern.test(clientRequestId) || !uuidPattern.test(memberId) || !uuidPattern.test(cycleId)) {
+    if (!uuidPattern.test(clientRequestId) || !uuidPattern.test(memberId) || !uuidPattern.test(accountId) || !uuidPattern.test(cycleId)) {
       throw new Error("collections_obligation_not_found");
     }
 
@@ -172,6 +174,7 @@ export async function recordOverdueContributionAction(formData: FormData) {
     const parsed = memberPaymentFormSchema.parse({
       clientRequestId,
       memberId,
+      accountId,
       targetCycleId: cycleId,
       amount: String(agingRow.amountDue),
       datedOn: currentEcuadorDateString(),

@@ -35,6 +35,7 @@ describe("ScrStatementsArchivePage", () => {
         canonicalPayloadHash: "a".repeat(64),
         pdfUri: `/statement-archive/monthly-close/${"a".repeat(64)}.pdf`,
         periodCloseId: "period-close-1",
+        artifactStatus: "ready",
       },
       {
         id: "member-1",
@@ -52,5 +53,24 @@ describe("ScrStatementsArchivePage", () => {
     expect(screen.getByRole("button", { name: "Generar estados de cuenta de 2026-06" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Compartir por WhatsApp" })).toBeInTheDocument();
     expect(screen.getByText("1 estados por socia listos para compartir.")).toBeInTheDocument();
+  });
+
+  it("shows processing instead of exposing a pending monthly close link", async () => {
+    listStatementArchive.mockResolvedValueOnce([{
+      id: "close-pending",
+      kind: "monthly_close",
+      periodLabel: "Asamblea extraordinaria",
+      generatedAt: new Date("2026-07-05T20:00:00.000Z"),
+      canonicalPayloadHash: "c".repeat(64),
+      pdfUri: `/statement-archive/public/${"c".repeat(64)}.pdf`,
+      periodCloseId: "period-close-pending",
+      artifactStatus: "pending",
+    }]);
+
+    render(await ScrStatementsArchivePage());
+
+    expect(screen.getByText("El PDF se esta procesando.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Abrir PDF" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Generar estados/ })).not.toBeInTheDocument();
   });
 });

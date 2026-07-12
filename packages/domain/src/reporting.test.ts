@@ -10,6 +10,8 @@ import {
   publicVerifyUrl,
   sha256Hex,
   verifierResultText,
+  verifyResultFromArchivedPayload,
+  money,
 } from "./reporting";
 
 const statementCopy = {
@@ -30,9 +32,69 @@ const statementCopy = {
   fallbackAllocation: "Aplicación",
   unknownCycle: "sin período",
   unknownMember: "socia",
+  reconciliationTitle: "Regularización de depósitos",
+  pendingContribution: "Aporte pendiente",
+  pendingRepayment: "Pago pendiente",
+  regularizedContribution: "Aporte regularizado",
+  regularizedRepayment: "Pago regularizado",
+  regularizationTransfer: "Transferencia para regularizar",
+  legacyAccount: "Cuenta histórica sin referencia",
 };
 
 describe("public statement verification", () => {
+  it("formats numeric(18,4) boundaries exactly without Number rounding", () => {
+    expect(money("99999999999999.9999")).toBe("USD 100,000,000,000,000.00");
+    expect(money("0.0099")).toBe("USD 0.01");
+    expect(money("-12345678901234.5678")).toBe("USD -12,345,678,901,234.57");
+  });
+
+  it("builds verification only from the archived payload for date and non-date labels", () => {
+    const archived = {
+      orgName: "Nombre archivado",
+      periodLabel: "Asamblea extraordinaria",
+      verificationMovements: [{
+        id: "c1",
+        kind: "contribution",
+        status: "pending",
+        amount: "40.0000",
+        datedOn: "2026-07-11",
+        accountName: "Cuenta archivada",
+        label: "Aporte pendiente · Cuenta archivada",
+      }],
+    };
+    const hash = sha256Hex(canonicalJson(archived));
+
+    expect(verifyResultFromArchivedPayload({
+      canonicalPayloadHash: hash,
+      canonicalPayload: archived,
+      generatedAt: new Date("2026-07-12T10:00:00.000Z"),
+    })).toEqual({
+      matched: true,
+      groupName: "Nombre archivado",
+      generatedAt: "2026-07-12T10:00:00.000Z",
+      movements: archived.verificationMovements,
+    });
+    expect(sha256Hex(canonicalJson(archived))).toBe(hash);
+  });
+
+  it("verifies a legacy archive from immutable archive metadata when canonical payload is absent", () => {
+    expect(verifyResultFromArchivedPayload({
+      canonicalPayloadHash: "b".repeat(64),
+      canonicalPayload: null,
+      generatedAt: new Date("2026-06-30T23:59:59.000Z"),
+      orgId: "11111111-1111-4111-8111-111111111111",
+      periodLabel: "Asamblea extraordinaria",
+      kind: "monthly_member",
+    })).toEqual({
+      matched: true,
+      groupName: "Archivo historico",
+      generatedAt: "2026-06-30T23:59:59.000Z",
+      movements: [],
+      legacy: true,
+      periodLabel: "Asamblea extraordinaria",
+    });
+  });
+
   it("orders object keys deterministically before hashing", () => {
     const left = canonicalJson({ b: 2, a: { d: 4, c: 3 } });
     const right = canonicalJson({ a: { c: 3, d: 4 }, b: 2 });
@@ -70,6 +132,31 @@ describe("public statement verification", () => {
 
     expect(payload.sections[0].rows).toContainEqual({ label: "Saldo inicial", value: "USD 100.00" });
     expect(sha256Hex(canonicalJson(payload))).toHaveLength(64);
+  });
+
+  it("keeps the pending source and regularizing transfer as separate transparent statement rows", () => {
+    const payload = monthlyMemberStatementPayload({
+      orgName: "Mi Banquito",
+      periodLabel: "2026-06",
+      member: { id: "m1", displayName: "Ana Mora" },
+      openingBalance: "0.0000",
+      closingBalance: "50.0000",
+      contributions: [],
+      withdrawals: [],
+      reconciliationMovements: [
+        { id: "c1", kind: "contribution", status: "pending", amount: "50.0000", datedOn: "2026-06-10", accountName: "Cuenta personal" },
+        { id: "t1", kind: "regularization_transfer", status: "regularized", amount: "50.0000", datedOn: "2026-06-11", accountName: "Banco del grupo" },
+      ],
+      treasurerName: "Pancho",
+      bankLast4: "1234",
+      copy: statementCopy,
+    });
+
+    const section = payload.sections.find((row) => row.id === "member-reconciliation");
+    expect(section?.rows).toEqual([
+      expect.objectContaining({ label: "Aporte pendiente · Cuenta personal", value: "USD 50.00" }),
+      expect.objectContaining({ label: "Transferencia para regularizar · Banco del grupo", value: "USD 50.00" }),
+    ]);
   });
 
   it("keeps grouped BR-26 contribution child rows as statement rows without receipt duplication", () => {
@@ -218,6 +305,7 @@ describe("public statement verification", () => {
       matched: true,
       groupName: "Mi Banquito",
       generatedAt: "2026-07-04T10:00:00.000Z",
+      movements: [],
     })).toBe("Este documento coincide con el registro del grupo Mi Banquito al 2026-07-04.");
     expect(verifierResultText({ matched: false })).toBe("No se encontró un documento con este código.");
   });

@@ -41,6 +41,17 @@ const transferSchema = z.object({
   clientRequestId: z.string().uuid(),
 }).strict();
 
+const regularizationSchema = z.object({
+  regularizesKind: z.enum(["contribution", "repayment"]),
+  regularizesId: z.string().uuid(),
+  toAccountId: z.string().uuid(),
+  amount: z.string().min(1),
+  datedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  notes: z.string().max(2_000).optional().default(""),
+  clientRequestId: z.string().uuid(),
+  confirmed: z.literal("yes"),
+}).strict();
+
 function parseScalarFields(formData: FormData, keys: readonly string[], options: { allowSlip?: boolean } = {}) {
   const allowed = new Set(options.allowSlip ? [...keys, "slipPhoto"] : keys);
   const result: Record<string, string> = {};
@@ -85,6 +96,9 @@ function movementErrorCode(error: unknown): string {
     || error.message === "transfer_account_unavailable"
     || error.message === "transfer_accounts_must_differ"
     || error.message === "transfer_group_accounts_required"
+    || error.message === "regularization_source_unavailable"
+    || error.message === "regularization_target_unavailable"
+    || error.message === "regularization_source_already_regularized"
   ) {
     return "account-unavailable";
   }
@@ -223,4 +237,34 @@ export async function recordTransferAction(formData: FormData) {
 
   revalidateMovementSurfaces();
   redirect(successPath({ saved: "transfer", category: "transfer", amount: String(result.amount) }));
+}
+
+export async function regularizePendingDepositAction(formData: FormData) {
+  const session = await requireTreasurer();
+  let result: Awaited<ReturnType<ReturnType<typeof createMovementService>["regularizePendingDeposit"]>>;
+  try {
+    const parsed = regularizationSchema.parse(parseScalarFields(formData, [
+      "regularizesKind",
+      "regularizesId",
+      "toAccountId",
+      "amount",
+      "datedOn",
+      "notes",
+      "clientRequestId",
+      "confirmed",
+    ]));
+    result = await createMovementService().regularizePendingDeposit({
+      ...parsed,
+      orgId: session.orgId,
+      actorId: session.actorId,
+    });
+  } catch (error) {
+    redirect(`${ROUTE_SCR_RECORD_MOVEMENT}?error=${movementErrorCode(error)}`);
+  }
+
+  revalidateMovementSurfaces();
+  revalidatePath("/cierre");
+  revalidatePath("/socias");
+  revalidatePath("/estados");
+  redirect(successPath({ saved: "transfer", category: "regularization", amount: String(result.transfer.amount) }));
 }

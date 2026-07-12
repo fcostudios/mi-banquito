@@ -2,6 +2,7 @@ import { getTableName } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  account,
   auditLogEntry,
   baseFundQuotaConfig,
   contribution,
@@ -37,9 +38,12 @@ type UpdateRecord = {
 const tableNameOf = (table: unknown): string => getTableName(table as Parameters<typeof getTableName>[0]);
 
 class FakeSelectBuilder {
-  constructor(private readonly nextResult: () => unknown[]) {}
+  private tableName = "unknown";
 
-  from() {
+  constructor(private readonly nextResult: (tableName: string) => unknown[]) {}
+
+  from(table: unknown) {
+    this.tableName = tableNameOf(table);
     return this;
   }
 
@@ -51,11 +55,19 @@ class FakeSelectBuilder {
     return this;
   }
 
+  limit() {
+    return this;
+  }
+
+  for() {
+    return this;
+  }
+
   then<TResult1 = unknown[], TResult2 = never>(
     onfulfilled?: ((value: unknown[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2> {
-    return Promise.resolve(this.nextResult()).then(onfulfilled, onrejected);
+    return Promise.resolve(this.nextResult(this.tableName)).then(onfulfilled, onrejected);
   }
 }
 
@@ -108,7 +120,14 @@ class FakeDb {
   }
 
   select() {
-    return new FakeSelectBuilder(() => this.selectResults.shift() ?? []);
+    return new FakeSelectBuilder((tableName) => tableName === tableNameOf(account)
+      ? [{
+          id: "99999999-9999-4999-8999-999999999999",
+          orgId: "11111111-1111-4111-8111-111111111111",
+          status: "active",
+          isGroupFund: true,
+        }]
+      : this.selectResults.shift() ?? []);
   }
 
   insert(table: unknown) {
@@ -438,6 +457,7 @@ describe("audit atomicity", () => {
         actorId: "22222222-2222-4222-8222-222222222222",
         clientRequestId: "33333333-3333-4333-8333-333333333333",
         loanId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        accountId: "99999999-9999-4999-8999-999999999999",
         amount: "15.0000",
         datedOn: "2026-07-02",
       }), DynamicAuditWriteFailure);

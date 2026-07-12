@@ -13,9 +13,19 @@ import {
   EXPECTED_UNIQUE_CONSTRAINT_NAMES,
   EXPECTED_UPDATED_AT_TABLES,
   REQUIRED_FUNCTIONS,
+  parseExpectedSchema,
 } from "./verify-schema.mjs";
 
 describe("schema verifier", () => {
+  it("ignores quoted dynamic trigger templates when deriving static expectations", () => {
+    const parsed = parseExpectedSchema(`
+      EXECUTE format('CREATE TRIGGER fake BEFORE INSERT ON %I FOR EACH ROW EXECUTE FUNCTION f()', table_name);
+      CREATE TRIGGER real BEFORE INSERT ON contribution FOR EACH ROW EXECUTE FUNCTION f();
+      SELECT 1 FROM account a ON a.id = a.id;
+    `);
+    expect(parsed.triggerTables).toEqual(["contribution"]);
+  });
+
   it("passes when tables, RLS, policies, triggers, and updated_at triggers match expectations", () => {
     const result = evaluateSchemaHealth({
       tableNames: EXPECTED_TABLE_NAMES,

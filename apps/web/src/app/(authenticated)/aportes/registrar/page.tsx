@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { createLedgerService } from "@mi-banquito/domain";
+import { createLedgerService, createMovementService } from "@mi-banquito/domain";
 import { ButtonPrimary, FormField, InputNumber, InputText, Radio, Select } from "@mi-banquito/ui";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import { todayISO } from "@/lib/format/es-ec";
@@ -18,6 +18,7 @@ export default async function ScrRecordContributionPage({
     confirm?: string;
     clientRequestId?: string;
     memberId?: string;
+    accountId?: string;
     amount?: string;
     datedOn?: string;
     paymentSource?: string;
@@ -28,18 +29,35 @@ export default async function ScrRecordContributionPage({
   }>;
 }) {
   const session = await requireTreasurer();
-  const members = await createLedgerService().listMembers(session.orgId);
+  const [members, accounts] = await Promise.all([
+    createLedgerService().listMembers(session.orgId),
+    createMovementService().listActiveAccounts(session.orgId),
+  ]);
   const params = await searchParams;
   const errorMessage = params?.error ? decodeURIComponent(params.error) : undefined;
   const showConfirmation = params?.confirm === "1";
   const clientRequestId = params?.clientRequestId || randomUUID();
   const defaultMemberId = params?.memberId ?? members[0]?.id;
   const defaultPaymentSource = params?.paymentSource ?? "cash_in_meeting";
+  const hasGroupAccount = accounts.some((account) => account.isGroupFund);
+  const defaultAccountId = params?.accountId ?? accounts.find((account) => account.isGroupFund)?.id ?? accounts[0]?.id;
+
+  const accountLabel = (account: (typeof accounts)[number]) => {
+    const suffix = account.last4 ? ` ****${account.last4}` : "";
+    return account.isGroupFund
+      ? `${account.name}${suffix} - fondo del grupo`
+      : `${account.name}${suffix} - pendiente de regularizar`;
+  };
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
       <h1 className="text-2xl font-bold text-text-primary">{copy.contributions.title}</h1>
-      <form action={recordContributionAction} className="grid gap-4 rounded-md border border-border bg-surface p-5">
+      {!hasGroupAccount ? (
+        <div className="rounded-md border border-warning-text bg-warning-bg p-4 text-text-primary" role="alert">
+          <h2 className="font-semibold">{copy.contributions.noGroupAccountTitle}</h2>
+          <p className="mt-1 text-sm">{copy.contributions.noGroupAccountBody}</p>
+        </div>
+      ) : <form action={recordContributionAction} className="grid gap-4 rounded-md border border-border bg-surface p-5">
         {errorMessage ? (
           <div className="rounded-md border border-error bg-surface p-3 text-sm text-error" role="alert">
             {errorMessage}
@@ -48,11 +66,16 @@ export default async function ScrRecordContributionPage({
         <input type="hidden" name="clientRequestId" value={clientRequestId} />
         {params?.targetLoanId ? <input type="hidden" name="targetLoanId" value={params.targetLoanId} /> : null}
         {params?.targetCycleId ? <input type="hidden" name="targetCycleId" value={params.targetCycleId} /> : null}
-        <FormField labelKey={copy.common.member}>
-          <Select name="memberId" defaultValue={defaultMemberId} required>
+        <FormField controlId="contribution-member" labelKey={copy.common.member}>
+          <Select id="contribution-member" name="memberId" defaultValue={defaultMemberId} required>
             {members.map((row) => (
               <option key={row.id} value={row.id}>{row.displayName}</option>
             ))}
+          </Select>
+        </FormField>
+        <FormField controlId="contribution-account" helperTextKey={copy.contributions.accountHelp} labelKey={copy.contributions.account}>
+          <Select id="contribution-account" name="accountId" defaultValue={defaultAccountId} required>
+            {accounts.map((account) => <option key={account.id} value={account.id}>{accountLabel(account)}</option>)}
           </Select>
         </FormField>
         <FormField labelKey={copy.common.amount}>
@@ -87,7 +110,7 @@ export default async function ScrRecordContributionPage({
         <div>
           <ButtonPrimary type="submit" labelKey={copy.contributions.submit} />
         </div>
-      </form>
+      </form>}
     </main>
   );
 }

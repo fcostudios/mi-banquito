@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
-import { account, alert, auditLogEntry, contribution, expense, repayment, slipPhoto, transfer } from "@mi-banquito/db/schema";
+import { account, alert, auditLogEntry, contribution, expense, member, repayment, slipPhoto, transfer } from "@mi-banquito/db/schema";
 import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 
 export const EXPENSE_CATEGORIES = [
@@ -23,10 +23,18 @@ export type PendingDeposit = {
   orgId: string;
   sourceKind: "contribution" | "repayment";
   amount: string;
+  remaining: string;
   currencyCode: string;
   datedOn: string;
   accountId: string | null;
+  accountName: string | null;
+  memberId: string;
+  memberName: string;
   notes: string | null;
+};
+
+export type DepositStatus = PendingDeposit & {
+  reconciliationStatus: "pending" | "regularized";
 };
 
 type TransferAccount = Pick<MovementAccountRow, "id" | "orgId" | "isGroupFund" | "status">;
@@ -59,11 +67,32 @@ export type RecordTransferInput = {
   clientRequestId: string;
 };
 
+export type RegularizePendingDepositInput = {
+  orgId: string;
+  actorId: string;
+  regularizesKind: "contribution" | "repayment";
+  regularizesId: string;
+  toAccountId: string;
+  amount: string;
+  datedOn: string;
+  notes?: string | null;
+  clientRequestId: string;
+};
+
+export type RegularizePendingDepositResult = {
+  transfer: TransferRow;
+  coverage: string;
+  remaining: string;
+  regularized: boolean;
+};
+
 export interface MovementService {
   readonly context: "movements";
+  listActiveAccounts(orgId: string): Promise<MovementAccountRow[]>;
   listActiveGroupAccounts(orgId: string): Promise<MovementAccountRow[]>;
   listActiveGroupAccountBalances(orgId: string): Promise<MovementAccountBalance[]>;
   listPendingDeposits(orgId: string): Promise<PendingDeposit[]>;
+  listMemberDeposits(orgId: string, memberId: string): Promise<DepositStatus[]>;
   isExpenseSlipUriReferenced(orgId: string, uri: string): Promise<boolean>;
   recordBlobCleanupRequired(input: {
     orgId: string;
@@ -74,6 +103,7 @@ export interface MovementService {
   }): Promise<void>;
   recordExpense(input: RecordExpenseInput): Promise<ExpenseRow>;
   recordTransfer(input: RecordTransferInput): Promise<TransferRow>;
+  regularizePendingDeposit(input: RegularizePendingDepositInput): Promise<RegularizePendingDepositResult>;
 }
 
 export function assertExpenseCategory(value: string): ExpenseCategory {
@@ -126,6 +156,21 @@ export function transferFundDelta(input: {
 }): "0.0000" {
   transferAccountDeltas(input);
   return "0.0000";
+}
+
+export function pendingDepositFundDelta(input: {
+  reconciliationStatus: "pending" | "regularized";
+  amount: string;
+}): string {
+  const amount = parsePositiveMoney4(input.amount);
+  return input.reconciliationStatus === "regularized" ? amount : "0.0000";
+}
+
+export function shouldMarkRegularized(input: {
+  sourceAmount: string;
+  regularizedAmount: string;
+}): boolean {
+  return signedMoneyUnits(input.regularizedAmount) >= signedMoneyUnits(input.sourceAmount);
 }
 
 function normalizedNotes(notes: string | null | undefined): string | null {
@@ -184,6 +229,11 @@ function formattedMoneyUnits(units: bigint): string {
   return `${negative ? "-" : ""}${absolute / scale}.${String(absolute % scale).padStart(4, "0")}`;
 }
 
+function remainingMoney(sourceAmount: string, coverage: string): string {
+  const remaining = signedMoneyUnits(sourceAmount) - signedMoneyUnits(coverage);
+  return formattedMoneyUnits(remaining > BigInt(0) ? remaining : BigInt(0));
+}
+
 function totalsByAccount(rows: Array<{ accountId: string | null; total: string }>): Map<string, bigint> {
   return new Map(rows.flatMap((row) => row.accountId ? [[row.accountId, signedMoneyUnits(String(row.total))]] : []));
 }
@@ -193,6 +243,13 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
 
   return {
     context: "movements",
+
+    async listActiveAccounts(orgId) {
+      return withTenantTransaction(orgId, (tx) => tx.select().from(account).where(and(
+        eq(account.orgId, orgId),
+        eq(account.status, "active"),
+      )).orderBy(asc(account.name), asc(account.id)));
+    },
 
     async listActiveGroupAccounts(orgId) {
       return withTenantTransaction(orgId, (tx) => tx.select().from(account).where(and(
@@ -253,8 +310,14 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
           currencyCode: contribution.currencyCode,
           datedOn: contribution.datedOn,
           accountId: contribution.accountId,
+          accountName: account.name,
+          memberId: contribution.memberId,
+          memberName: member.displayName,
           notes: contribution.notes,
-        }).from(contribution).where(and(
+        }).from(contribution)
+          .innerJoin(member, and(eq(member.orgId, contribution.orgId), eq(member.id, contribution.memberId)))
+          .leftJoin(account, and(eq(account.orgId, contribution.orgId), eq(account.id, contribution.accountId)))
+          .where(and(
           eq(contribution.orgId, orgId),
           eq(contribution.reconciliationStatus, "pending"),
         ));
@@ -265,19 +328,77 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
           currencyCode: repayment.currencyCode,
           datedOn: repayment.datedOn,
           accountId: repayment.accountId,
+          accountName: account.name,
+          memberId: repayment.memberId,
+          memberName: member.displayName,
           notes: repayment.notes,
-        }).from(repayment).where(and(
+        }).from(repayment)
+          .innerJoin(member, and(eq(member.orgId, repayment.orgId), eq(member.id, repayment.memberId)))
+          .leftJoin(account, and(eq(account.orgId, repayment.orgId), eq(account.id, repayment.accountId)))
+          .where(and(
           eq(repayment.orgId, orgId),
           eq(repayment.reconciliationStatus, "pending"),
         ));
-        return [
+        const rows = [
           ...contributionRows.map((row) => ({ ...row, sourceKind: "contribution" as const })),
           ...repaymentRows.map((row) => ({ ...row, sourceKind: "repayment" as const })),
         ].sort((left, right) => (
           String(left.datedOn).localeCompare(String(right.datedOn))
           || left.sourceKind.localeCompare(right.sourceKind)
           || left.id.localeCompare(right.id)
-        )) as PendingDeposit[];
+        ));
+        const coverageResult = await tx.execute<{ regularizesKind: string; regularizesId: string; total: string }>(sql`
+          SELECT t.regularizes_kind AS "regularizesKind", t.regularizes_id AS "regularizesId",
+                 COALESCE(SUM(t.amount), 0)::numeric(18, 4)::text AS total
+          FROM transfer t
+          WHERE t.org_id = ${orgId}
+            AND t.purpose = 'regularization'
+            AND t.reverses_id IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM transfer reversal
+              WHERE reversal.org_id = t.org_id AND reversal.reverses_id = t.id
+            )
+          GROUP BY t.regularizes_kind, t.regularizes_id
+        `);
+        const coverageRows = Array.isArray(coverageResult) ? coverageResult : coverageResult.rows ?? [];
+        const coverage = new Map(coverageRows.map((row) => [`${row.regularizesKind}:${row.regularizesId}`, row.total]));
+        return rows.map((row) => ({
+          ...row,
+          remaining: remainingMoney(String(row.amount), coverage.get(`${row.sourceKind}:${row.id}`) ?? "0.0000"),
+        })) as PendingDeposit[];
+      });
+    },
+
+    async listMemberDeposits(orgId, memberId) {
+      return withTenantTransaction(orgId, async (tx) => {
+        const result = await tx.execute(sql`
+          SELECT source.id,
+                 source.kind AS "sourceKind",
+                 source.amount::numeric(18, 4)::text AS amount,
+                 source.currency_code AS "currencyCode",
+                 source.dated_on::text AS "datedOn",
+                 source.account_id AS "accountId",
+                 a.name AS "accountName",
+                 source.member_id AS "memberId",
+                 m.display_name AS "memberName",
+                 source.notes,
+                 source.reconciliation_status AS "reconciliationStatus",
+                 ${orgId}::uuid AS "orgId"
+          FROM (
+            SELECT id, 'contribution'::text AS kind, amount, currency_code, dated_on,
+                   account_id, member_id, notes, reconciliation_status, reverses_id
+            FROM contribution WHERE org_id = ${orgId} AND member_id = ${memberId}
+            UNION ALL
+            SELECT id, 'repayment'::text AS kind, amount, currency_code, dated_on,
+                   account_id, member_id, notes, reconciliation_status, reverses_id
+            FROM repayment WHERE org_id = ${orgId} AND member_id = ${memberId}
+          ) source
+          JOIN member m ON m.id = source.member_id AND m.org_id = ${orgId}
+          LEFT JOIN account a ON a.id = source.account_id AND a.org_id = ${orgId}
+          WHERE source.reverses_id IS NULL
+          ORDER BY source.dated_on DESC, source.kind, source.id
+        `);
+        return (Array.isArray(result) ? result : result.rows ?? []) as DepositStatus[];
       });
     },
 
@@ -587,6 +708,210 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
           createdAt: timestamp,
         });
         return saved;
+      });
+    },
+
+    async regularizePendingDeposit(input) {
+      const amount = parsePositiveMoney4(input.amount);
+      const datedOn = assertDateOnly(input.datedOn);
+      const notes = normalizedNotes(input.notes);
+
+      return withWritableTenantTransaction(input.orgId, async (tx) => {
+        const assertEquivalentReplay = (replayed: TransferRow): TransferRow => {
+          if (
+            replayed.orgId !== input.orgId
+            || replayed.createdBy !== input.actorId
+            || replayed.toAccountId !== input.toAccountId
+            || String(replayed.amount) !== amount
+            || replayed.currencyCode !== "USD"
+            || String(replayed.datedOn) !== datedOn
+            || replayed.purpose !== "regularization"
+            || replayed.regularizesKind !== input.regularizesKind
+            || replayed.regularizesId !== input.regularizesId
+            || replayed.notes !== notes
+            || replayed.slipPhotoId !== null
+          ) {
+            throw new Error("movement_idempotency_conflict");
+          }
+          return replayed;
+        };
+        const replayOutcome = async () => {
+          const [replayed] = await tx.select().from(transfer).where(and(
+            eq(transfer.orgId, input.orgId),
+            eq(transfer.clientRequestId, input.clientRequestId),
+          )).limit(1);
+          if (!replayed) return undefined;
+          assertEquivalentReplay(replayed);
+          const [audit] = await tx.select({ payloadSnapshot: auditLogEntry.payloadSnapshot })
+            .from(auditLogEntry).where(and(
+              eq(auditLogEntry.orgId, input.orgId),
+              eq(auditLogEntry.actionKind, "movement.regularization"),
+              eq(auditLogEntry.subjectKind, "transfer"),
+              eq(auditLogEntry.subjectId, replayed.id),
+            )).limit(1);
+          const snapshot = audit?.payloadSnapshot as { coverage?: unknown; regularized?: unknown } | null | undefined;
+          if (typeof snapshot?.coverage !== "string" || typeof snapshot.regularized !== "boolean") {
+            throw new Error("regularization_replay_outcome_missing");
+          }
+          const [sourceAmount] = input.regularizesKind === "contribution"
+            ? await tx.select({ amount: contribution.amount }).from(contribution).where(and(
+              eq(contribution.orgId, input.orgId), eq(contribution.id, input.regularizesId),
+            )).limit(1)
+            : await tx.select({ amount: repayment.amount }).from(repayment).where(and(
+              eq(repayment.orgId, input.orgId), eq(repayment.id, input.regularizesId),
+            )).limit(1);
+          return {
+            transfer: replayed,
+            coverage: snapshot.coverage,
+            remaining: remainingMoney(String(sourceAmount?.amount ?? snapshot.coverage), snapshot.coverage),
+            regularized: snapshot.regularized,
+          };
+        };
+
+        const earlyReplay = await replayOutcome();
+        if (earlyReplay) return earlyReplay;
+
+        const sourceRows = input.regularizesKind === "contribution"
+          ? await tx.select({
+            id: contribution.id,
+            orgId: contribution.orgId,
+            accountId: contribution.accountId,
+            amount: contribution.amount,
+            reconciliationStatus: contribution.reconciliationStatus,
+          }).from(contribution).where(and(
+            eq(contribution.orgId, input.orgId),
+            eq(contribution.id, input.regularizesId),
+            isNull(contribution.reversesId),
+          )).for("update").limit(1)
+          : await tx.select({
+            id: repayment.id,
+            orgId: repayment.orgId,
+            accountId: repayment.accountId,
+            amount: repayment.amount,
+            reconciliationStatus: repayment.reconciliationStatus,
+          }).from(repayment).where(and(
+            eq(repayment.orgId, input.orgId),
+            eq(repayment.id, input.regularizesId),
+            isNull(repayment.reversesId),
+          )).for("update").limit(1);
+        const source = sourceRows[0];
+        if (!source?.accountId) throw new Error("regularization_source_unavailable");
+        const replayAfterLock = await replayOutcome();
+        if (replayAfterLock) return replayAfterLock;
+        if (source.reconciliationStatus === "regularized") {
+          throw new Error("regularization_source_already_regularized");
+        }
+
+        const accounts = await tx.select().from(account).where(and(
+          eq(account.orgId, input.orgId),
+          inArray(account.id, [source.accountId, input.toAccountId]),
+        )).for("update");
+        const from = accounts.find((row) => row.id === source.accountId);
+        const to = accounts.find((row) => row.id === input.toAccountId);
+        if (!from || from.isGroupFund) throw new Error("regularization_source_unavailable");
+        if (!to || !to.isGroupFund || to.status !== "active") throw new Error("regularization_target_unavailable");
+
+        const [priorCoverageRow] = await tx.select({
+          total: sql<string>`COALESCE(SUM(${transfer.amount}), 0)::numeric(18, 4)::text`,
+        }).from(transfer).where(and(
+          eq(transfer.orgId, input.orgId),
+          eq(transfer.purpose, "regularization"),
+          eq(transfer.regularizesKind, input.regularizesKind),
+          eq(transfer.regularizesId, input.regularizesId),
+          isNull(transfer.reversesId),
+          sql`NOT EXISTS (
+            SELECT 1 FROM transfer reversal
+            WHERE reversal.org_id = ${transfer.orgId} AND reversal.reverses_id = ${transfer.id}
+          )`,
+        ));
+        const priorCoverage = String(priorCoverageRow?.total ?? "0.0000");
+        const remainingBefore = remainingMoney(String(source.amount), priorCoverage);
+        if (signedMoneyUnits(amount) > signedMoneyUnits(remainingBefore)) {
+          throw new Error("regularization_amount_exceeds_remaining");
+        }
+
+        let [saved] = await tx.insert(transfer).values({
+            orgId: input.orgId,
+            fromAccountId: from.id,
+            toAccountId: to.id,
+            amount,
+            currencyCode: "USD",
+            datedOn,
+            purpose: "regularization",
+            notes,
+            regularizesKind: input.regularizesKind,
+            regularizesId: input.regularizesId,
+            clientRequestId: input.clientRequestId,
+            slipPhotoId: null,
+            reversesId: null,
+            createdAt: now(),
+            createdBy: input.actorId,
+          }).onConflictDoNothing().returning();
+        if (!saved) {
+          const concurrentReplay = await replayOutcome();
+          if (concurrentReplay) return concurrentReplay;
+          throw new Error("movement_transfer_not_saved");
+        }
+
+        const [coverageRow] = await tx.select({
+          total: sql<string>`COALESCE(SUM(${transfer.amount}), 0)::numeric(18, 4)::text`,
+        }).from(transfer).where(and(
+          eq(transfer.orgId, input.orgId),
+          eq(transfer.purpose, "regularization"),
+          eq(transfer.regularizesKind, input.regularizesKind),
+          eq(transfer.regularizesId, input.regularizesId),
+          isNull(transfer.reversesId),
+          sql`NOT EXISTS (
+            SELECT 1 FROM transfer reversal
+            WHERE reversal.org_id = ${transfer.orgId} AND reversal.reverses_id = ${transfer.id}
+          )`,
+        ));
+        const coverage = String(coverageRow?.total ?? "0.0000");
+        const remaining = remainingMoney(String(source.amount), coverage);
+        const regularized = shouldMarkRegularized({ sourceAmount: String(source.amount), regularizedAmount: coverage });
+        if (regularized && source.reconciliationStatus === "pending") {
+          if (input.regularizesKind === "contribution") {
+            await tx.update(contribution).set({ reconciliationStatus: "regularized" }).where(and(
+              eq(contribution.orgId, input.orgId),
+              eq(contribution.id, input.regularizesId),
+              eq(contribution.reconciliationStatus, "pending"),
+            ));
+          } else {
+            await tx.update(repayment).set({ reconciliationStatus: "regularized" }).where(and(
+              eq(repayment.orgId, input.orgId),
+              eq(repayment.id, input.regularizesId),
+              eq(repayment.reconciliationStatus, "pending"),
+            ));
+          }
+        }
+        const timestamp = now();
+        await tx.insert(auditLogEntry).values({
+          orgId: input.orgId,
+          actorKind: "member",
+          actorId: input.actorId,
+          actionKind: "movement.regularization",
+          subjectKind: "transfer",
+          subjectId: saved.id,
+          payloadSnapshot: {
+            fromAccountId: from.id,
+            toAccountId: to.id,
+            amount,
+            currencyCode: "USD",
+            datedOn,
+            notes,
+            regularizesKind: input.regularizesKind,
+            regularizesId: input.regularizesId,
+            clientRequestId: input.clientRequestId,
+            fundDelta: amount,
+            coverage,
+            remaining,
+            regularized,
+          },
+          reason: null,
+          at: timestamp,
+          createdAt: timestamp,
+        });
+        return { transfer: saved, coverage, remaining, regularized };
       });
     },
   };

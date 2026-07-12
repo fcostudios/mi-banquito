@@ -4,6 +4,7 @@ import { db } from "@mi-banquito/db";
 import { withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import {
   arAging,
+  account,
   auditLogEntry,
   contribution,
   contributionCycle,
@@ -50,6 +51,105 @@ type ChildLinks = {
   repayments: Map<string, string>;
   contributions: Map<string, string>;
 };
+
+export type CanonicalReceiptCommand = {
+  orgId: string;
+  actorId: string;
+  accountId: string;
+  memberId: string;
+  amount: string;
+  datedOn: string;
+  receivedVia: string;
+  slipPhotoId: string | null;
+  notes: string | null;
+  extraDecision: string | null;
+  targetLoanId: string | null;
+  targetCycleId: string | null;
+  overrideReason: string | null;
+};
+
+export type LegacyReceiptCommand = {
+  kind: "legacy_payment_command_v1";
+  legacy: true;
+  known: Partial<CanonicalReceiptCommand>;
+  unknownFields: Array<keyof CanonicalReceiptCommand>;
+};
+
+function isLegacyReceiptCommand(value: CanonicalReceiptCommand | LegacyReceiptCommand): value is LegacyReceiptCommand {
+  return "kind" in value && value.kind === "legacy_payment_command_v1";
+}
+
+export function assertCanonicalReceiptReplay(
+  expected: CanonicalReceiptCommand,
+  actual: CanonicalReceiptCommand | LegacyReceiptCommand,
+): void {
+  const comparable = (command: CanonicalReceiptCommand) => ({
+    orgId: command.orgId,
+    actorId: command.actorId,
+    accountId: command.accountId,
+    memberId: command.memberId,
+    amount: command.amount,
+    datedOn: command.datedOn,
+    receivedVia: command.receivedVia,
+    slipPhotoId: command.slipPhotoId,
+    notes: normalizeNullableText(command.notes),
+    extraDecision: command.extraDecision,
+    targetLoanId: command.targetLoanId,
+    targetCycleId: command.targetCycleId,
+    overrideReason: normalizeNullableText(command.overrideReason),
+  });
+  const expectedValue = comparable(expected);
+  if (isLegacyReceiptCommand(actual)) {
+    if (actual.legacy !== true || !actual.known || typeof actual.known !== "object" || Array.isArray(actual.known)
+      || !Array.isArray(actual.unknownFields)) {
+      throw new Error("payment_idempotency_conflict");
+    }
+    const known = actual.known as Record<string, unknown>;
+    const canonicalFields = Object.keys(expectedValue);
+    const unknownFields = new Set<string>(actual.unknownFields);
+    if (unknownFields.size !== actual.unknownFields.length
+      || [...unknownFields].some((field) => !canonicalFields.includes(field))
+      || canonicalFields.some((field) => Object.hasOwn(known, field) === unknownFields.has(field))) {
+      throw new Error("payment_idempotency_conflict");
+    }
+    const normalizedKnown = {
+      ...known,
+      ...(Object.hasOwn(known, "amount") ? { amount: money4(known.amount as string | number) } : {}),
+      ...(Object.hasOwn(known, "notes") ? { notes: normalizeNullableText(known.notes as string | null | undefined) } : {}),
+      ...(Object.hasOwn(known, "overrideReason") ? { overrideReason: normalizeNullableText(known.overrideReason as string | null | undefined) } : {}),
+    };
+    for (const [field, value] of Object.entries(normalizedKnown)) {
+      if (!(field in expectedValue) || JSON.stringify(expectedValue[field as keyof typeof expectedValue]) !== JSON.stringify(value)) {
+        throw new Error("payment_idempotency_conflict");
+      }
+    }
+    return;
+  }
+  const actualValue = comparable(actual);
+  if (JSON.stringify(actualValue) !== JSON.stringify(expectedValue)) {
+    throw new Error("payment_idempotency_conflict");
+  }
+}
+
+async function depositAccountForWrite(query: PaymentQuery, input: RecordMemberPaymentInput) {
+  const [groupFundAccount] = await query.select({ id: account.id }).from(account).where(and(
+    eq(account.orgId, input.orgId),
+    eq(account.status, "active"),
+    eq(account.isGroupFund, true),
+  )).limit(1);
+  if (!groupFundAccount) throw new Error("deposit_group_account_required");
+
+  const [selected] = await query.select().from(account).where(and(
+    eq(account.orgId, input.orgId),
+    eq(account.id, input.accountId),
+    eq(account.status, "active"),
+  )).for("update").limit(1);
+  if (!selected) throw new Error("deposit_account_unavailable");
+  return {
+    accountId: selected.id,
+    reconciliationStatus: selected.isGroupFund ? "regularized" as const : "pending" as const,
+  };
+}
 
 const ACTOR_KIND = "member";
 const ACTIVE_LOAN_STATUSES = new Set(["originated", "activo", "en_mora"]);
@@ -335,16 +435,56 @@ async function allocationContextForInput(query: PaymentQuery, input: RecordMembe
 async function existingReceiptResult(
   query: PaymentQuery,
   existingReceipt: Row,
+  expected: CanonicalReceiptCommand,
 ): Promise<RecordMemberPaymentResult> {
   const allocationRows = await query.select().from(paymentAllocation)
     .where(and(eq(paymentAllocation.orgId, String(existingReceipt.orgId)), eq(paymentAllocation.receiptId, String(existingReceipt.id))))
     .orderBy(paymentAllocation.sortOrder);
 
+  const allocations = (allocationRows as Row[]).map(allocationLineFromRow);
+  const persistedCommand = existingReceipt.commandPayload && typeof existingReceipt.commandPayload === "object"
+    ? existingReceipt.commandPayload as CanonicalReceiptCommand
+    : {
+    orgId: String(existingReceipt.orgId),
+    actorId: String(existingReceipt.createdBy),
+    accountId: String(existingReceipt.accountId),
+    memberId: String(existingReceipt.memberId),
+    amount: money4(existingReceipt.amount as string | number),
+    datedOn: String(existingReceipt.datedOn),
+    receivedVia: String(existingReceipt.receivedVia),
+    slipPhotoId: existingReceipt.slipPhotoId ? String(existingReceipt.slipPhotoId) : null,
+    notes: normalizeNullableText(existingReceipt.notes as string | null | undefined),
+    extraDecision: existingReceipt.extraDecision ? String(existingReceipt.extraDecision) : null,
+    targetLoanId: null,
+    targetCycleId: null,
+    overrideReason: null,
+  };
+  assertCanonicalReceiptReplay(expected, persistedCommand);
   return {
     receiptId: String(existingReceipt.id),
-    allocations: (allocationRows as Row[]).map(allocationLineFromRow),
+    allocations,
     unappliedAmount: "0.0000",
     requiresExtraDecision: false,
+  };
+}
+
+function canonicalReceiptCommand(
+  input: RecordMemberPaymentInput,
+): CanonicalReceiptCommand {
+  return {
+    orgId: input.orgId,
+    actorId: input.actorId,
+    accountId: input.accountId,
+    memberId: input.memberId,
+    amount: money4(input.amount),
+    datedOn: input.datedOn,
+    receivedVia: input.paymentSource,
+    slipPhotoId: input.slipPhotoId || null,
+    notes: normalizeNullableText(input.notes),
+    extraDecision: input.extraDecision || null,
+    targetLoanId: input.targetLoanId || null,
+    targetCycleId: input.targetCycleId || null,
+    overrideReason: normalizeNullableText(input.overrideReason),
   };
 }
 
@@ -484,14 +624,16 @@ export function createPaymentService(): PaymentService {
 
       const existingReceipt = await findExistingReceipt(db, input);
       if (existingReceipt) {
-        return existingReceiptResult(db, existingReceipt);
+        return existingReceiptResult(db, existingReceipt, canonicalReceiptCommand(input));
       }
 
       return withWritableTenantTransaction(input.orgId, async (tx) => {
+        const depositAccount = await depositAccountForWrite(tx, input);
         const allocation = await allocationContextForInput(tx, input);
         if (allocation.requiresExtraDecision) {
           throw new Error("payment_extra_decision_required");
         }
+        const canonicalCommand = canonicalReceiptCommand(input);
 
         const now = new Date();
         const receiptId = deterministicUuid(`payment_receipt:${input.orgId}:${input.memberId}:${input.clientRequestId}`);
@@ -503,6 +645,7 @@ export function createPaymentService(): PaymentService {
           id: receiptId,
           orgId: input.orgId,
           memberId: input.memberId,
+          accountId: depositAccount.accountId,
           amount: money4(input.amount),
           currencyCode: allocation.currencyCode,
           datedOn: input.datedOn,
@@ -510,6 +653,7 @@ export function createPaymentService(): PaymentService {
           slipPhotoId: input.slipPhotoId || null,
           notes: normalizeNullableText(input.notes),
           extraDecision: input.extraDecision || null,
+          commandPayload: canonicalCommand,
           clientRequestId: input.clientRequestId,
           createdAt: now,
           createdBy: input.actorId,
@@ -521,19 +665,20 @@ export function createPaymentService(): PaymentService {
             throw new Error("payment_receipt_conflict_without_existing_receipt");
           }
 
-          return existingReceiptResult(tx, conflictedReceipt);
+          return existingReceiptResult(tx, conflictedReceipt, canonicalCommand);
         }
 
         let childOrder = 1;
         for (const [loanId, lines] of groupLoanAllocations(allocation.allocations)) {
           const repaymentId = randomUUID();
+          const repaymentAmount = sumLines(lines);
           childLinks.repayments.set(loanId, repaymentId);
           await tx.insert(repayment).values({
             id: repaymentId,
             orgId: input.orgId,
             loanId,
             memberId: input.memberId,
-            amount: sumLines(lines),
+            amount: repaymentAmount,
             currencyCode: lines[0]?.currencyCode ?? "USD",
             appliedToPrincipal: sumLines(lines, "loan_principal"),
             appliedToInterest: sumLines(lines, "loan_interest"),
@@ -547,9 +692,31 @@ export function createPaymentService(): PaymentService {
             adjustmentCycleId: null,
             clientRequestId: deterministicUuid(`${input.clientRequestId}:repayment:${childOrder}:${loanId}`),
             paymentReceiptId: receiptId,
+            accountId: depositAccount.accountId,
+            reconciliationStatus: depositAccount.reconciliationStatus,
             createdAt: now,
             createdBy: input.actorId,
             createdByKind: ACTOR_KIND,
+          });
+          await tx.insert(auditLogEntry).values({
+            orgId: input.orgId,
+            actorKind: ACTOR_KIND,
+            actorId: input.actorId,
+            actionKind: "loan.repayment.create",
+            subjectKind: "repayment",
+            subjectId: repaymentId,
+            payloadSnapshot: {
+              paymentReceiptId: receiptId,
+              memberId: input.memberId,
+              loanId,
+              amount: repaymentAmount,
+              datedOn: input.datedOn,
+              accountId: depositAccount.accountId,
+              reconciliationStatus: depositAccount.reconciliationStatus,
+            },
+            reason: null,
+            at: now,
+            createdAt: now,
           });
           childOrder += 1;
         }
@@ -557,6 +724,7 @@ export function createPaymentService(): PaymentService {
         let extraSavingsCycleId: string | null = null;
         for (const [cycleKey, lines] of groupContributionAllocations(allocation.allocations)) {
           const contributionId = randomUUID();
+          const contributionAmount = sumLines(lines);
           const cycleId = cycleIdForContributionGroup({
             allocationLines: allocation.allocations,
             contributionObligations: allocation.contributionObligations,
@@ -578,7 +746,7 @@ export function createPaymentService(): PaymentService {
             memberId: input.memberId,
             kind: "regular",
             paymentSource: input.paymentSource,
-            amount: sumLines(lines),
+            amount: contributionAmount,
             currencyCode: lines[0]?.currencyCode ?? "USD",
             datedOn: input.datedOn,
             recordedAt: now,
@@ -589,9 +757,31 @@ export function createPaymentService(): PaymentService {
             adjustmentCycleId: null,
             clientRequestId: deterministicUuid(`${input.clientRequestId}:contribution:${childOrder}:${cycleKey}`),
             paymentReceiptId: receiptId,
+            accountId: depositAccount.accountId,
+            reconciliationStatus: depositAccount.reconciliationStatus,
             createdAt: now,
             createdBy: input.actorId,
             createdByKind: ACTOR_KIND,
+          });
+          await tx.insert(auditLogEntry).values({
+            orgId: input.orgId,
+            actorKind: ACTOR_KIND,
+            actorId: input.actorId,
+            actionKind: "contribution.create",
+            subjectKind: "contribution",
+            subjectId: contributionId,
+            payloadSnapshot: {
+              paymentReceiptId: receiptId,
+              memberId: input.memberId,
+              cycleId,
+              amount: contributionAmount,
+              datedOn: input.datedOn,
+              accountId: depositAccount.accountId,
+              reconciliationStatus: depositAccount.reconciliationStatus,
+            },
+            reason: null,
+            at: now,
+            createdAt: now,
           });
           childOrder += 1;
         }
@@ -652,6 +842,8 @@ export function createPaymentService(): PaymentService {
               repaymentId: line.repaymentId,
               contributionId: line.contributionId,
             })),
+            accountId: depositAccount.accountId,
+            reconciliationStatus: depositAccount.reconciliationStatus,
           },
           reason: null,
           at: now,

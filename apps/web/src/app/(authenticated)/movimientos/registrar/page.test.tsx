@@ -8,6 +8,7 @@ import { MovementForms, ecuadorTodayISO } from "./movement-forms";
 
 const expenseAction = async () => undefined;
 const transferAction = async () => undefined;
+const regularizationAction = async () => undefined;
 const componentSource = readFileSync(
   resolve(process.cwd(), "src/app/(authenticated)/movimientos/registrar/movement-forms.tsx"),
   "utf8",
@@ -24,8 +25,11 @@ function renderForms(search: Record<string, string> = {}, rows = accounts) {
     search={search}
     expenseAction={expenseAction}
     transferAction={transferAction}
+    regularizationAction={regularizationAction}
+    pendingDeposits={[]}
     expenseClientRequestId="33333333-3333-4333-8333-333333333333"
     transferClientRequestId="44444444-4444-4444-8444-444444444444"
+    regularizationClientRequestId="55555555-5555-4555-8555-555555555555"
     today="2026-07-11"
   />);
 }
@@ -111,8 +115,11 @@ describe("SCR-record-movement", () => {
       search={{ error: "invalid-form" }}
       expenseAction={expenseAction}
       transferAction={transferAction}
+      regularizationAction={regularizationAction}
+      pendingDeposits={[]}
       expenseClientRequestId="33333333-3333-4333-8333-333333333333"
       transferClientRequestId="44444444-4444-4444-8444-444444444444"
+      regularizationClientRequestId="55555555-5555-4555-8555-555555555555"
       today="2026-07-11"
     />);
     expect(screen.getByRole("alert")).toHaveTextContent("Revisa los datos del movimiento e intenta nuevamente.");
@@ -135,5 +142,36 @@ describe("SCR-record-movement", () => {
       expect(form).toHaveClass("grid", "grid-cols-1", "w-full");
     }
     expect(componentSource).not.toMatch(/w-\[(?:[4-9]\d\d|\d{4,})px\]/);
+  });
+
+  it("preselects a pending deposit and fixes its personal source account in regularization mode", () => {
+    render(<MovementForms
+      accounts={accounts}
+      search={{ regularizesKind: "contribution", regularizesId: "66666666-6666-4666-8666-666666666666" }}
+      expenseAction={expenseAction}
+      transferAction={transferAction}
+      regularizationAction={regularizationAction}
+      pendingDeposits={[{
+        id: "66666666-6666-4666-8666-666666666666",
+        sourceKind: "contribution",
+        memberName: "Ana",
+        accountId: "77777777-7777-4777-8777-777777777777",
+        accountName: "Cuenta personal",
+        amount: "50.0000",
+        remaining: "10.0000",
+        datedOn: "2026-07-10",
+      }]}
+      expenseClientRequestId="33333333-3333-4333-8333-333333333333"
+      transferClientRequestId="44444444-4444-4444-8444-444444444444"
+      regularizationClientRequestId="55555555-5555-4555-8555-555555555555"
+      today="2026-07-11"
+    />);
+
+    const section = screen.getByTestId("regularization_group");
+    expect(within(section).getByText("Cuenta personal")).toBeInTheDocument();
+    expect(within(section).getByRole("combobox", { name: "Hacia la cuenta del fondo" })).toHaveValue(accounts[0]?.id);
+    expect(within(section).getByRole("textbox", { name: "Monto (USD)" })).toHaveValue("10.0000");
+    expect(within(section).getByRole("checkbox", { name: /Confirmo/ })).toBeRequired();
+    expect(within(section).getByRole("button", { name: "Guardar regularización" })).toBeEnabled();
   });
 });

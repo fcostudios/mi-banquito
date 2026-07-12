@@ -97,6 +97,7 @@ describe("Sprint 2 form validation", () => {
       loanId: "22222222-2222-4222-8222-222222222222",
       amount: "125.0000",
       datedOn: "2026-06-30",
+      accountId: "44444444-4444-4444-8444-444444444444",
       slipPhotoId: "",
     });
 
@@ -123,10 +124,20 @@ describe("memberPaymentFormSchema", () => {
       amount: "80.00",
       datedOn: "2026-07-09",
       paymentSource: "cash_in_meeting",
+      accountId: "44444444-4444-4444-8444-444444444444",
     })).toMatchObject({
       amount: "80.00",
       paymentSource: "cash_in_meeting",
+      accountId: "44444444-4444-4444-8444-444444444444",
     });
+
+    expect(() => memberPaymentFormSchema.parse({
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      memberId: "22222222-2222-4222-8222-222222222222",
+      amount: "80.00",
+      datedOn: "2026-07-09",
+      paymentSource: "cash_in_meeting",
+    })).toThrow();
   });
 
   it("rejects loan-principal extra decision without an explicit open loan target", () => {

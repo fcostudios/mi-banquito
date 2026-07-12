@@ -15,7 +15,7 @@ const copy = messages.statementArchive;
 export default async function ScrStatementsArchivePage() {
   const session = await requireTreasurer();
   const rows = await createReportingService().listStatementArchive(session.orgId);
-  const latestPeriodClose = rows.find((row) => row.kind === "monthly_close" && row.periodCloseId);
+  const latestPeriodClose = rows.find((row) => row.kind === "monthly_close" && row.periodCloseId && row.artifactStatus === "ready");
   const memberRows = rows.filter((row) => row.kind === "monthly_member");
 
   return (
@@ -56,9 +56,11 @@ export default async function ScrStatementsArchivePage() {
                   <td className="px-4 py-3 text-text-primary">{ecDate.format(row.generatedAt)}</td>
                   <td className="px-4 py-3 font-mono text-xs text-text-secondary">{row.canonicalPayloadHash.slice(0, 12)}</td>
                   <td className="px-4 py-3">
-                    <Link className="text-primary underline-offset-4 hover:underline" href={row.pdfUri}>
-                      {copy.openPdf}
-                    </Link>
+                    {row.kind !== "monthly_close" || row.artifactStatus === "ready" ? (
+                      <Link className="text-primary underline-offset-4 hover:underline" href={row.pdfUri}>
+                        {copy.openPdf}
+                      </Link>
+                    ) : <span className="text-text-secondary">{messages.monthlyClose.artifactProcessing}</span>}
                     {row.kind === "monthly_member" ? (
                       <form action={shareStatementAction} className="mt-2">
                         <input type="hidden" name="statementArchiveId" value={row.id} />

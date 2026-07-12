@@ -553,7 +553,7 @@ async function latestShareOutCommitmentRows(input: {
     SELECT
       cc.year,
       cc.commitment::numeric(18, 4)::text AS commitment,
-      COALESCE(projected.available_capital, capital.available_capital, 0)::numeric(18, 4)::text AS projected_available,
+      projected.available_capital::numeric(18, 4)::text AS projected_available,
       cc.source_kind,
       cc.status,
       cc.version,
@@ -561,15 +561,27 @@ async function latestShareOutCommitmentRows(input: {
       cc.committed_at
     FROM commitment_candidates cc
     LEFT JOIN LATERAL (
-      SELECT pl.available_capital
-      FROM mv_liquidez_proyectada pl
-      WHERE pl.org_id = ${input.orgId}
-        AND EXTRACT(YEAR FROM pl.month_on)::integer = cc.year
-      ORDER BY pl.month_on DESC
-      LIMIT 1
+      SELECT (
+        fund_pool_balance(${input.orgId})
+        - COALESCE((
+          SELECT base_fund_pool FROM mv_base_fund_pool_per_fiscal_year
+          WHERE org_id = ${input.orgId}
+          ORDER BY fiscal_year DESC LIMIT 1
+        ), 0)
+        + COALESCE((
+          SELECT SUM(
+            GREATEST(0, schedule.principal_due - schedule.paid_principal_to_date)
+            + GREATEST(0, schedule.interest_due - schedule.paid_interest_to_date)
+          )
+          FROM loan_schedule schedule
+          JOIN loan active_loan ON active_loan.org_id = ${input.orgId} AND active_loan.id = schedule.loan_id
+          WHERE schedule.org_id = ${input.orgId}
+            AND active_loan.status IN ('originated', 'activo', 'en_mora')
+            AND schedule.status <> 'pagado'
+            AND EXTRACT(YEAR FROM schedule.due_on)::integer <= cc.year
+        ), 0)
+      )::numeric(18, 4) AS available_capital
     ) projected ON TRUE
-    LEFT JOIN mv_available_capital capital
-      ON capital.org_id = ${input.orgId}
     ORDER BY cc.year, cc.committed_at DESC, cc.version DESC
   `);
   return latestCommitmentByYear(executeRows(result), input.currentYear);

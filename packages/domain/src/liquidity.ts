@@ -42,19 +42,7 @@ export function createLiquidityService(): LiquidityService {
       const rows = await withTenantTransaction(orgId, async (tx) => {
         const result = await tx.execute<LiveLiquidityRow>(sql`
           WITH movement_pool AS (
-            SELECT COALESCE(SUM(delta), 0)::numeric(18, 4) AS pool_balance
-            FROM (
-              SELECT amount AS delta FROM contribution WHERE org_id = ${orgId}
-              UNION ALL
-              SELECT amount AS delta FROM repayment WHERE org_id = ${orgId} AND reverses_id IS NULL
-              UNION ALL
-              SELECT -amount AS delta FROM withdrawal WHERE org_id = ${orgId} AND reverses_id IS NULL
-              UNION ALL
-              SELECT -amount AS delta FROM expense
-                WHERE org_id = ${orgId} AND status = 'paid' AND reverses_id IS NULL
-              UNION ALL
-              SELECT -amount AS delta FROM loan_disbursement WHERE org_id = ${orgId}
-            ) tenant_movement_delta
+            SELECT fund_pool_balance(${orgId}) AS pool_balance
           ),
           latest_base_fund AS (
             SELECT COALESCE(SUM(amount), 0)::numeric(18, 4) AS base_fund_pool

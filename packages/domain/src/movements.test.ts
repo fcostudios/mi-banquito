@@ -9,15 +9,21 @@ import {
   alert,
   auditLogEntry,
   availableCapital,
+  cashBalances,
   contribution,
   contributionCycle,
   expense,
   loan,
   member,
   organization,
+  groupConfig,
+  periodClose,
   projectedLiquidity,
+  reconciliationCycle,
   repayment,
   slipPhoto,
+  statementArchive,
+  statementArtifactEvent,
   transfer,
 } from "@mi-banquito/db/schema";
 
@@ -45,7 +51,13 @@ let parsePositiveMoney4: typeof import("./movements")["parsePositiveMoney4"];
 let assertTransferAccounts: typeof import("./movements")["assertTransferAccounts"];
 let transferAccountDeltas: typeof import("./movements")["transferAccountDeltas"];
 let transferFundDelta: typeof import("./movements")["transferFundDelta"];
+let pendingDepositFundDelta: typeof import("./movements")["pendingDepositFundDelta"];
+let shouldMarkRegularized: typeof import("./movements")["shouldMarkRegularized"];
 let createLiquidityService: typeof import("./liquidity")["createLiquidityService"];
+let createLedgerService: typeof import("./ledger")["createLedgerService"];
+let createReportingService: typeof import("./reporting")["createReportingService"];
+let canonicalJson: typeof import("./reporting")["canonicalJson"];
+let sha256Hex: typeof import("./reporting")["sha256Hex"];
 
 describe("movement invariants", () => {
   beforeAll(async () => {
@@ -56,6 +68,8 @@ describe("movement invariants", () => {
       parsePositiveMoney4,
       transferAccountDeltas,
       transferFundDelta,
+      pendingDepositFundDelta,
+      shouldMarkRegularized,
     } = await import("./movements"));
   });
 
@@ -131,6 +145,14 @@ describe("movement invariants", () => {
       to: "25.2500",
     });
   });
+
+  it("keeps pending deposits outside the fund until regularizing coverage is complete", () => {
+    expect(pendingDepositFundDelta({ reconciliationStatus: "pending", amount: "100.0000" })).toBe("0.0000");
+    expect(pendingDepositFundDelta({ reconciliationStatus: "regularized", amount: "100.0000" })).toBe("100.0000");
+    expect(shouldMarkRegularized({ sourceAmount: "100.0000", regularizedAmount: "99.9999" })).toBe(false);
+    expect(shouldMarkRegularized({ sourceAmount: "100.0000", regularizedAmount: "100.0000" })).toBe(true);
+    expect(shouldMarkRegularized({ sourceAmount: "100.0000", regularizedAmount: "120.0000" })).toBe(true);
+  });
 });
 
 describe("movement service with PostgreSQL", () => {
@@ -142,6 +164,8 @@ describe("movement service with PostgreSQL", () => {
     ({ withTenantTransaction } = await import("@mi-banquito/db/tenant"));
     ({ createMovementService, transferAccountDeltas, transferFundDelta } = await import("./movements"));
     ({ createLiquidityService } = await import("./liquidity"));
+    ({ createLedgerService } = await import("./ledger"));
+    ({ createReportingService, canonicalJson, sha256Hex } = await import("./reporting"));
 
     for (const [id, displayName] of [[ORG_A, "Movements test A"], [ORG_B, "Movements test B"]] as const) {
       await db.insert(organization).values({
@@ -168,17 +192,23 @@ describe("movement service with PostgreSQL", () => {
         await tx.delete(auditLogEntry).where(eq(auditLogEntry.orgId, orgId));
         await tx.delete(alert).where(eq(alert.orgId, orgId));
         await tx.delete(transfer).where(eq(transfer.orgId, orgId));
+        await tx.delete(statementArtifactEvent).where(eq(statementArtifactEvent.orgId, orgId));
+        await tx.delete(statementArchive).where(eq(statementArchive.orgId, orgId));
+        await tx.delete(periodClose).where(eq(periodClose.orgId, orgId));
+        await tx.delete(reconciliationCycle).where(eq(reconciliationCycle.orgId, orgId));
         await tx.delete(expense).where(eq(expense.orgId, orgId));
         await tx.delete(slipPhoto).where(eq(slipPhoto.orgId, orgId));
         await tx.delete(repayment).where(eq(repayment.orgId, orgId));
         await tx.delete(contribution).where(eq(contribution.orgId, orgId));
         await tx.delete(loan).where(eq(loan.orgId, orgId));
         await tx.delete(account).where(eq(account.orgId, orgId));
+        await tx.delete(groupConfig).where(eq(groupConfig.orgId, orgId));
         await tx.delete(contributionCycle).where(eq(contributionCycle.orgId, orgId));
         await tx.delete(member).where(eq(member.orgId, orgId));
       });
     }
     await db.execute(sql`REFRESH MATERIALIZED VIEW mv_available_capital`);
+    await db.execute(sql`REFRESH MATERIALIZED VIEW mv_cash_balances`);
     await db.execute(sql`REFRESH MATERIALIZED VIEW mv_liquidez_proyectada`);
   });
 
@@ -191,11 +221,12 @@ describe("movement service with PostgreSQL", () => {
     name: string;
     isGroupFund?: boolean;
     status?: "active" | "archived";
+    type?: "group_bank" | "cash_box" | "treasurer_personal" | "external";
   }) {
     const [row] = await db.insert(account).values({
       orgId: input.orgId ?? ORG_A,
       name: input.name,
-      type: input.isGroupFund === false ? "external" : "group_bank",
+      type: input.type ?? (input.isGroupFund === false ? "external" : "group_bank"),
       isGroupFund: input.isGroupFund ?? true,
       status: input.status ?? "active",
       createdAt: NOW,
@@ -275,6 +306,57 @@ describe("movement service with PostgreSQL", () => {
     `);
   }
 
+  async function seedPendingContribution(input: {
+    orgId?: string;
+    amount?: string;
+    accountId?: string;
+  } = {}) {
+    const orgId = input.orgId ?? ORG_A;
+    const sourceAccount = input.accountId
+      ? { id: input.accountId }
+      : await seedAccount({ orgId, name: `Personal ${randomUUID()}`, isGroupFund: false });
+    const memberId = randomUUID();
+    const cycleId = randomUUID();
+    await db.insert(member).values({
+      id: memberId,
+      orgId,
+      displayName: `Pending member ${memberId}`,
+      joinedOn: "2026-01-01",
+      role: "aportante",
+      status: "activo",
+      initialSavingsBalance: "0.0000",
+      createdAt: NOW,
+      createdBy: ACTOR_ID,
+      createdByKind: "system",
+    });
+    await db.insert(contributionCycle).values({
+      id: cycleId,
+      orgId,
+      cycleLabel: `pending-${cycleId}`,
+      kind: "monthly",
+      opensOn: "2026-07-01",
+      closesOn: "2026-07-31",
+      expectedAmountPerMember: "100.0000",
+      currencyCode: "USD",
+      status: "open",
+      createdAt: NOW,
+      createdBy: ACTOR_ID,
+      createdByKind: "member",
+    });
+    const id = randomUUID();
+    await db.execute(sql`
+      INSERT INTO contribution (
+        id, org_id, cycle_id, member_id, kind, payment_source, amount, currency_code,
+        dated_on, recorded_at, account_id, reconciliation_status, created_at, created_by, created_by_kind
+      ) VALUES (
+        ${id}, ${orgId}, ${cycleId}, ${memberId}, 'regular', 'bank_transfer', ${input.amount ?? "100.0000"}, 'USD',
+        '2026-07-10', ${NOW}, ${sourceAccount.id}, 'pending', ${NOW}, ${ACTOR_ID}, 'member'
+      )
+    `);
+    const row = { id, orgId, cycleId, memberId, accountId: sourceAccount.id, amount: input.amount ?? "100.0000" };
+    return { row, memberId, sourceAccountId: sourceAccount.id };
+  }
+
   it("lists only active group-fund accounts for the requested tenant", async () => {
     await seedAccount({ name: "Zeta" });
     await seedAccount({ name: "Archived", status: "archived" });
@@ -335,7 +417,872 @@ describe("movement service with PostgreSQL", () => {
       sourceKind: "contribution",
       amount: "25.0000",
       datedOn: "2026-07-10",
+      memberName: expect.stringContaining("Pending member"),
     })]);
+  });
+
+  it("regularizes only after total non-reversed coverage reaches the pending source amount", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingContribution();
+    const target = await seedAccount({ name: "Group target" });
+
+    const partial = await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "40.0000",
+      datedOn: "2026-07-11",
+      notes: "Primera parte",
+      clientRequestId: randomUUID(),
+    });
+    expect(partial.regularized).toBe(false);
+
+    const full = await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "60.0000",
+      datedOn: "2026-07-12",
+      notes: "Completa cobertura",
+      clientRequestId: randomUUID(),
+    });
+    expect(full.regularized).toBe(true);
+
+    const [source] = await withTenantTransaction(ORG_A, (tx) => tx.select({ reconciliationStatus: contribution.reconciliationStatus }).from(contribution)
+      .where(and(eq(contribution.orgId, ORG_A), eq(contribution.id, pending.row.id))));
+    const transfers = await withTenantTransaction(ORG_A, (tx) => tx.select().from(transfer)
+      .where(and(eq(transfer.orgId, ORG_A), eq(transfer.regularizesId, pending.row.id))));
+    expect(source?.reconciliationStatus).toBe("regularized");
+    expect(transfers.map((row) => [row.fromAccountId, row.toAccountId, row.amount, row.purpose])).toEqual([
+      [pending.sourceAccountId, target.id, "40.0000", "regularization"],
+      [pending.sourceAccountId, target.id, "60.0000", "regularization"],
+    ]);
+  });
+
+  it("verifies the archived payload after live renames and backdated movements", async () => {
+    const group = await seedAccount({ name: "Archived bank label" });
+    await seedInflows({
+      orgId: ORG_A,
+      accountId: group.id,
+      contributionAmount: "10.0000",
+      repaymentAmount: "1.0000",
+    });
+    const payload = {
+      kind: "monthly_member",
+      orgName: "Archived organization label",
+      periodLabel: "Asamblea extraordinaria",
+      verificationMovements: [{
+        id: "archived-movement",
+        kind: "contribution",
+        status: "regularized",
+        amount: "10.0000",
+        datedOn: "2026-07-10",
+        accountName: "Archived bank label",
+        label: "Aporte regularizado · Archived bank label",
+      }],
+      sections: [],
+    };
+    const hash = sha256Hex(canonicalJson(payload));
+    await withTenantTransaction(ORG_A, async (tx) => {
+      await tx.insert(statementArchive).values({
+        orgId: ORG_A,
+        kind: "monthly_member",
+        memberId: null,
+        periodLabel: "Asamblea extraordinaria",
+        pdfUri: `/statement-archive/public/${hash}.pdf`,
+        canonicalPayloadHash: hash,
+        canonicalPayload: payload,
+        generatedAt: NOW,
+        periodCloseId: null,
+        yearEndShareOutId: null,
+        byteSize: Buffer.byteLength(canonicalJson(payload), "utf8"),
+        createdAt: NOW,
+        createdByKind: "system",
+      });
+      await tx.update(account).set({ name: "Renamed live bank" }).where(and(
+        eq(account.orgId, ORG_A), eq(account.id, group.id),
+      ));
+      await tx.update(organization).set({ displayName: "Renamed live organization" }).where(eq(organization.id, ORG_A));
+    });
+    await seedInflows({
+      orgId: ORG_A,
+      accountId: group.id,
+      contributionAmount: "999.0000",
+      repaymentAmount: "999.0000",
+    });
+
+    const verified = await createReportingService().verifyStatementHash(hash);
+
+    expect(verified).toEqual({
+      matched: true,
+      groupName: "Archived organization label",
+      generatedAt: NOW.toISOString(),
+      movements: payload.verificationMovements,
+    });
+    expect(sha256Hex(canonicalJson(payload))).toBe(hash);
+    await db.update(organization).set({ displayName: "Movements test A" }).where(eq(organization.id, ORG_A));
+  });
+
+  it("keeps a legacy null-payload archive verifiable after account renames and backdated movements", async () => {
+    const accountRow = await seedAccount({ name: "Legacy archived account" });
+    const legacyHash = "b".repeat(64);
+    await withTenantTransaction(ORG_A, async (tx) => {
+      await tx.insert(statementArchive).values({
+        orgId: ORG_A,
+        kind: "monthly_member",
+        memberId: null,
+        periodLabel: "Asamblea extraordinaria",
+        pdfUri: `/statement-archive/public/${legacyHash}.pdf`,
+        canonicalPayloadHash: legacyHash,
+        canonicalPayload: null,
+        legacyVerificationPayload: {
+          legacy: true,
+          orgId: ORG_A,
+          kind: "monthly_member",
+          periodLabel: "Asamblea extraordinaria",
+          canonicalPayloadHash: legacyHash,
+        },
+        generatedAt: NOW,
+        periodCloseId: null,
+        yearEndShareOutId: null,
+        byteSize: 321,
+        createdAt: NOW,
+        createdByKind: "system",
+      });
+      await tx.update(account).set({ name: "Renamed after legacy archive" }).where(and(
+        eq(account.orgId, ORG_A), eq(account.id, accountRow.id),
+      ));
+    });
+    await seedInflows({
+      orgId: ORG_A,
+      accountId: accountRow.id,
+      contributionAmount: "777.0000",
+      repaymentAmount: "333.0000",
+    });
+
+    await expect(createReportingService().verifyStatementHash(legacyHash)).resolves.toEqual({
+      matched: true,
+      groupName: "Archivo historico",
+      generatedAt: NOW.toISOString(),
+      movements: [],
+      legacy: true,
+      periodLabel: "Asamblea extraordinaria",
+    });
+  });
+
+  it("rejects coverage above the remaining amount while allowing an exact 40 plus 60 split", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingContribution();
+    const target = await seedAccount({ name: "Coverage cap target" });
+
+    await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "40.0000",
+      datedOn: "2026-07-11",
+      clientRequestId: randomUUID(),
+    });
+    await expect(service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "100.0000",
+      datedOn: "2026-07-12",
+      clientRequestId: randomUUID(),
+    })).rejects.toThrow("regularization_amount_exceeds_remaining");
+
+    const completed = await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "60.0000",
+      datedOn: "2026-07-12",
+      clientRequestId: randomUUID(),
+    });
+    expect(completed).toMatchObject({ coverage: "100.0000", remaining: "0.0000", regularized: true });
+  });
+
+  it("allows only one concurrent regularization when both commands target the same remaining amount", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingContribution();
+    const target = await seedAccount({ name: "Concurrent cap target" });
+    const command = {
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution" as const,
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "100.0000",
+      datedOn: "2026-07-12",
+    };
+
+    const results = await Promise.allSettled([
+      service.regularizePendingDeposit({ ...command, clientRequestId: randomUUID() }),
+      service.regularizePendingDeposit({ ...command, clientRequestId: randomUUID() }),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toEqual([
+      expect.objectContaining({ reason: expect.objectContaining({ message: "regularization_source_already_regularized" }) }),
+    ]);
+    const rows = await withTenantTransaction(ORG_A, (tx) => tx.select().from(transfer).where(and(
+      eq(transfer.orgId, ORG_A),
+      eq(transfer.regularizesId, pending.row.id),
+    )));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.amount).toBe("100.0000");
+  });
+
+  it("enforces the cumulative cap for direct SQL and excludes reversed transfers from coverage", async () => {
+    const pending = await seedPendingContribution();
+    const target = await seedAccount({ name: "Database cap target" });
+    const service = createMovementService({ now: () => NOW });
+    const partial = await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "40.0000",
+      datedOn: "2026-07-11",
+      clientRequestId: randomUUID(),
+    });
+
+    await expect(db.execute(sql`
+      INSERT INTO transfer (
+        org_id, from_account_id, to_account_id, amount, currency_code, dated_on,
+        purpose, regularizes_kind, regularizes_id, created_at, created_by
+      ) VALUES (
+        ${ORG_A}, ${pending.sourceAccountId}, ${target.id}, 100.0000, 'USD', '2026-07-12',
+        'regularization', 'contribution', ${pending.row.id}, ${NOW}, ${ACTOR_ID}
+      )
+    `)).rejects.toThrow("regularization_amount_exceeds_remaining");
+
+    await db.execute(sql.raw("SET session_replication_role = replica"));
+    const reversalId = randomUUID();
+    await db.insert(transfer).values({
+      id: reversalId,
+      orgId: ORG_A,
+      fromAccountId: target.id,
+      toAccountId: pending.sourceAccountId,
+      amount: "40.0000",
+      currencyCode: "USD",
+      datedOn: "2026-07-12",
+      purpose: "regularization_reversal",
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      reversesId: partial.transfer.id,
+      createdAt: NOW,
+      createdBy: ACTOR_ID,
+    });
+    await db.execute(sql.raw("SET session_replication_role = origin"));
+
+    await expect(service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "100.0000",
+      datedOn: "2026-07-13",
+      clientRequestId: randomUUID(),
+    })).resolves.toMatchObject({ coverage: "100.0000", regularized: true });
+  });
+
+  it("derives contribution reconciliation status from the tenant-owned deposit account", async () => {
+    const seeded = await seedPendingContribution();
+    const groupAccount = await seedAccount({ name: "Derived group account" });
+    const foreignAccount = await seedAccount({ orgId: ORG_B, name: "Foreign derived account" });
+    const personalId = randomUUID();
+    const groupId = randomUUID();
+
+    await db.execute(sql`
+      INSERT INTO contribution (
+        id, org_id, cycle_id, member_id, kind, payment_source, amount, currency_code,
+        dated_on, recorded_at, account_id, reconciliation_status, created_at, created_by, created_by_kind
+      ) VALUES
+        (${personalId}, ${ORG_A}, ${seeded.row.cycleId}, ${seeded.memberId}, 'regular', 'bank_transfer',
+         '10.0000', 'USD', '2026-07-13', ${NOW}, ${seeded.sourceAccountId}, 'regularized', ${NOW}, ${ACTOR_ID}, 'member'),
+        (${groupId}, ${ORG_A}, ${seeded.row.cycleId}, ${seeded.memberId}, 'regular', 'bank_transfer',
+         '11.0000', 'USD', '2026-07-13', ${NOW}, ${groupAccount.id}, 'pending', ${NOW}, ${ACTOR_ID}, 'member')
+    `);
+
+    const statuses = await withTenantTransaction(ORG_A, (tx) => tx.select({
+      id: contribution.id,
+      reconciliationStatus: contribution.reconciliationStatus,
+    }).from(contribution).where(inArray(contribution.id, [personalId, groupId])));
+    expect(statuses).toEqual(expect.arrayContaining([
+      { id: personalId, reconciliationStatus: "pending" },
+      { id: groupId, reconciliationStatus: "regularized" },
+    ]));
+
+    await expect(db.execute(sql`
+      INSERT INTO contribution (
+        org_id, cycle_id, member_id, kind, payment_source, amount, currency_code,
+        dated_on, recorded_at, account_id, reconciliation_status, created_at, created_by, created_by_kind
+      ) VALUES (
+        ${ORG_A}, ${seeded.row.cycleId}, ${seeded.memberId}, 'regular', 'bank_transfer', '12.0000', 'USD',
+        '2026-07-13', ${NOW}, ${foreignAccount.id}, 'regularized', ${NOW}, ${ACTOR_ID}, 'member'
+      )
+    `)).rejects.toThrow("deposit_account_unavailable");
+  });
+
+  it("rejects a direct status flip while regularization coverage is partial", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingContribution();
+    const target = await seedAccount({ name: "Partial coverage target" });
+    await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "99.9999",
+      datedOn: "2026-07-12",
+      clientRequestId: randomUUID(),
+    });
+
+    await expect(db.execute(sql`
+      UPDATE contribution
+      SET reconciliation_status = 'regularized'
+      WHERE org_id = ${ORG_A} AND id = ${pending.row.id}
+    `))
+      .rejects.toThrow("regularization_coverage_incomplete");
+  });
+
+  it("persists and fully regularizes repayment deposits through the same guarded path", async () => {
+    const personalAccount = await seedAccount({ name: "Repayment personal", isGroupFund: false });
+    const groupAccount = await seedAccount({ name: "Repayment group" });
+    await seedInflows({
+      orgId: ORG_A,
+      accountId: personalAccount.id,
+      contributionAmount: "1.0000",
+      repaymentAmount: "75.0000",
+    });
+    const [source] = await withTenantTransaction(ORG_A, (tx) => tx.select({
+      id: repayment.id,
+      reconciliationStatus: repayment.reconciliationStatus,
+    }).from(repayment).where(and(
+      eq(repayment.orgId, ORG_A),
+      eq(repayment.accountId, personalAccount.id),
+    )).limit(1));
+    expect(source?.reconciliationStatus).toBe("pending");
+    if (!source) throw new Error("test_repayment_not_created");
+
+    const service = createMovementService({ now: () => NOW });
+    const partial = await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "repayment",
+      regularizesId: source.id,
+      toAccountId: groupAccount.id,
+      amount: "25.0000",
+      datedOn: "2026-07-12",
+      clientRequestId: randomUUID(),
+    });
+    expect(partial).toMatchObject({ coverage: "25.0000", regularized: false });
+
+    const completed = await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "repayment",
+      regularizesId: source.id,
+      toAccountId: groupAccount.id,
+      amount: "50.0000",
+      datedOn: "2026-07-13",
+      clientRequestId: randomUUID(),
+    });
+    expect(completed).toMatchObject({ coverage: "75.0000", regularized: true });
+    const [updated] = await withTenantTransaction(ORG_A, (tx) => tx.select({
+      reconciliationStatus: repayment.reconciliationStatus,
+    }).from(repayment).where(and(eq(repayment.orgId, ORG_A), eq(repayment.id, source.id))));
+    expect(updated?.reconciliationStatus).toBe("regularized");
+  });
+
+  it("rejects non-group and cross-tenant regularization targets without transfer, audit, or status flip", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingContribution();
+    const personalTarget = await seedAccount({ name: "Other personal", isGroupFund: false });
+    const foreignTarget = await seedAccount({ orgId: ORG_B, name: "Foreign group" });
+
+    for (const toAccountId of [personalTarget.id, foreignTarget.id]) {
+      await expect(service.regularizePendingDeposit({
+        orgId: ORG_A,
+        actorId: ACTOR_ID,
+        regularizesKind: "contribution",
+        regularizesId: pending.row.id,
+        toAccountId,
+        amount: "100.0000",
+        datedOn: "2026-07-11",
+        clientRequestId: randomUUID(),
+      })).rejects.toThrow("regularization_target_unavailable");
+    }
+
+    const [source] = await withTenantTransaction(ORG_A, (tx) => tx.select({ reconciliationStatus: contribution.reconciliationStatus }).from(contribution)
+      .where(eq(contribution.id, pending.row.id)));
+    expect(source?.reconciliationStatus).toBe("pending");
+    expect(await withTenantTransaction(ORG_A, (tx) => tx.select().from(transfer).where(eq(transfer.orgId, ORG_A)))).toEqual([]);
+    expect(await withTenantTransaction(ORG_A, (tx) => tx.select().from(auditLogEntry).where(eq(auditLogEntry.orgId, ORG_A)))).toEqual([]);
+  });
+
+  it("replays the original partial outcome after later completion and target archival", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingContribution();
+    const target = await seedAccount({ name: "Concurrent target" });
+    const clientRequestId = randomUUID();
+    const command = {
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution" as const,
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "40.0000",
+      datedOn: "2026-07-11",
+      notes: "Concurrente",
+      clientRequestId,
+    };
+
+    const results = await Promise.all([service.regularizePendingDeposit(command), service.regularizePendingDeposit(command)]);
+    expect(new Set(results.map((result) => result.transfer.id)).size).toBe(1);
+    expect(results).toEqual([
+      expect.objectContaining({ coverage: "40.0000", regularized: false }),
+      expect.objectContaining({ coverage: "40.0000", regularized: false }),
+    ]);
+
+    await service.regularizePendingDeposit({
+      ...command,
+      amount: "60.0000",
+      notes: "Completa despues",
+      clientRequestId: randomUUID(),
+    });
+    await db.update(account).set({ status: "archived" }).where(and(eq(account.orgId, ORG_A), eq(account.id, target.id)));
+
+    await expect(service.regularizePendingDeposit(command)).resolves.toMatchObject({
+      transfer: { id: results[0]?.transfer.id },
+      coverage: "40.0000",
+      regularized: false,
+    });
+    await expect(service.regularizePendingDeposit({ ...command, amount: "41.0000" }))
+      .rejects.toThrow("movement_idempotency_conflict");
+
+    const transfers = await withTenantTransaction(ORG_A, (tx) => tx.select().from(transfer)
+      .where(and(eq(transfer.orgId, ORG_A), eq(transfer.clientRequestId, clientRequestId))));
+    const audits = await withTenantTransaction(ORG_A, (tx) => tx.select().from(auditLogEntry)
+      .where(and(
+        eq(auditLogEntry.orgId, ORG_A),
+        eq(auditLogEntry.actionKind, "movement.regularization"),
+        eq(auditLogEntry.subjectId, results[0]!.transfer.id),
+      )));
+    expect(transfers).toHaveLength(1);
+    expect(audits).toHaveLength(1);
+  });
+
+  it("projects only live group-fund inflows and exact regularization transfer coverage", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingContribution();
+    const target = await seedAccount({ name: "Projection target" });
+    const secondGroup = await seedAccount({ name: "Projection transfer target" });
+
+    expect((await createLiquidityService().getProjection(ORG_A)).poolBalance).toBe("0.0000");
+    await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "40.0000",
+      datedOn: "2026-07-11",
+      clientRequestId: randomUUID(),
+    });
+    expect((await createLiquidityService().getProjection(ORG_A)).poolBalance).toBe("40.0000");
+    await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "60.0000",
+      datedOn: "2026-07-12",
+      clientRequestId: randomUUID(),
+    });
+    expect((await createLiquidityService().getProjection(ORG_A)).poolBalance).toBe("100.0000");
+    await service.recordTransfer({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      fromAccountId: target.id,
+      toAccountId: secondGroup.id,
+      amount: "25.0000",
+      datedOn: "2026-07-13",
+      clientRequestId: randomUUID(),
+    });
+    expect((await createLiquidityService().getProjection(ORG_A)).poolBalance).toBe("100.0000");
+  });
+
+  it("projects pending and regularization cash effects into the correct bank and cash buckets", async () => {
+    const movementService = createMovementService({ now: () => NOW });
+    const pending = await seedPendingContribution();
+    await seedInflows({
+      orgId: ORG_A,
+      accountId: pending.sourceAccountId,
+      contributionAmount: "1.0000",
+      repaymentAmount: "50.0000",
+    });
+    const bank = await seedAccount({ name: "Cash projection bank", type: "group_bank" });
+    const cash = await seedAccount({ name: "Cash projection box", type: "cash_box" });
+    const readLive = async () => {
+      const row = await createLedgerService().getCashBalances(ORG_A);
+      return { bankBalance: row.bankBalance, pettyCashBalance: row.pettyCashBalance };
+    };
+
+    expect(await readLive()).toEqual({ bankBalance: "0.0000", pettyCashBalance: "0.0000" });
+    await movementService.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: bank.id,
+      amount: "40.0000",
+      datedOn: "2026-07-11",
+      clientRequestId: randomUUID(),
+    });
+    expect(await readLive()).toEqual({ bankBalance: "40.0000", pettyCashBalance: "0.0000" });
+    await movementService.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: bank.id,
+      amount: "60.0000",
+      datedOn: "2026-07-12",
+      clientRequestId: randomUUID(),
+    });
+    expect(await readLive()).toEqual({ bankBalance: "100.0000", pettyCashBalance: "0.0000" });
+    await movementService.recordTransfer({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      fromAccountId: bank.id,
+      toAccountId: cash.id,
+      amount: "25.0000",
+      datedOn: "2026-07-13",
+      clientRequestId: randomUUID(),
+    });
+    const afterTransfer = await readLive();
+    expect(afterTransfer).toEqual({ bankBalance: "75.0000", pettyCashBalance: "25.0000" });
+    expect(Number(afterTransfer.bankBalance) + Number(afterTransfer.pettyCashBalance)).toBe(100);
+
+    await db.execute(sql`REFRESH MATERIALIZED VIEW mv_cash_balances`);
+    const [materialized] = await db.select().from(cashBalances).where(eq(cashBalances.orgId, ORG_A));
+    expect(materialized).toMatchObject(afterTransfer);
+  });
+
+  it("rejects monthly close with pending rows and enables it immediately after the last regularization", async () => {
+    const movementService = createMovementService({ now: () => NOW });
+    const pending = await seedPendingContribution();
+    const target = await seedAccount({ name: "Close target" });
+    await db.insert(groupConfig).values({
+      orgId: ORG_A,
+      version: 1,
+      validFrom: new Date("2026-01-01T00:00:00.000Z"),
+      validTo: null,
+      contributionCycleKind: "monthly",
+      contributionAmount: "100.0000",
+      currencyCode: "USD",
+      loanRateModel: "declining_balance",
+      loanRateValue: "1.0000",
+      loanRatePeriodUnit: "monthly",
+      loanGracePeriods: 0,
+      loanToSavingsCapRatio: "3.00",
+      interestResolution: "daily",
+      repaymentSplitRule: "interest_first",
+      paysSavingsInterest: false,
+      savingsInterestRate: null,
+      yearEndShareOutFormula: "proportional_time_weighted",
+      safetyMarginAmount: "0.0000",
+      reconciliationToleranceAmount: "0.0000",
+      lateThresholdDays: 1,
+      moraThresholdDays: 5,
+      fiscalYearStartMonth: 1,
+      fiscalYearStartDay: 1,
+      config: {},
+      createdAt: NOW,
+      createdBy: ACTOR_ID,
+      createdByKind: "member",
+    });
+    const { createReconciliationService, repairPendingMonthlyCloseArtifacts } = await import("./reconciliation");
+    let artifactPayload: Record<string, any> | undefined;
+    let artifactWrites = 0;
+    const reconciliationService = createReconciliationService({
+      now: () => new Date("2026-08-02T12:00:00.000Z"),
+    });
+    const recoveryService = createReconciliationService({
+      now: () => new Date("2026-08-02T12:01:00.000Z"),
+      monthlyCloseArtifactWriter: async () => {
+        artifactWrites += 1;
+        throw new Error("writer_stopped");
+      },
+    });
+    const reconciliation = await reconciliationService.executeReconciliation({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      cycleId: pending.row.cycleId,
+      declaredBankBalance: "100.0000",
+    });
+
+    await expect(reconciliationService.closePeriod({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      reconciliationCycleId: reconciliation.id,
+    })).rejects.toThrow("period_close_pending_regularizations");
+    expect(artifactWrites).toBe(0);
+    const rejectionAudits = await withTenantTransaction(ORG_A, (tx) => tx.select().from(auditLogEntry)
+      .where(and(eq(auditLogEntry.orgId, ORG_A), eq(auditLogEntry.actionKind, "period_close.reject"))));
+    expect(rejectionAudits).toEqual([
+      expect.objectContaining({
+        reason: "period_close_pending_regularizations",
+        payloadSnapshot: expect.objectContaining({
+          pendingIds: [pending.row.id],
+        }),
+      }),
+    ]);
+    expect(await withTenantTransaction(ORG_A, (tx) => tx.select().from(periodClose).where(eq(periodClose.orgId, ORG_A)))).toEqual([]);
+    expect(await withTenantTransaction(ORG_A, (tx) => tx.select().from(statementArchive).where(eq(statementArchive.orgId, ORG_A)))).toEqual([]);
+
+    await movementService.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "contribution",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "100.0000",
+      datedOn: "2026-07-12",
+      clientRequestId: randomUUID(),
+    });
+    const refreshed = await reconciliationService.getMonthlyCloseState(ORG_A);
+    expect(refreshed).toMatchObject({ computedPoolBalance: "100.0000", closeAllowed: true });
+    const closeInput = {
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      reconciliationCycleId: reconciliation.id,
+    };
+    const [firstClose, replayedClose] = await Promise.all([
+      reconciliationService.closePeriod(closeInput),
+      reconciliationService.closePeriod(closeInput),
+    ]);
+    expect(firstClose).toMatchObject({ status: "closed", pendingRegularizations: [] });
+    expect(replayedClose).toMatchObject({
+      status: "closed",
+      periodCloseId: firstClose.periodCloseId,
+      monthlyCloseStatementId: firstClose.monthlyCloseStatementId,
+      canonicalPayloadHash: firstClose.canonicalPayloadHash,
+    });
+    await expect(createReportingService().listStatementArchive(ORG_A)).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: firstClose.monthlyCloseStatementId, artifactStatus: "pending" }),
+    ]));
+    expect(artifactWrites).toBe(0);
+    await expect(recoveryService.closePeriod(closeInput)).resolves.toMatchObject({ monthlyCloseArtifactStatus: "failed" });
+    expect(artifactWrites).toBe(1);
+    const repair = await repairPendingMonthlyCloseArtifacts({
+      organizationIds: [ORG_A],
+      now: () => new Date("2026-08-02T12:02:00.000Z"),
+      writer: async (input) => {
+        artifactWrites += 1;
+        artifactPayload = input.payload;
+        await db.update(organization).set({ status: "paused" }).where(eq(organization.id, ORG_A));
+        return { pdfUri: `/statement-archive/public/${input.canonicalPayloadHash}.pdf`, byteSize: 1024 };
+      },
+    });
+    expect(repair).toEqual({ scannedOrganizations: 1, attempted: 1, ready: 1, failed: 0 });
+    const [pausedOrg] = await db.select({ status: organization.status }).from(organization).where(eq(organization.id, ORG_A));
+    expect(pausedOrg?.status).toBe("paused");
+    await expect(createReportingService().listStatementArchive(ORG_A)).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: firstClose.monthlyCloseStatementId, artifactStatus: "ready" }),
+    ]));
+    await db.update(organization).set({ status: "active" }).where(eq(organization.id, ORG_A));
+    const [recovered, idempotentRecovery] = await Promise.all([
+      recoveryService.closePeriod(closeInput),
+      recoveryService.closePeriod(closeInput),
+    ]);
+    expect(recovered.monthlyCloseArtifactStatus).toBe("ready");
+    expect(idempotentRecovery.monthlyCloseArtifactStatus).toBe("ready");
+    expect(artifactWrites).toBe(2);
+    const artifactEvents = await withTenantTransaction(ORG_A, (tx) => tx.select().from(statementArtifactEvent)
+      .where(and(eq(statementArtifactEvent.orgId, ORG_A), eq(statementArtifactEvent.statementArchiveId, firstClose.monthlyCloseStatementId!))));
+    expect(artifactEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ status: "pending", attemptNumber: 1, byteSize: null }),
+      expect.objectContaining({ status: "failed", attemptNumber: 2, errorCode: "writer_stopped" }),
+      expect.objectContaining({ status: "ready", byteSize: 1024 }),
+    ]));
+    const closeAudits = await withTenantTransaction(ORG_A, (tx) => tx.select({ id: auditLogEntry.id })
+      .from(auditLogEntry)
+      .where(and(eq(auditLogEntry.orgId, ORG_A), eq(auditLogEntry.actionKind, "period_close.create"))));
+    expect(closeAudits).toHaveLength(1);
+    expect(artifactPayload?.movementSummary).toEqual({
+      bankFees: "0.0000",
+      supplies: "0.0000",
+      sharedExpenses: "0.0000",
+      operatingExpenses: "0.0000",
+      transfers: "100.0000",
+      netFundBalance: "100.0000",
+      pendingRegularizations: 0,
+      pendingAssertion: "cero movimientos pendientes de regularizar",
+    });
+    expect(artifactPayload?.ledgerEntries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "contribution", amount: "100.0000" }),
+      expect.objectContaining({ kind: "transfer", amount: "100.0000", note: "regularization" }),
+    ]));
+  });
+
+  it("repairs paused and archived tenants while isolating lifecycle and tenant failures", async () => {
+    const { repairPendingMonthlyCloseArtifacts } = await import("./reconciliation");
+    const seedArtifact = async (input: { orgId: string; marker: string; validHash: boolean }) => {
+      const payload = { kind: "monthly_close", orgId: input.orgId, marker: input.marker };
+      const hash = input.validHash ? sha256Hex(canonicalJson(payload)) : "0".repeat(64);
+      return withTenantTransaction(input.orgId, async (tx) => {
+        const [archive] = await tx.insert(statementArchive).values({
+          orgId: input.orgId,
+          kind: "monthly_close",
+          memberId: null,
+          periodLabel: input.marker,
+          pdfUri: `/statement-archive/public/${hash}.pdf`,
+          canonicalPayloadHash: hash,
+          canonicalPayload: payload,
+          legacyVerificationPayload: null,
+          generatedAt: NOW,
+          periodCloseId: null,
+          yearEndShareOutId: null,
+          byteSize: 0,
+          createdAt: NOW,
+          createdByKind: "system",
+        }).returning();
+        await tx.insert(statementArtifactEvent).values({
+          orgId: input.orgId,
+          statementArchiveId: archive!.id,
+          status: "pending",
+          attemptNumber: 1,
+          byteSize: null,
+          errorCode: null,
+          attemptedAt: NOW,
+          createdAt: NOW,
+        });
+        return archive!;
+      });
+    };
+    const writer = async (input: { canonicalPayloadHash: string }) => ({
+      pdfUri: `/statement-archive/public/${input.canonicalPayloadHash}.pdf`,
+      byteSize: 2048,
+    });
+
+    const pausedArchive = await seedArtifact({ orgId: ORG_A, marker: "paused-repair", validHash: true });
+    await db.update(organization).set({ status: "paused" }).where(eq(organization.id, ORG_A));
+    await expect(repairPendingMonthlyCloseArtifacts({
+      organizationIds: [ORG_A],
+      now: () => new Date("2026-08-03T12:00:00.000Z"),
+      writer,
+    })).resolves.toEqual({ scannedOrganizations: 1, attempted: 1, ready: 1, failed: 0 });
+    await expect(withTenantTransaction(ORG_A, (tx) => tx.select().from(statementArtifactEvent).where(and(
+      eq(statementArtifactEvent.statementArchiveId, pausedArchive.id),
+      eq(statementArtifactEvent.status, "ready"),
+    )))).resolves.toHaveLength(1);
+
+    const corruptArchive = await seedArtifact({ orgId: ORG_A, marker: "corrupt-lifecycle", validHash: false });
+    const archivedArchive = await seedArtifact({ orgId: ORG_B, marker: "archived-repair", validHash: true });
+    await db.update(organization).set({ status: "archived" }).where(eq(organization.id, ORG_B));
+    await expect(repairPendingMonthlyCloseArtifacts({
+      organizationIds: [ORG_A, ORG_B],
+      now: () => new Date("2026-08-03T12:05:00.000Z"),
+      writer,
+    })).resolves.toEqual({ scannedOrganizations: 2, attempted: 1, ready: 1, failed: 1 });
+    await expect(withTenantTransaction(ORG_B, (tx) => tx.select().from(statementArtifactEvent).where(and(
+      eq(statementArtifactEvent.statementArchiveId, archivedArchive.id),
+      eq(statementArtifactEvent.status, "ready"),
+    )))).resolves.toHaveLength(1);
+    await expect(withTenantTransaction(ORG_A, (tx) => tx.select().from(statementArtifactEvent).where(
+      and(
+        eq(statementArtifactEvent.orgId, ORG_A),
+        eq(statementArtifactEvent.statementArchiveId, archivedArchive.id),
+      ),
+    ))).resolves.toEqual([]);
+    await expect(withTenantTransaction(ORG_A, (tx) => tx.select().from(statementArtifactEvent).where(and(
+      eq(statementArtifactEvent.statementArchiveId, corruptArchive.id),
+      eq(statementArtifactEvent.status, "ready"),
+    )))).resolves.toEqual([]);
+
+    await db.update(organization).set({ status: "active" }).where(inArray(organization.id, [ORG_A, ORG_B]));
+  });
+
+  it("skips a ready legacy archive without blocking a pending artifact in the same tenant", async () => {
+    const { repairPendingMonthlyCloseArtifacts } = await import("./reconciliation");
+    const pendingPayload = { kind: "monthly_close", orgId: ORG_A, marker: "pending-after-legacy" };
+    const pendingHash = sha256Hex(canonicalJson(pendingPayload));
+    const legacyHash = "e".repeat(64);
+    const [legacyArchive, pendingArchive] = await withTenantTransaction(ORG_A, async (tx) => {
+      const [legacy] = await tx.insert(statementArchive).values({
+        orgId: ORG_A,
+        kind: "monthly_close",
+        memberId: null,
+        periodLabel: "legacy-ready",
+        pdfUri: `/statement-archive/public/${legacyHash}.pdf`,
+        canonicalPayloadHash: legacyHash,
+        canonicalPayload: null,
+        legacyVerificationPayload: { legacy: true },
+        generatedAt: NOW,
+        periodCloseId: null,
+        yearEndShareOutId: null,
+        byteSize: 321,
+        createdAt: NOW,
+        createdByKind: "system",
+      }).returning();
+      const [pending] = await tx.insert(statementArchive).values({
+        orgId: ORG_A,
+        kind: "monthly_close",
+        memberId: null,
+        periodLabel: "pending-after-legacy",
+        pdfUri: `/statement-archive/public/${pendingHash}.pdf`,
+        canonicalPayloadHash: pendingHash,
+        canonicalPayload: pendingPayload,
+        legacyVerificationPayload: null,
+        generatedAt: NOW,
+        periodCloseId: null,
+        yearEndShareOutId: null,
+        byteSize: 0,
+        createdAt: NOW,
+        createdByKind: "system",
+      }).returning();
+      return [legacy!, pending!];
+    });
+    const writtenMarkers: string[] = [];
+
+    await expect(repairPendingMonthlyCloseArtifacts({
+      organizationIds: [ORG_A],
+      now: () => new Date("2026-08-03T13:00:00.000Z"),
+      writer: async (artifact) => {
+        writtenMarkers.push(String((artifact.payload as { marker?: string }).marker));
+        return {
+          pdfUri: `/statement-archive/public/${artifact.canonicalPayloadHash}.pdf`,
+          byteSize: 4096,
+        };
+      },
+    })).resolves.toEqual({ scannedOrganizations: 1, attempted: 1, ready: 1, failed: 0 });
+
+    expect(writtenMarkers).toEqual(["pending-after-legacy"]);
+    const events = await withTenantTransaction(ORG_A, (tx) => tx.select().from(statementArtifactEvent).where(
+      eq(statementArtifactEvent.orgId, ORG_A),
+    ));
+    expect(events.filter((event) => event.statementArchiveId === legacyArchive.id)).toEqual([]);
+    expect(events.filter((event) => event.statementArchiveId === pendingArchive.id)).toEqual([
+      expect.objectContaining({ status: "pending", attemptNumber: 1 }),
+      expect.objectContaining({ status: "ready", attemptNumber: 1, byteSize: 4096 }),
+    ]);
   });
 
   it("requires an active group account and rejects missing, archived, non-group, and cross-tenant selections without writes", async () => {

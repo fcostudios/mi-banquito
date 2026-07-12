@@ -47,6 +47,8 @@ const baseState = {
   monthlyCloseStatementId: null,
   monthlyClosePdfUri: null,
   canonicalPayloadHash: null,
+  monthlyCloseArtifactStatus: null,
+  pendingRegularizations: [],
 } as const;
 
 describe("ScrMonthlyClosePage", () => {
@@ -85,6 +87,35 @@ describe("ScrMonthlyClosePage", () => {
     expect(screen.getByRole("button", { name: "Cerrar mes" })).toBeEnabled();
   });
 
+  it("lists every pending movement above the close action and blocks close with fixed copy", async () => {
+    getMonthlyCloseState.mockResolvedValueOnce({
+      ...baseState,
+      pendingRegularizations: [{
+        id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        kind: "contribution",
+        memberId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        memberName: "Ana",
+        accountId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        accountName: "Cuenta personal",
+        amount: "50.0000",
+        datedOn: "2026-06-20",
+      }],
+    });
+
+    render(await ScrMonthlyClosePage({ searchParams: Promise.resolve({}) }));
+
+    const panel = screen.getByRole("region", { name: "Movimientos pendientes de regularizar" });
+    expect(panel).toHaveTextContent("Ana");
+    expect(panel).toHaveTextContent("Cuenta personal");
+    expect(panel).toHaveTextContent("USD 50.00");
+    expect(screen.getByRole("link", { name: "Regularizar" })).toHaveAttribute(
+      "href",
+      "/movimientos/registrar?regularizesKind=contribution&regularizesId=dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    );
+    expect(screen.getByRole("button", { name: "Cerrar mes" })).toBeDisabled();
+    expect(screen.getByText("Regulariza estos depósitos antes de cerrar el mes.")).toBeInTheDocument();
+  });
+
   it("shows archived PDF and WhatsApp controls after closing", async () => {
     getMonthlyCloseState.mockResolvedValueOnce({
       ...baseState,
@@ -93,6 +124,7 @@ describe("ScrMonthlyClosePage", () => {
       monthlyCloseStatementId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       monthlyClosePdfUri: "/statement-archive/monthly-close/f4".padEnd(96, "a"),
       canonicalPayloadHash: "f4".padEnd(64, "a"),
+      monthlyCloseArtifactStatus: "ready",
     });
 
     render(await ScrMonthlyClosePage({ searchParams: Promise.resolve({ closed: "1" }) }));
@@ -103,5 +135,23 @@ describe("ScrMonthlyClosePage", () => {
       expect.stringContaining("/statement-archive/monthly-close/"),
     );
     expect(screen.getByRole("button", { name: "Compartir por WhatsApp" })).toBeInTheDocument();
+  });
+
+  it("shows processing without PDF or share controls while the close artifact is pending", async () => {
+    getMonthlyCloseState.mockResolvedValueOnce({
+      ...baseState,
+      status: "closed",
+      periodCloseId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      monthlyCloseStatementId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      monthlyClosePdfUri: "/statement-archive/public/f4.pdf",
+      canonicalPayloadHash: "f4".padEnd(64, "a"),
+      monthlyCloseArtifactStatus: "pending",
+    });
+
+    render(await ScrMonthlyClosePage({ searchParams: Promise.resolve({ closed: "1" }) }));
+
+    expect(screen.getByText("El PDF se esta procesando.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Abrir PDF" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Compartir por WhatsApp" })).not.toBeInTheDocument();
   });
 });

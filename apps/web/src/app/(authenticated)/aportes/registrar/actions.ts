@@ -24,6 +24,7 @@ function confirmationRedirect(input: Record<string, unknown>): string {
   for (const key of [
     "clientRequestId",
     "memberId",
+    "accountId",
     "amount",
     "datedOn",
     "paymentSource",

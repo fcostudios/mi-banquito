@@ -257,6 +257,15 @@
     "expenseSubtitle": "Registra una comisión, insumo u otro gasto permitido.",
     "transferTitle": "Movimiento entre cuentas",
     "transferSubtitle": "Mueve dinero entre dos cuentas activas del fondo sin cambiar el total.",
+    "regularizationTitle": "Regularizar depósito",
+    "regularizationSubtitle": "Pasa al fondo un aporte o pago que entró en una cuenta personal.",
+    "pendingDeposits": "Depósitos pendientes de regularizar",
+    "noPendingDeposits": "No hay depósitos pendientes de regularizar.",
+    "legacyAccount": "Cuenta histórica sin referencia",
+    "legacyCannotRegularize": "Este movimiento histórico permanece legible, pero no tiene una cuenta de origen para regularizar.",
+    "regularizationTarget": "Hacia la cuenta del fondo",
+    "regularizationConfirm": "Confirmo que este traslado corresponde al depósito seleccionado.",
+    "saveRegularization": "Guardar regularización",
     "expenseAccount": "Cuenta de donde sale",
     "category": "Categoría",
     "fromAccount": "Desde la cuenta",
@@ -283,6 +292,7 @@
       "solidarity_payout": "Pago solidario (colecta)",
       "treasurer_comp_payout": "Pago a tesorera (reconocido)",
       "transfer": "Transferencia"
+      ,"regularization": "Regularización"
     },
     "errors": {
       "invalid-form": "Revisa los datos del movimiento e intenta nuevamente.",
@@ -330,6 +340,9 @@
     "promiseKeptAction": "Cumplida",
     "promiseBrokenAction": "Sigue pendiente",
     "recordPayment": "Registrar pago",
+    "depositAccount": "¿En qué cuenta entró?",
+    "groupFundAccount": "fondo del grupo",
+    "pendingAccount": "pendiente de regularizar",
     "whatsapp": "Avisar por WhatsApp",
     "recordChase": "Registrar aviso",
     "missingContact": "Sin WhatsApp registrado",
@@ -378,12 +391,28 @@
     "annotate": "Guardar nota",
     "close": "Cerrar mes",
     "closeDisabled": "Primero guarda una conciliación dentro de tolerancia o una nota de aceptación.",
+    "pendingTitle": "Movimientos pendientes de regularizar",
+    "pendingDescription": "Regulariza cada depósito que entró fuera del fondo antes de cerrar.",
+    "pendingEmpty": "Cero pendientes — el mes se puede cerrar.",
+    "pendingStatus": "Pendiente de regularizar",
+    "regularize": "Regularizar",
+    "legacyAccount": "Cuenta histórica sin referencia",
+    "pendingCloseDisabled": "Regulariza estos depósitos antes de cerrar el mes.",
     "archiveTitle": "Reporte archivado",
+    "artifactProcessing": "El PDF se esta procesando.",
     "previewPdf": "Abrir PDF",
     "shareWhatsApp": "Compartir por WhatsApp",
     "hash": "Hash",
     "pdfTitle": "Cierre mensual",
     "pdfSummary": "Resumen de conciliación",
+    "pdfMovements": "Movimientos del fondo",
+    "pdfBankFees": "Comisiones",
+    "pdfSupplies": "Insumos",
+    "pdfSharedExpenses": "Gastos compartidos",
+    "pdfOperatingExpenses": "Gastos operativos",
+    "pdfTransfers": "Transferencias",
+    "pdfNetFundBalance": "Saldo neto del fondo",
+    "pdfRegularization": "Regularización",
     "pdfEvidence": "Evidencia de archivo",
     "pdfCanonicalHash": "Hash canónico",
     "pdfOrganization": "Organización",
@@ -464,6 +493,13 @@
       "fallbackAllocation": "Aplicación",
       "unknownCycle": "sin período",
       "unknownMember": "socia"
+      ,"reconciliationTitle": "Regularización de depósitos"
+      ,"pendingContribution": "Aporte pendiente"
+      ,"pendingRepayment": "Pago pendiente"
+      ,"regularizedContribution": "Aporte regularizado"
+      ,"regularizedRepayment": "Pago regularizado"
+      ,"regularizationTransfer": "Transferencia para regularizar"
+      ,"legacyAccount": "Cuenta histórica sin referencia"
     },
     "yearEndMemberTitle": "Estado fin de año",
     "yearEndShareOutTitle": "Reparto fin de año",
@@ -579,6 +615,8 @@
       "empty": "Aún no hay socias registradas.",
       "pendingRegularization": "Pendientes de regularizar",
       "pendingRegularizationHint": "Depósitos en cuenta personal sin pasar al fondo.",
+      "pendingStatus": "Pendiente de regularizar",
+      "regularizedStatus": "Regularizado",
       "accounts": "Cuentas del grupo",
       "accountsValue": "Configurar cuentas",
       "liquidity": "Mes más bajo proyectado",
@@ -610,6 +648,13 @@
       "statementReady": "Estado de cuenta listo.",
       "openStatement": "Abrir estado de cuenta {{period}}",
       "noSearchResults": "No hay socias con ese nombre."
+      ,"depositStatusTitle": "Depósitos y regularización"
+      ,"noDeposits": "Aún no hay aportes o pagos registrados."
+      ,"contributionDeposit": "Aporte"
+      ,"repaymentDeposit": "Pago de préstamo"
+      ,"legacyAccount": "Cuenta histórica sin referencia"
+      ,"pendingStatus": "Pendiente de regularizar"
+      ,"regularizedStatus": "Regularizado"
     },
     "group": {
       "title": "Mi grupo",
@@ -627,6 +672,10 @@
       "kindRegular": "Regular",
       "kindPartial": "Parcial",
       "paymentSource": "Origen del pago",
+      "account": "¿En qué cuenta entró?",
+      "accountHelp": "Una cuenta personal deja el aporte pendiente de regularizar hasta pasarlo al fondo.",
+      "noGroupAccountTitle": "Configura una cuenta del fondo antes de registrar aportes",
+      "noGroupAccountBody": "Debe existir al menos una cuenta activa marcada como fondo del grupo.",
       "bankTransfer": "Transferencia bancaria",
       "cashInMeeting": "Efectivo en reunión",
       "pettyCashDeposit": "Depósito desde caja chica",
@@ -730,6 +779,10 @@
       "nextInstallment": "Pagar próxima cuota",
       "principalPayment": "Abonar a capital",
       "waterfallWarning": "BR-26 puede aplicar este pago primero a mora, intereses o aportes vencidos antes de abonar al préstamo seleccionado.",
+      "account": "¿En qué cuenta entró?",
+      "accountHelp": "Una cuenta personal deja el pago pendiente de regularizar hasta pasarlo al fondo.",
+      "noGroupAccountTitle": "Configura una cuenta del fondo antes de registrar pagos",
+      "noGroupAccountBody": "Debe existir al menos una cuenta activa marcada como fondo del grupo.",
       "slip": "Comprobante",
       "notes": "Notas",
       "submit": "Registrar pago"

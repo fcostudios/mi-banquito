@@ -5,7 +5,7 @@ import pg from "pg";
 import { describe, expect, it } from "vitest";
 
 config({ path: "../../.env.local" });
-config({ path: "../../apps/web/.env.local", override: true });
+config({ path: "../../apps/web/.env.local" });
 
 const runIfDatabase = process.env.DATABASE_URL ? it : it.skip;
 
@@ -140,10 +140,19 @@ describe("Sprint 4 schema substrate", () => {
           FROM pg_matviews
           WHERE schemaname = 'public'
             AND matviewname = 'mv_available_capital'
-            AND definition ILIKE '%loan_disbursement%'
-            AND definition ILIKE '%repayment%'
-            AND definition ILIKE '%withdrawal%'
-            AND definition ILIKE '%expense%'
+            AND definition ILIKE '%fund_pool_balance%'
+            AND EXISTS (
+              SELECT 1
+              FROM pg_proc
+              WHERE proname = 'fund_pool_balance'
+                AND pg_get_functiondef(oid) ILIKE '%reconciliation_status = ''regularized''%'
+                AND pg_get_functiondef(oid) ILIKE '%is_group_fund%'
+                AND pg_get_functiondef(oid) ILIKE '%loan_disbursement%'
+                AND pg_get_functiondef(oid) ILIKE '%repayment%'
+                AND pg_get_functiondef(oid) ILIKE '%withdrawal%'
+                AND pg_get_functiondef(oid) ILIKE '%expense%'
+                AND pg_get_functiondef(oid) ILIKE '%transfer%'
+            )
         ) AS available_capital_models_cash_in_and_out,
         EXISTS (
           SELECT 1

@@ -1,4 +1,4 @@
-import { createCollectionsService, type CollectionsAgingReasonKind, type CollectionsAgingRow } from "@mi-banquito/domain";
+import { createCollectionsService, createMovementService, type CollectionsAgingReasonKind, type CollectionsAgingRow } from "@mi-banquito/domain";
 import { FormField, Select } from "@mi-banquito/ui";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import messages from "@/lib/i18n/en-US.json";
@@ -80,10 +80,11 @@ export default async function ScrArAgingPage({
     : promiseOutcome === "broken"
       ? copy.promiseBroken
       : "";
-  const rows = sortRows(
-    await createCollectionsService().listAgingRows(session.orgId, reason),
-    sort,
-  );
+  const [agingRows, accounts] = await Promise.all([
+    createCollectionsService().listAgingRows(session.orgId, reason),
+    createMovementService().listActiveAccounts(session.orgId),
+  ]);
+  const rows = sortRows(agingRows, sort);
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6" data-screen="SCR-ar-aging">
@@ -143,7 +144,12 @@ export default async function ScrArAgingPage({
         </button>
       </form>
 
-      <AgingTable rows={rows} />
+      <AgingTable rows={rows} accounts={accounts.map((account) => ({
+        id: account.id,
+        name: account.name,
+        last4: account.last4,
+        isGroupFund: account.isGroupFund,
+      }))} />
     </main>
   );
 }

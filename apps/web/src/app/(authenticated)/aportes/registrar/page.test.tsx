@@ -20,6 +20,13 @@ vi.mock("@mi-banquito/domain", () => ({
       },
     ]),
   }),
+  createMovementService: () => ({
+    listActiveAccounts: () => Promise.resolve([
+      { id: "44444444-4444-4444-8444-444444444444", name: "Banco del grupo", last4: "1234", isGroupFund: true },
+      { id: "55555555-5555-4555-8555-555555555555", name: "Cuenta personal", last4: null, isGroupFund: false },
+    ]),
+    listActiveGroupAccounts: () => Promise.resolve([{ id: "44444444-4444-4444-8444-444444444444" }]),
+  }),
 }));
 
 describe("ScrRecordContributionPage", () => {
@@ -28,6 +35,8 @@ describe("ScrRecordContributionPage", () => {
 
     expect(screen.getByText("Origen del pago")).toBeInTheDocument();
     expect(container.querySelector('select[name="paymentSource"]')).toHaveValue("cash_in_meeting");
+    expect(screen.getByRole("combobox", { name: "¿En qué cuenta entró?" })).toHaveValue("44444444-4444-4444-8444-444444444444");
+    expect(screen.getByRole("option", { name: /Cuenta personal.*pendiente de regularizar/i })).toBeInTheDocument();
   });
 
   it("renders one-tap BR-26 extra-money decisions during confirmation", async () => {

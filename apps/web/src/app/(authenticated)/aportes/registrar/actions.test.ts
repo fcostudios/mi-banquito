@@ -29,6 +29,7 @@ function baseFormData() {
   const formData = new FormData();
   formData.set("clientRequestId", "11111111-1111-4111-8111-111111111111");
   formData.set("memberId", "22222222-2222-4222-8222-222222222222");
+    formData.set("accountId", "44444444-4444-4444-8444-444444444444");
     formData.set("amount", "10.00");
     formData.set("datedOn", "2026-07-01");
     formData.set("paymentSource", "cash_in_meeting");

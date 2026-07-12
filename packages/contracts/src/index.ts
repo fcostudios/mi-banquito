@@ -306,6 +306,7 @@ export const loanOriginationFormSchema = z.object({
 export const loanRepaymentFormSchema = z.object({
   clientRequestId: uuidString,
   loanId: uuidString,
+  accountId: uuidString,
   amount: moneyString,
   datedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   paymentMode: z.enum(["next_installment", "principal_payment"]).default("next_installment"),
@@ -322,6 +323,7 @@ export const paymentExtraDecisionSchema = z.enum([
 export const memberPaymentFormSchema = z.object({
   clientRequestId: uuidString,
   memberId: uuidString,
+  accountId: uuidString,
   amount: positiveMoneyString,
   datedOn: dateString,
   paymentSource: contributionSourceSchema.default("cash_in_meeting"),

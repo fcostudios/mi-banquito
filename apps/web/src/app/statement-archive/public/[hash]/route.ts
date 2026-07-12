@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@mi-banquito/db";
-import { statementArchive } from "@mi-banquito/db/schema";
+import { statementArchive, statementArtifactEvent } from "@mi-banquito/db/schema";
 
 import { readPrivateStatementArtifact } from "@/lib/statement-artifact";
 
@@ -27,6 +27,23 @@ export async function GET(_request: Request, { params }: { params: Promise<{ has
     .limit(1);
   if (!archive) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  if (archive.kind === "monthly_close") {
+    const [artifactEvent] = await db.select().from(statementArtifactEvent)
+      .where(and(
+        eq(statementArtifactEvent.orgId, archive.orgId),
+        eq(statementArtifactEvent.statementArchiveId, archive.id),
+      ))
+      .orderBy(
+        desc(statementArtifactEvent.createdAt),
+        desc(statementArtifactEvent.attemptNumber),
+        sql`CASE ${statementArtifactEvent.status} WHEN 'ready' THEN 3 WHEN 'failed' THEN 2 ELSE 1 END DESC`,
+      )
+      .limit(1);
+    if (artifactEvent?.status !== "ready" && archive.byteSize === 0) {
+      return NextResponse.json({ status: "processing" }, { status: 202 });
+    }
   }
 
   const folder = folderForKind(archive.kind);

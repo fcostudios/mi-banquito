@@ -8,7 +8,9 @@ import {
   periodClose,
   reconciliationCycle,
   statementArchive,
+  statementArtifactEvent,
 } from "@mi-banquito/db/schema";
+import { canonicalJson } from "./reporting";
 
 type InsertRecord = {
   tableName: string;
@@ -35,6 +37,10 @@ class FakeSelectBuilder {
   }
 
   orderBy() {
+    return this;
+  }
+
+  for() {
     return this;
   }
 
@@ -102,6 +108,7 @@ class FakeUpdateBuilder {
 class FakeDb {
   readonly inserts: InsertRecord[] = [];
   readonly updates: InsertRecord[] = [];
+  inTransaction = false;
   private readonly selectResults: unknown[][];
   private readonly selectedByTable = new Map<string, unknown[]>();
 
@@ -133,15 +140,22 @@ class FakeDb {
     });
   }
 
+  execute() {
+    return Promise.resolve([]);
+  }
+
   async transaction<T>(callback: (tx: FakeDb) => Promise<T>): Promise<T> {
     const snapshot = [...this.inserts];
     const updateSnapshot = [...this.updates];
     try {
+      this.inTransaction = true;
       return await callback(this);
     } catch (error) {
       this.inserts.splice(0, this.inserts.length, ...snapshot);
       this.updates.splice(0, this.updates.length, ...updateSnapshot);
       throw error;
+    } finally {
+      this.inTransaction = false;
     }
   }
 }
@@ -163,6 +177,7 @@ const updatedRows = (
 const mockTenantDb = (fakeDb: FakeDb) => {
   vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
   vi.doMock("@mi-banquito/db/tenant", () => ({
+    lockTenantMoneyWrites: async () => undefined,
     withTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) =>
       fakeDb.transaction(run),
     withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) =>
@@ -177,6 +192,12 @@ const unmockTenantDb = () => {
 };
 
 describe("adjustment window reconciliation", () => {
+  it("blocks close whenever the selected period has a pending regularization", async () => {
+    const { canCloseWithPendingRegularizations } = await import("./reconciliation");
+    expect(canCloseWithPendingRegularizations([])).toBe(true);
+    expect(canCloseWithPendingRegularizations([{ id: "pending-1" }])).toBe(false);
+  });
+
   it("computes discrepancy and status at tolerance boundaries", async () => {
     const { classifyReconciliation } = await import("./reconciliation");
 
@@ -419,10 +440,13 @@ describe("adjustment window reconciliation", () => {
       const { createReconciliationService } = await import("./reconciliation");
       const close = await createReconciliationService({
         now: () => closedAt,
-        monthlyCloseArtifactWriter: async ({ canonicalPayloadHash }) => ({
-          pdfUri: `https://blob.vercel-storage.com/monthly-close/${canonicalPayloadHash}.pdf`,
-          byteSize: 2048,
-        }),
+        monthlyCloseArtifactWriter: async ({ canonicalPayloadHash }) => {
+          expect(fakeDb.inTransaction).toBe(false);
+          return {
+            pdfUri: `/statement-archive/public/${canonicalPayloadHash}.pdf`,
+            byteSize: 2048,
+          };
+        },
       }).closePeriod({
         orgId: "11111111-1111-4111-8111-111111111111",
         actorId: "33333333-3333-4333-8333-333333333333",
@@ -431,22 +455,32 @@ describe("adjustment window reconciliation", () => {
 
       expect(close).toMatchObject({
         periodCloseId: expect.any(String),
-        monthlyClosePdfUri: expect.stringContaining("https://blob.vercel-storage.com/monthly-close/"),
+        monthlyClosePdfUri: expect.stringMatching(/^\/statement-archive\/public\/[a-f0-9]{64}\.pdf$/),
         status: "closed",
       });
       expect(insertedRows(fakeDb, periodClose)).toHaveLength(1);
       expect(updatedRows(fakeDb, periodClose)).toEqual([]);
-      expect(insertedRows(fakeDb, statementArchive)).toEqual([
+      const archiveRows = insertedRows(fakeDb, statementArchive);
+      expect(archiveRows).toEqual([
         expect.objectContaining({
           orgId: "11111111-1111-4111-8111-111111111111",
           kind: "monthly_close",
           periodLabel: "junio 2026",
-          pdfUri: expect.stringContaining("https://blob.vercel-storage.com/monthly-close/"),
+          pdfUri: expect.stringMatching(/^\/statement-archive\/public\/[a-f0-9]{64}\.pdf$/),
           canonicalPayloadHash: expect.stringMatching(/^[a-f0-9]{64}$/),
-          byteSize: 2048,
+          canonicalPayload: expect.objectContaining({ kind: "monthly_close" }),
+          byteSize: expect.any(Number),
           createdByKind: "system",
         }),
       ]);
+      expect(Buffer.byteLength(canonicalJson(
+        archiveRows[0]?.canonicalPayload as Parameters<typeof canonicalJson>[0],
+      ), "utf8")).toBeGreaterThan(0);
+      expect(archiveRows[0]?.byteSize).toBe(0);
+      expect(insertedRows(fakeDb, statementArtifactEvent)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ status: "pending", attemptNumber: 1, byteSize: null }),
+        expect.objectContaining({ status: "ready", attemptNumber: 1, byteSize: 2048 }),
+      ]));
       expect(updatedRows(fakeDb, contributionCycle)).toEqual([
         expect.objectContaining({
           id: "44444444-4444-4444-8444-444444444444",

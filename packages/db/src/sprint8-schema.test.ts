@@ -30,6 +30,10 @@ const liveMovementMigrationUrl = new URL(
 const liveMovementMigration = existsSync(liveMovementMigrationUrl)
   ? readFileSync(liveMovementMigrationUrl, "utf8")
   : "";
+const qualityMigrationUrl = new URL(
+  "./migrations/V20260712223000__task4_quality_guards.sql",
+  import.meta.url,
+);
 
 const foreignKeySummary = (table: Parameters<typeof getTableConfig>[0]) =>
   getTableConfig(table).foreignKeys.map((foreignKey) => {
@@ -235,5 +239,16 @@ describe("Sprint 8 account and movement schema", () => {
     expect(migration).not.toContain("uq_expense_org_client_request");
     expect(migration).not.toContain("ALTER TABLE account");
     expect(migration).not.toContain("uq_account_org_client_request");
+  });
+
+  it("ships upgraded-database close uniqueness and cumulative regularization guards", () => {
+    expect(existsSync(qualityMigrationUrl)).toBe(true);
+    const qualityMigration = readFileSync(qualityMigrationUrl, "utf8");
+    expect(qualityMigration).toContain("uq_period_close_org_id_cycle_id");
+    expect(qualityMigration).toContain("UNIQUE (org_id, cycle_id)");
+    expect(qualityMigration).toContain("regularization_amount_exceeds_remaining");
+    expect(qualityMigration).toContain("pg_advisory_xact_lock");
+    expect(qualityMigration).toContain("statement_archive");
+    expect(qualityMigration).toContain("canonical_payload");
   });
 });

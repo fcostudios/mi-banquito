@@ -51,6 +51,7 @@ let db: typeof import("@mi-banquito/db")["db"];
 let withTenantTransaction: typeof import("@mi-banquito/db/tenant")["withTenantTransaction"];
 let recordExpenseAction: typeof import("./actions")["recordExpenseAction"];
 let recordTransferAction: typeof import("./actions")["recordTransferAction"];
+let regularizePendingDepositAction: typeof import("./actions")["regularizePendingDepositAction"];
 let fromAccountId: string;
 let toAccountId: string;
 const originalBypass = process.env.E2E_AUTH_BYPASS;
@@ -156,7 +157,7 @@ describe("movement server actions", () => {
     toAccountId = rows[1]?.id ?? "";
     process.env.AUTH0_ORGANIZATION_DB_ORG_ID = ORG_ID;
     process.env.E2E_AUTH_BYPASS = "1";
-    ({ recordExpenseAction, recordTransferAction } = await import("./actions"));
+    ({ recordExpenseAction, recordTransferAction, regularizePendingDepositAction } = await import("./actions"));
   });
 
   beforeEach(async () => {
@@ -169,7 +170,7 @@ describe("movement server actions", () => {
       await tx.execute(sql.raw("SET LOCAL session_replication_role = replica"));
       await tx.delete(auditLogEntry).where(and(
         eq(auditLogEntry.orgId, ORG_ID),
-        sql`${auditLogEntry.actionKind} IN ('movement.expense', 'movement.transfer')`,
+        sql`${auditLogEntry.actionKind} IN ('movement.expense', 'movement.transfer', 'movement.regularization')`,
       ));
       await tx.delete(alert).where(eq(alert.orgId, ORG_ID));
       await tx.delete(transfer).where(eq(transfer.orgId, ORG_ID));
@@ -556,11 +557,26 @@ describe("movement server actions", () => {
     expect(rows).toEqual([]);
   });
 
+  it("rejects malformed regularization input through the real service boundary without a write", async () => {
+    const formData = new FormData();
+    formData.set("regularizesKind", "contribution");
+    formData.set("regularizesId", randomUUID());
+    formData.set("toAccountId", toAccountId);
+    formData.set("amount", "10.00");
+    formData.set("datedOn", "2026-07-11");
+    formData.set("notes", "");
+    formData.set("clientRequestId", randomUUID());
+
+    await expectRedirect(() => regularizePendingDepositAction(formData), "/movimientos/registrar?error=invalid-form");
+    expect(await withTenantTransaction(ORG_ID, (tx) => tx.select().from(transfer).where(eq(transfer.orgId, ORG_ID)))).toEqual([]);
+  });
+
   it("checks authorization before parsing either form", async () => {
     process.env.E2E_AUTH_BYPASS = "0";
 
     await expectRedirect(() => recordExpenseAction(new FormData()), "/auth/login");
     await expectRedirect(() => recordTransferAction(new FormData()), "/auth/login");
-    expect(framework.redirects).toEqual(["/auth/login", "/auth/login"]);
+    await expectRedirect(() => regularizePendingDepositAction(new FormData()), "/auth/login");
+    expect(framework.redirects).toEqual(["/auth/login", "/auth/login", "/auth/login"]);
   });
 });
