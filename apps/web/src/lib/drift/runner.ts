@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { accessSync, constants, existsSync, realpathSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { accessSync, constants, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 
 import type { DriftRunner, DriftRunnerResult } from "@mi-banquito/domain";
@@ -75,31 +76,59 @@ function repositoryRoot(start = process.cwd()): string | undefined {
   }
 }
 
-function hasValidLocalCommand(executable: string, args: string[], env: RunnerEnvironment): boolean {
-  const root = repositoryRoot();
-  const executableName = basename(executable);
-  const resolvedExecutable = realExecutable(executable, env);
-  if (!root || !resolvedExecutable) return false;
+type LocalRunnerCommand = {
+  executable: string;
+  args: string[];
+  script: string;
+  scriptSha256: string;
+};
 
-  let commandArgs: string[];
-  if (executableName === "python" || executableName === "python3") {
-    const script = realFile(args[0] ?? "");
-    if (!script || basename(script) !== "nous_package.py") return false;
-    commandArgs = args.slice(1);
-  } else if (executableName === "nous_package.py" && basename(resolvedExecutable) === "nous_package.py") {
-    commandArgs = args;
-  } else {
-    return false;
-  }
-
-  if (commandArgs.length !== 4) return false;
-  const [command, strict, targetFlag, targetValue] = commandArgs;
-  if (command !== "drift" || strict !== "--strict" || targetFlag !== "--target") return false;
+function matchesScriptHash(script: string, expectedHash: string): boolean {
+  if (!/^[a-fA-F0-9]{64}$/.test(expectedHash)) return false;
   try {
-    return realpathSync(resolve(targetValue)) === root;
+    return createHash("sha256").update(readFileSync(script)).digest("hex") === expectedHash.toLowerCase();
   } catch {
     return false;
   }
+}
+
+function validLocalCommand(
+  executable: string,
+  args: string[],
+  expectedHash: string | undefined,
+  env: RunnerEnvironment,
+): LocalRunnerCommand | undefined {
+  const root = repositoryRoot();
+  const executableName = basename(executable);
+  const resolvedExecutable = realExecutable(executable, env);
+  if (!root || !resolvedExecutable || !expectedHash) return undefined;
+
+  let commandArgs: string[];
+  let script: string;
+  let normalizedArgs: string[];
+  if (executableName === "python" || executableName === "python3") {
+    const resolvedScript = realFile(args[0] ?? "");
+    if (!resolvedScript || basename(resolvedScript) !== "nous_package.py") return undefined;
+    script = resolvedScript;
+    commandArgs = args.slice(1);
+    normalizedArgs = [script, ...commandArgs];
+  } else if (executableName === "nous_package.py" && basename(resolvedExecutable) === "nous_package.py") {
+    script = resolvedExecutable;
+    commandArgs = args;
+    normalizedArgs = commandArgs;
+  } else {
+    return undefined;
+  }
+
+  if (!matchesScriptHash(script, expectedHash) || commandArgs.length !== 4) return undefined;
+  const [command, strict, targetFlag, targetValue] = commandArgs;
+  if (command !== "drift" || strict !== "--strict" || targetFlag !== "--target") return undefined;
+  try {
+    if (realpathSync(resolve(targetValue)) !== root) return undefined;
+  } catch {
+    return undefined;
+  }
+  return { executable: resolvedExecutable, args: normalizedArgs, script, scriptSha256: expectedHash.toLowerCase() };
 }
 
 export function getDriftRunnerDeploymentStatus(
@@ -122,7 +151,12 @@ export function getDriftRunnerDeploymentStatus(
   }
   try {
     const args = parseArgs(env.NOUS_DRIFT_RUNNER_ARGS);
-    if (!hasValidLocalCommand(env.NOUS_DRIFT_RUNNER_EXECUTABLE, args, env)) {
+    if (!validLocalCommand(
+      env.NOUS_DRIFT_RUNNER_EXECUTABLE,
+      args,
+      env.NOUS_DRIFT_SCRIPT_SHA256,
+      env,
+    )) {
       return { ready: false, mode: "unavailable", code: "local_runner_command_invalid" };
     }
   } catch {
@@ -131,10 +165,14 @@ export function getDriftRunnerDeploymentStatus(
   return { ready: true, mode: "local", code: "local_runner_ready" };
 }
 
-function createLocalRunner(executable: string, args: string[], env: RunnerEnvironment): DriftRunner {
+function createLocalRunner(command: LocalRunnerCommand, env: RunnerEnvironment): DriftRunner {
   return {
     run: () => new Promise<DriftRunnerResult>((resolve, reject) => {
-      const child = spawn(executable, args, {
+      if (!matchesScriptHash(command.script, command.scriptSha256)) {
+        reject(new Error("drift_runner_unavailable:local_runner_command_invalid"));
+        return;
+      }
+      const child = spawn(command.executable, command.args, {
         env: { ...process.env, ...env },
         shell: false,
         stdio: ["ignore", "pipe", "pipe"],
@@ -216,9 +254,14 @@ export function createConfiguredDriftRunner(options: { env?: RunnerEnvironment }
   if (deployment.mode === "remote") {
     return createRemoteRunner(env.NOUS_DRIFT_RUNNER_URL!, env.NOUS_DRIFT_RUNNER_SECRET!);
   }
-  return createLocalRunner(
+  const command = validLocalCommand(
     env.NOUS_DRIFT_RUNNER_EXECUTABLE!,
     parseArgs(env.NOUS_DRIFT_RUNNER_ARGS),
+    env.NOUS_DRIFT_SCRIPT_SHA256,
     env,
   );
+  if (!command) {
+    return { run: async () => { throw new Error("drift_runner_unavailable:local_runner_command_invalid"); } };
+  }
+  return createLocalRunner(command, env);
 }

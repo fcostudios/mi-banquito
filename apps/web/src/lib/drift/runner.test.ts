@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { once } from "node:events";
+import { createHash } from "node:crypto";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -19,13 +20,17 @@ describe("configured drift runners", () => {
     const directory = await mkdtemp(join(tmpdir(), "mi-banquito-drift-"));
     temporaryDirectories.push(directory);
     const script = join(directory, "nous_package.py");
-    await writeFile(script, "#!/usr/bin/env node\nprocess.stdout.write(process.argv.slice(2).join('|'))\n");
+    const contents = "#!/usr/bin/env node\nprocess.stdout.write(process.argv.slice(2).join('|'))\n";
+    await writeFile(script, contents);
     await chmod(script, 0o755);
-    return script;
+    return {
+      hash: createHash("sha256").update(contents).digest("hex"),
+      script,
+    };
   }
 
   it("executes only a real direct nous_package.py command against this repository", async () => {
-    const script = await executableNousPackage();
+    const { hash, script } = await executableNousPackage();
     const runner = createConfiguredDriftRunner({
       env: {
         NOUS_DRIFT_RUNNER_EXECUTABLE: script,
@@ -35,6 +40,7 @@ describe("configured drift runners", () => {
           "--target",
           repoRoot,
         ]),
+        NOUS_DRIFT_SCRIPT_SHA256: hash,
       },
     });
 
@@ -47,10 +53,11 @@ describe("configured drift runners", () => {
   });
 
   it("accepts python only when it receives an existing nous_package.py and the exact target contract", async () => {
-    const script = await executableNousPackage();
+    const { hash, script } = await executableNousPackage();
     const env = {
       NOUS_DRIFT_RUNNER_EXECUTABLE: "python3",
       NOUS_DRIFT_RUNNER_ARGS: JSON.stringify([script, "drift", "--strict", "--target", repoRoot]),
+      NOUS_DRIFT_SCRIPT_SHA256: hash,
     };
 
     expect(getDriftRunnerDeploymentStatus(env)).toEqual({
@@ -59,6 +66,56 @@ describe("configured drift runners", () => {
       code: "local_runner_ready",
     });
   });
+
+  it("rejects a same-named local script when its bytes do not match the configured hash", async () => {
+    const { script } = await executableNousPackage();
+
+    const env = {
+      NOUS_DRIFT_RUNNER_EXECUTABLE: script,
+      NOUS_DRIFT_RUNNER_ARGS: JSON.stringify(["drift", "--strict", "--target", repoRoot]),
+      NOUS_DRIFT_SCRIPT_SHA256: "0".repeat(64),
+    };
+
+    expect(getDriftRunnerDeploymentStatus(env)).toEqual({
+      ready: false,
+      mode: "unavailable",
+      code: "local_runner_command_invalid",
+    });
+    await expect(createConfiguredDriftRunner({ env }).run())
+      .rejects.toThrow("drift_runner_unavailable:local_runner_command_invalid");
+  });
+
+  it("rehashes the resolved script immediately before local execution", async () => {
+    const { hash, script } = await executableNousPackage();
+    const runner = createConfiguredDriftRunner({
+      env: {
+        NOUS_DRIFT_RUNNER_EXECUTABLE: script,
+        NOUS_DRIFT_RUNNER_ARGS: JSON.stringify(["drift", "--strict", "--target", repoRoot]),
+        NOUS_DRIFT_SCRIPT_SHA256: hash,
+      },
+    });
+    await writeFile(script, "#!/usr/bin/env node\nprocess.stdout.write('replacement')\n");
+
+    await expect(runner.run())
+      .rejects.toThrow("drift_runner_unavailable:local_runner_command_invalid");
+  });
+
+  it.each([undefined, "not-a-sha256", "a".repeat(63)])(
+    "rejects a local runner with an absent or malformed script hash: %s",
+    async (hash) => {
+      const { script } = await executableNousPackage();
+
+      expect(getDriftRunnerDeploymentStatus({
+        NOUS_DRIFT_RUNNER_EXECUTABLE: script,
+        NOUS_DRIFT_RUNNER_ARGS: JSON.stringify(["drift", "--strict", "--target", repoRoot]),
+        NOUS_DRIFT_SCRIPT_SHA256: hash,
+      })).toEqual({
+        ready: false,
+        mode: "unavailable",
+        code: "local_runner_command_invalid",
+      });
+    },
+  );
 
   it.each([
     ["arbitrary executable", "/usr/bin/true", ["drift", "--strict", "--target", repoRoot]],
@@ -75,7 +132,7 @@ describe("configured drift runners", () => {
   });
 
   it("rejects missing, wrong, and shell-extended targets after validating the real script", async () => {
-    const script = await executableNousPackage();
+    const { hash, script } = await executableNousPackage();
     const invalidArguments = [
       [script, "drift", "--strict"],
       [script, "drift", "--strict", "--target", tmpdir()],
@@ -86,6 +143,7 @@ describe("configured drift runners", () => {
       expect(getDriftRunnerDeploymentStatus({
         NOUS_DRIFT_RUNNER_EXECUTABLE: "python3",
         NOUS_DRIFT_RUNNER_ARGS: JSON.stringify(args),
+        NOUS_DRIFT_SCRIPT_SHA256: hash,
       })).toEqual({
         ready: false,
         mode: "unavailable",

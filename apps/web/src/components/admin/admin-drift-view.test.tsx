@@ -55,7 +55,7 @@ describe("AdminDriftView", () => {
     expect(screen.getAllByRole("tabpanel", { hidden: true })).toHaveLength(2);
   });
 
-  it("renders green only for a persisted zero exit code", () => {
+  it("fails closed when the runner is unavailable despite a stale zero exit code", () => {
     render(<AdminDriftView runnerDeployment={{ ready: false, mode: "unavailable", code: "remote_runner_missing" }} result={{
       checkedAt: new Date("2026-07-12T10:00:00.000Z"),
       exitCode: 0,
@@ -66,9 +66,27 @@ describe("AdminDriftView", () => {
       runnerKind: "remote",
     }} />);
 
-    expect(screen.getByText("Sin drift")).toBeInTheDocument();
+    expect(screen.getByTestId("drift_badge")).toHaveTextContent("Runner no disponible");
+    expect(screen.getByTestId("drift_badge")).not.toHaveTextContent("Sin drift");
     expect(screen.getByTestId("runner_config")).toHaveTextContent("Runner no disponible");
-    expect(screen.queryByText("Drift detectado")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Resumen" }));
+    expect(screen.getByText("El último chequeo terminó con código 0.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Crear IMP desde este drift" })).not.toBeInTheDocument();
+  });
+
+  it("renders green when the runner is ready and the persisted exit code is zero", () => {
+    render(<AdminDriftView runnerDeployment={{ ready: true, mode: "local", code: "local_runner_ready" }} result={{
+      checkedAt: new Date("2026-07-12T10:00:00.000Z"),
+      exitCode: 0,
+      status: "clean",
+      stdout: "clean",
+      stderr: "",
+      rawText: "clean",
+      runnerKind: "local",
+    }} />);
+
+    expect(screen.getByTestId("drift_badge")).toHaveTextContent("Sin drift");
+    expect(screen.getByTestId("runner_config")).toHaveTextContent("Runner local configurado");
   });
 
   it("builds and copies a complete IMP template without inventing a route", async () => {

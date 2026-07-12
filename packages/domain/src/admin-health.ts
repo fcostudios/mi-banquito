@@ -138,10 +138,11 @@ export function createAdminHealthService(options: {
           FROM organization
           WHERE status = 'active'
         ),
-        successful_org_months AS (
-          SELECT DISTINCT
+        reconciled_org_months AS (
+          SELECT
             period_close.org_id,
-            date_trunc('month', contribution_cycle.closes_on::timestamp) AS month_start
+            date_trunc('month', contribution_cycle.closes_on::timestamp) AS month_start,
+            reconciliation_cycle.discrepancy_amount
           FROM period_close
           JOIN active_orgs ON active_orgs.id = period_close.org_id
           JOIN contribution_cycle
@@ -155,6 +156,12 @@ export function createAdminHealthService(options: {
             AND reconciliation_cycle.closed_at IS NOT NULL
           CROSS JOIN completed_month
           WHERE contribution_cycle.closes_on < completed_month.current_month_start
+        ),
+        successful_org_months AS (
+          SELECT org_id, month_start
+          FROM reconciled_org_months
+          GROUP BY org_id, month_start
+          HAVING bool_and(discrepancy_amount = 0::numeric)
         ),
         clean_months AS (
           SELECT successful_org_months.month_start
