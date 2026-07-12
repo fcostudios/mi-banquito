@@ -144,6 +144,9 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+      undici:
+        specifier: 6.27.0
+        version: 6.27.0
 
   packages/config:
     devDependencies:

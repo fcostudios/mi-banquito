@@ -23,6 +23,8 @@ export type AdminAuditFilters = {
   limit?: number;
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type AuditFunctionRow = {
   id: string;
   org_id: string | null;
@@ -46,7 +48,7 @@ function decodeCursor(cursor: string | undefined): AdminAuditCursor | null {
   try {
     const value = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Partial<AdminAuditCursor>;
     if (typeof value.at !== "string" || !Number.isFinite(Date.parse(value.at))) throw new Error("invalid_at");
-    if (typeof value.id !== "string" || !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value.id)) throw new Error("invalid_id");
+    if (typeof value.id !== "string" || !UUID_RE.test(value.id)) throw new Error("invalid_id");
     return { at: value.at, id: value.id };
   } catch {
     throw new Error("audit_cursor_invalid");

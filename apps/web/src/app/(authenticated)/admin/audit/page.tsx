@@ -5,7 +5,7 @@ import { asc } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
 import { organization } from "@mi-banquito/db/schema";
 
-import { auditFiltersFromSearchParams, auditQueryString, type AdminAuditSearchParams } from "@/lib/admin-audit-query";
+import { auditQueryString, parseAdminAuditFilters, type AdminAuditSearchParams } from "@/lib/admin-audit-query";
 import { requirePlatformOperator } from "@/lib/auth/require-session";
 import messages from "@/lib/i18n/en-US.json";
 
@@ -14,14 +14,9 @@ const copy = messages.adminAudit;
 export default async function ScrAdminAuditPage({ searchParams }: { searchParams: Promise<AdminAuditSearchParams> }) {
   await requirePlatformOperator();
   const params = await searchParams;
-  let filterError = false;
-  let filters;
-  try {
-    filters = auditFiltersFromSearchParams(params);
-  } catch {
-    filterError = true;
-    filters = {};
-  }
+  const parsedFilters = parseAdminAuditFilters(params);
+  const filterError = !parsedFilters.ok;
+  const filters = parsedFilters.ok ? parsedFilters.filters : {};
   const [page, organizations] = await Promise.all([
     createAdminAuditService().list({ ...filters, limit: 50 }),
     db.select({ id: organization.id, displayName: organization.displayName }).from(organization).orderBy(asc(organization.displayName)),

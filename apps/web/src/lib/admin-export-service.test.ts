@@ -25,7 +25,7 @@ const MISSING_PDF_EXPORT_ID = randomUUID();
 const MISSING_PDF_ARCHIVE_ID = randomUUID();
 let db: typeof import("@mi-banquito/db")["db"];
 let withTenantTransaction: typeof import("@mi-banquito/db/tenant")["withTenantTransaction"];
-let generateTenantExport: typeof import("./admin-export-service")["generateTenantExport"];
+let prepareTenantExport: typeof import("./admin-export-service")["prepareTenantExport"];
 let loadTenantExportDownload: typeof import("./admin-export-service")["loadTenantExportDownload"];
 let loadTenantExportHistory: typeof import("./admin-export-service")["loadTenantExportHistory"];
 
@@ -52,7 +52,7 @@ describe("US-021 export orchestration", () => {
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for export orchestration tests");
     ({ db } = await import("@mi-banquito/db"));
     ({ withTenantTransaction } = await import("@mi-banquito/db/tenant"));
-    ({ generateTenantExport, loadTenantExportDownload, loadTenantExportHistory } = await import("./admin-export-service"));
+    ({ prepareTenantExport, loadTenantExportDownload, loadTenantExportHistory } = await import("./admin-export-service"));
     await db.insert(organization).values([
       {
         id: ORG_A,
@@ -104,7 +104,7 @@ describe("US-021 export orchestration", () => {
       delete: async () => undefined,
     };
 
-    const result = await generateTenantExport({
+    const prepared = await prepareTenantExport({
       orgId: ORG_A,
       actorId: ACTOR,
       operatorUserId: "auth0|operator-a",
@@ -112,7 +112,10 @@ describe("US-021 export orchestration", () => {
       exportId: SUCCESS_EXPORT_ID,
       blob: adapter,
     });
+    const responseBytes = Buffer.concat(await Array.fromAsync(Readable.fromWeb(prepared.stream as never), (chunk) => Buffer.from(chunk)));
+    const result = await prepared.completion;
 
+    expect(responseBytes).toEqual(uploadedBytes);
     expect(uploadedBytes.subarray(0, 4).toString("hex")).toBe("504b0304");
     expect(result.zipSha256).toBe(createHash("sha256").update(uploadedBytes).digest("hex"));
     expect(result.sizeBytes).toBe(uploadedBytes.byteLength);
@@ -145,17 +148,79 @@ describe("US-021 export orchestration", () => {
       delete: async () => undefined,
     };
 
-    await expect(generateTenantExport({
+    const prepared = await prepareTenantExport({
       orgId: ORG_A,
       actorId: ACTOR,
       operatorUserId: "auth0|operator-a",
       now: new Date("2026-07-12T16:00:00.000Z"),
       exportId: FAILED_EXPORT_ID,
       blob: adapter,
-    })).rejects.toThrow("blob_upload_failed");
+    });
+    await expect(Array.fromAsync(Readable.fromWeb(prepared.stream as never))).rejects.toThrow("blob_upload_failed");
+    await expect(prepared.completion).rejects.toThrow("blob_upload_failed");
 
     const audits = await withTenantTransaction(ORG_A, (tx) => tx.select({ id: auditLogEntry.id }).from(auditLogEntry).where(eq(auditLogEntry.id, FAILED_EXPORT_ID)));
     expect(audits).toEqual([]);
+  });
+
+  it("writes no success audit when the client disconnects", async () => {
+    const exportId = randomUUID();
+    let uploadFinished = false;
+    const adapter: AdminExportBlobAdapter = {
+      read: async () => null,
+      upload: async (pathname, body) => {
+        for await (const _chunk of body) {
+          // Cancellation must destroy the upload body before it can finish.
+        }
+        uploadFinished = true;
+        return { url: `https://private.invalid/${pathname}`, pathname };
+      },
+      delete: async () => undefined,
+    };
+    const prepared = await prepareTenantExport({
+      orgId: ORG_A,
+      actorId: ACTOR,
+      operatorUserId: "auth0|operator-a",
+      now: new Date("2026-07-12T16:30:00.000Z"),
+      exportId,
+      blob: adapter,
+    });
+    const reader = prepared.stream.getReader();
+    expect((await reader.read()).done).toBe(false);
+    await reader.cancel("client_disconnected");
+
+    await expect(prepared.completion).rejects.toThrow("tenant_export_client_disconnected");
+    expect(uploadFinished).toBe(false);
+    const audits = await withTenantTransaction(ORG_A, (tx) => tx.select({ id: auditLogEntry.id }).from(auditLogEntry).where(eq(auditLogEntry.id, exportId)));
+    expect(audits).toEqual([]);
+  });
+
+  it("keeps a committed success when temporary cleanup fails", async () => {
+    const exportId = randomUUID();
+    const adapter: AdminExportBlobAdapter = {
+      read: async () => null,
+      upload: async (pathname, body) => {
+        for await (const _chunk of body) {
+          // Consume with the real Node stream contract.
+        }
+        return { url: `https://private.invalid/${pathname}`, pathname };
+      },
+      delete: async () => undefined,
+    };
+    const prepared = await prepareTenantExport({
+      orgId: ORG_A,
+      actorId: ACTOR,
+      operatorUserId: "auth0|operator-a",
+      now: new Date("2026-07-12T16:45:00.000Z"),
+      exportId,
+      blob: adapter,
+      cleanup: async () => { throw new Error("cleanup_failed"); },
+    });
+    await Array.fromAsync(Readable.fromWeb(prepared.stream as never));
+
+    await expect(prepared.completion).resolves.toEqual(expect.objectContaining({ exportId }));
+    const audits = await withTenantTransaction(ORG_A, (tx) => tx.select({ id: auditLogEntry.id }).from(auditLogEntry).where(eq(auditLogEntry.id, exportId)));
+    expect(audits).toEqual([{ id: exportId }]);
   });
 
   it("fails explicitly and writes no audit when a required private statement PDF is missing", async () => {
@@ -185,7 +250,7 @@ describe("US-021 export orchestration", () => {
       delete: async () => undefined,
     };
 
-    await expect(generateTenantExport({
+    await expect(prepareTenantExport({
       orgId: ORG_A,
       actorId: ACTOR,
       operatorUserId: "auth0|operator-a",

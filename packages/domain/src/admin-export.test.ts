@@ -1,4 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Readable } from "node:stream";
 import { loadEnvFile } from "node:process";
 
@@ -32,9 +35,9 @@ const HASH_A = "a".repeat(64);
 const PDF_BYTES = Buffer.from("%PDF-1.4\norg-a-statement\n%%EOF\n", "utf8");
 
 let db: typeof import("@mi-banquito/db")["db"];
-let loadTenantExportData: typeof import("./admin-export")["loadTenantExportData"];
-let buildTenantExportPlan: typeof import("./admin-export")["buildTenantExportPlan"];
+let buildStagedTenantExportPlan: typeof import("./admin-export")["buildStagedTenantExportPlan"];
 let createTenantExportArchive: typeof import("./admin-export")["createTenantExportArchive"];
+let stageTenantExportFiles: typeof import("./admin-export")["stageTenantExportFiles"];
 
 async function collect(stream: Readable): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -47,9 +50,9 @@ describe("US-021 tenant export", () => {
     if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for admin export integration tests");
     ({ db } = await import("@mi-banquito/db"));
     const exportModule = await import("./admin-export");
-    loadTenantExportData = exportModule.loadTenantExportData;
-    buildTenantExportPlan = exportModule.buildTenantExportPlan;
+    buildStagedTenantExportPlan = exportModule.buildStagedTenantExportPlan;
     createTenantExportArchive = exportModule.createTenantExportArchive;
+    stageTenantExportFiles = exportModule.stageTenantExportFiles;
 
     await db.insert(organization).values([
       {
@@ -164,18 +167,18 @@ describe("US-021 tenant export", () => {
     });
   });
 
-  it("loads every entity through one tenant snapshot and rejects pending statement artifacts", async () => {
-    const data = await loadTenantExportData(ORG_A);
-    expect(data.members.map((row) => row.id)).toEqual([MEMBER_A]);
-    expect(data.auditLog.map((row) => row.orgId)).toEqual([ORG_A]);
-    expect(data.statementArchives.map((row) => row.id)).toEqual([ARCHIVE_A]);
-    expect(JSON.stringify(data)).not.toContain("FOREIGN_TENANT_SENTINEL");
-
+  it("rejects pending statement artifacts through the paged tenant staging path", async () => {
     await db.transaction(async (tx) => {
       await tx.execute(sql.raw("SET LOCAL session_replication_role = replica"));
       await tx.update(statementArtifactEvent).set({ status: "pending" }).where(inArray(statementArtifactEvent.orgId, [ORG_A]));
     });
-    await expect(loadTenantExportData(ORG_A)).rejects.toThrow("statement_artifact_not_ready");
+    const directory = await mkdtemp(join(tmpdir(), "mi-banquito-pending-export-test-"));
+    await expect(stageTenantExportFiles({
+      orgId: ORG_A,
+      directory,
+      stagePdf: async () => ({ sha256: "a".repeat(64), sizeBytes: PDF_BYTES.byteLength }),
+    })).rejects.toThrow("statement_artifact_not_ready");
+    await rm(directory, { recursive: true, force: true });
     await db.transaction(async (tx) => {
       await tx.execute(sql.raw("SET LOCAL session_replication_role = replica"));
       await tx.update(statementArtifactEvent).set({ status: "ready" }).where(inArray(statementArtifactEvent.orgId, [ORG_A]));
@@ -183,27 +186,32 @@ describe("US-021 tenant export", () => {
   });
 
   it("creates the exact canonical files, real PDFs, deterministic hashes, and no foreign tenant values", async () => {
-    const data = await loadTenantExportData(ORG_A);
     const pdfName = `statements/monthly_member-2026-07-${ARCHIVE_A}.pdf`;
-    const plan = buildTenantExportPlan({
-      orgId: ORG_A,
-      generatedAt: new Date("2026-07-12T13:00:00.000Z"),
-      data,
-      pdfs: [{
-        name: pdfName,
-        archiveId: ARCHIVE_A,
-        sha256: createHash("sha256").update(PDF_BYTES).digest("hex"),
-        sizeBytes: PDF_BYTES.byteLength,
-        source: () => Readable.from(PDF_BYTES),
-      }],
-    });
-    const { stream, completion } = createTenantExportArchive(plan);
-    const zipBytes = await collect(stream);
-    await completion;
-    const zip = await Open.buffer(zipBytes);
-    const names = zip.files.map((file) => file.path).sort();
+    const directory = await mkdtemp(join(tmpdir(), "mi-banquito-canonical-export-test-"));
+    try {
+      const staged = await stageTenantExportFiles({
+        orgId: ORG_A,
+        directory,
+        stagePdf: async (_archive, path) => {
+          await writeFile(path, PDF_BYTES, { flag: "wx" });
+          return {
+            sha256: createHash("sha256").update(PDF_BYTES).digest("hex"),
+            sizeBytes: PDF_BYTES.byteLength,
+          };
+        },
+      });
+      const plan = buildStagedTenantExportPlan({
+        orgId: ORG_A,
+        generatedAt: new Date("2026-07-12T13:00:00.000Z"),
+        ...staged,
+      });
+      const { stream, completion } = createTenantExportArchive(plan);
+      const zipBytes = await collect(stream);
+      await completion;
+      const zip = await Open.buffer(zipBytes);
+      const names = zip.files.map((file) => file.path).sort();
 
-    expect(names).toEqual([
+      expect(names).toEqual([
       "README.txt",
       "audit_log.csv",
       "base_fund_quota_configs.csv",
@@ -221,56 +229,82 @@ describe("US-021 tenant export", () => {
       pdfName,
       "statements.csv",
       "withdrawals.csv",
-    ].sort());
+      ].sort());
 
-    const manifestEntry = zip.files.find((file) => file.path === "manifest.json");
-    expect(manifestEntry).toBeDefined();
-    const manifest = JSON.parse((await manifestEntry!.buffer()).toString("utf8"));
-    expect(manifest).toEqual(expect.objectContaining({
+      const manifestEntry = zip.files.find((file) => file.path === "manifest.json");
+      expect(manifestEntry).toBeDefined();
+      const manifest = JSON.parse((await manifestEntry!.buffer()).toString("utf8"));
+      expect(manifest).toEqual(expect.objectContaining({
       orgId: ORG_A,
       generatedAt: "2026-07-12T13:00:00.000Z",
       entityRowCounts: expect.objectContaining({ members: 1, statements: 1, audit_log: 1 }),
-    }));
-    expect(Object.keys(manifest.files).sort()).toEqual(names.filter((name) => name.endsWith(".csv") || name.endsWith(".pdf")).sort());
+      }));
+      expect(Object.keys(manifest.files).sort()).toEqual(names.filter((name) => name.endsWith(".csv") || name.endsWith(".pdf")).sort());
 
-    for (const file of zip.files.filter((entry) => entry.path.endsWith(".csv") || entry.path.endsWith(".pdf"))) {
-      const bytes = await file.buffer();
-      expect(manifest.files[file.path].sha256).toBe(createHash("sha256").update(bytes).digest("hex"));
-      expect(manifest.files[file.path].sizeBytes).toBe(bytes.byteLength);
-      expect(bytes.toString("utf8")).not.toContain("FOREIGN_TENANT_SENTINEL");
+      for (const file of zip.files.filter((entry) => entry.path.endsWith(".csv") || entry.path.endsWith(".pdf"))) {
+        const bytes = await file.buffer();
+        expect(manifest.files[file.path].sha256).toBe(createHash("sha256").update(bytes).digest("hex"));
+        expect(manifest.files[file.path].sizeBytes).toBe(bytes.byteLength);
+        expect(bytes.toString("utf8")).not.toContain("FOREIGN_TENANT_SENTINEL");
+      }
+      const membersCsv = (await zip.files.find((file) => file.path === "members.csv")!.buffer()).toString("utf8");
+      expect(membersCsv).toContain("'=HYPERLINK");
+      expect((await zip.files.find((file) => file.path === "README.txt")!.buffer()).toString("utf8"))
+        .toMatch(/ESPAÑOL[\s\S]*ENGLISH/);
+      expect(plan.pdfs.map((pdf) => pdf.name)).toEqual([pdfName]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
     }
-    const membersCsv = (await zip.files.find((file) => file.path === "members.csv")!.buffer()).toString("utf8");
-    expect(membersCsv).toContain("'=HYPERLINK");
-    expect((await zip.files.find((file) => file.path === "README.txt")!.buffer()).toString("utf8"))
-      .toMatch(/ESPAÑOL[\s\S]*ENGLISH/);
   });
 
-  it("honors downstream backpressure instead of consuming a large source eagerly", async () => {
-    const chunk = Buffer.alloc(64 * 1024, 7);
-    const totalChunks = 256;
-    let emittedChunks = 0;
-    const source = new Readable({
-      read() {
-        if (emittedChunks >= totalChunks) return this.push(null);
-        emittedChunks += 1;
-        this.push(chunk);
-      },
-    });
-    const plan = buildTenantExportPlan({
+  it("pages a large tenant export within the configured bound and preserves every row and hash", async () => {
+    const syntheticIds = Array.from({ length: 113 }, () => randomUUID());
+    await db.insert(member).values(syntheticIds.map((id, index) => ({
+      id,
       orgId: ORG_A,
-      generatedAt: new Date("2026-07-12T13:00:00.000Z"),
-      data: await loadTenantExportData(ORG_A),
-      pdfs: [{
-        name: `statements/large-${ARCHIVE_A}.pdf`,
-        archiveId: ARCHIVE_A,
-        sha256: createHash("sha256").update(Buffer.alloc(chunk.byteLength * totalChunks, 7)).digest("hex"),
-        sizeBytes: chunk.byteLength * totalChunks,
-        source: () => source,
-      }],
-    });
-    const { stream } = createTenantExportArchive(plan);
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(emittedChunks).toBeLessThan(totalChunks);
-    stream.destroy();
+      displayName: index === 0 ? "+FORMULA" : `Synthetic ${index}`,
+      joinedOn: "2026-07-01",
+      role: "aportante" as const,
+      status: "activo" as const,
+      initialSavingsBalance: "1.0000",
+      createdAt: new Date("2026-07-01T00:00:00.000Z"),
+      createdBy: ACTOR,
+      createdByKind: "system",
+    })));
+    const directory = await mkdtemp(join(tmpdir(), "mi-banquito-domain-export-test-"));
+    const observedPages: Array<{ entity: string; size: number }> = [];
+
+    try {
+      const staged = await stageTenantExportFiles({
+        orgId: ORG_A,
+        directory,
+        pageSize: 17,
+        onPage: (page) => observedPages.push(page),
+        stagePdf: async (_archive, path) => {
+          await writeFile(path, PDF_BYTES, { flag: "wx" });
+          return {
+            sha256: createHash("sha256").update(PDF_BYTES).digest("hex"),
+            sizeBytes: PDF_BYTES.byteLength,
+          };
+        },
+      });
+      const members = staged.csvFiles.find((file) => file.name === "members.csv");
+      expect(members).toBeDefined();
+      const bytes = await readFile(members!.path);
+      const lines = bytes.toString("utf8").trimEnd().split("\r\n");
+
+      expect(Math.max(...observedPages.map((page) => page.size))).toBeLessThanOrEqual(17);
+      expect(observedPages.filter((page) => page.entity === "members").map((page) => page.size))
+        .toEqual([17, 17, 17, 17, 17, 17, 12]);
+      expect(members!.rowCount).toBe(114);
+      expect(lines).toHaveLength(115);
+      expect(members!.sha256).toBe(createHash("sha256").update(bytes).digest("hex"));
+      expect(members!.sizeBytes).toBe(bytes.byteLength);
+      expect(bytes.toString("utf8")).toContain("'+FORMULA");
+      expect(bytes.toString("utf8")).not.toContain("FOREIGN_TENANT_SENTINEL");
+    } finally {
+      await db.delete(member).where(inArray(member.id, syntheticIds));
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

@@ -17,7 +17,8 @@ describe("US-021/US-022 platform-operator boundary", () => {
     const gate = source.indexOf("await requirePlatformOperator()");
     const protectedCalls = [
       source.indexOf("createAdminAuditService()"),
-      source.indexOf("generateTenantExport("),
+      source.indexOf("createTenantExportRequest("),
+      source.indexOf("prepareTenantExport("),
       source.indexOf("loadTenantExportHistory("),
       source.indexOf("loadTenantExportDownload("),
     ].filter((index) => index >= 0);
@@ -26,5 +27,16 @@ describe("US-021/US-022 platform-operator boundary", () => {
     expect(gate).toBeGreaterThan(0);
     expect(protectedCalls.length).toBeGreaterThan(0);
     expect(protectedCalls.every((call) => gate < call)).toBe(true);
+  });
+
+  it("keeps export generation out of the server action", () => {
+    const source = readFileSync(resolve(
+      process.cwd(),
+      "src/app/(authenticated)/admin/orgs/[id]/export/actions.ts",
+    ), "utf8");
+
+    expect(source).toContain("createTenantExportRequest(");
+    expect(source).not.toContain("prepareTenantExport(");
+    expect(source).not.toContain("generateTenantExport(");
   });
 });
