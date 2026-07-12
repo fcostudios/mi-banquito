@@ -1,4 +1,4 @@
-import { del, list, put } from "@vercel/blob";
+import { del, get, list, put } from "@vercel/blob";
 
 export function uploadPrivateBlob(pathname: string, body: Parameters<typeof put>[1], contentType: string) {
   return put(pathname, body, {
@@ -19,4 +19,8 @@ export function listPrivateBlobs(input: { prefix: string; cursor?: string }) {
     prefix: input.prefix,
     cursor: input.cursor,
   });
+}
+
+export function readPrivateBlob(pathname: string) {
+  return get(pathname, { access: "private" });
 }

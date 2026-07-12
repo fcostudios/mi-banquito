@@ -18,10 +18,14 @@
   "dependencies": {
     "@mi-banquito/contracts": "workspace:*",
     "@mi-banquito/db": "workspace:*",
+    "archiver": "^7.0.1",
     "drizzle-orm": "^0.38.3"
   },
   "devDependencies": {
+    "@types/archiver": "^6.0.3",
+    "@types/unzipper": "^0.10.11",
     "fast-check": "4.1.1",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "unzipper": "^0.12.3"
   }
 }
