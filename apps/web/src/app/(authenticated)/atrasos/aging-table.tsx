@@ -8,7 +8,7 @@ import {
   type DateOnlyString,
 } from "@mi-banquito/domain";
 import { currentEcuadorDateString } from "@mi-banquito/contracts";
-import { ButtonPrimary, ButtonSecondary } from "@mi-banquito/ui";
+import { ButtonPrimary, ButtonSecondary, Select } from "@mi-banquito/ui";
 import { ecCurrency } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
 import {
@@ -20,6 +20,13 @@ import {
 import { PromiseDialog } from "./promise-dialog";
 
 const copy = messages.atrasos;
+
+type DepositAccount = {
+  id: string;
+  name: string;
+  last4: string | null;
+  isGroupFund: boolean;
+};
 
 const reasonLabels: Record<ChaseObligationKind, string> = {
   aporte: copy.reasonAporte,
@@ -94,13 +101,27 @@ function PromiseOutcomeActions({ promiseId }: { promiseId: string }) {
   );
 }
 
-function OverdueContributionPaymentAction({ row }: { row: CollectionsAgingRow }) {
+function accountLabel(account: DepositAccount): string {
+  const suffix = account.last4 ? ` ****${account.last4}` : "";
+  return account.isGroupFund
+    ? `${account.name}${suffix} - ${copy.groupFundAccount}`
+    : `${account.name}${suffix} - ${copy.pendingAccount}`;
+}
+
+function OverdueContributionPaymentAction({ row, accounts }: { row: CollectionsAgingRow; accounts: DepositAccount[] }) {
+  const defaultAccount = accounts.find((account) => account.isGroupFund);
   return (
-    <form action={recordOverdueContributionAction} className="w-full sm:w-auto">
+    <form action={recordOverdueContributionAction} className="grid w-full gap-2 sm:w-auto">
       <input type="hidden" name="clientRequestId" value={randomUUID()} />
       <input type="hidden" name="memberId" value={row.memberId ?? ""} />
       <input type="hidden" name="cycleId" value={row.cycleId ?? ""} />
-      <ButtonPrimary type="submit" labelKey={copy.recordPayment} />
+      <label className="grid gap-1 text-sm text-text-secondary">
+        <span>{copy.depositAccount}</span>
+        <Select name="accountId" defaultValue={defaultAccount?.id} required>
+          {accounts.map((account) => <option key={account.id} value={account.id}>{accountLabel(account)}</option>)}
+        </Select>
+      </label>
+      <ButtonPrimary type="submit" labelKey={copy.recordPayment} disabled={!defaultAccount} />
     </form>
   );
 }
@@ -121,7 +142,7 @@ function whatsappUrl(row: CollectionsAgingRow): string | null {
   });
 }
 
-export function AgingTable({ rows }: { rows: CollectionsAgingRow[] }) {
+export function AgingTable({ rows, accounts }: { rows: CollectionsAgingRow[]; accounts: DepositAccount[] }) {
   const defaultPromisedOn = defaultPromiseDate(todayIso());
 
   if (rows.length === 0) {
@@ -197,7 +218,7 @@ export function AgingTable({ rows }: { rows: CollectionsAgingRow[] }) {
                   <PromiseOutcomeActions promiseId={row.openPromiseId} />
                 ) : null}
                 {canRecordContributionPayment(row) ? (
-                  <OverdueContributionPaymentAction row={row} />
+                  <OverdueContributionPaymentAction row={row} accounts={accounts} />
                 ) : null}
                 <div className="flex flex-wrap gap-2">
                   {rowWhatsappUrl ? (

@@ -7,13 +7,12 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
-import { withWritableTenantTransaction } from "@mi-banquito/db/tenant";
+import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import {
   alert,
   auditLogEntry,
   baseFundQuotaConfig,
   baseFundQuotaPayment,
-  cashBalances,
   contribution,
   contributionCycle,
   entityVersion,
@@ -857,8 +856,24 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
     return createPlatformService({ auditWriter }).saveGroupConfig(orgId, input, actorId, "member");
   },
   async getCashBalances(orgId) {
-    const [row] = await db.select().from(cashBalances).where(eq(cashBalances.orgId, orgId));
-    return row ?? {
+    const rows = await withTenantTransaction(orgId, async (tx) => {
+      const result = await tx.execute<{
+        bankBalance: string;
+        pettyCashBalance: string;
+      }>(sql`
+        SELECT bank_balance::numeric(18, 4)::text AS "bankBalance",
+               petty_cash_balance::numeric(18, 4)::text AS "pettyCashBalance"
+        FROM current_cash_balances(${orgId})
+      `);
+      return Array.isArray(result) ? result : result.rows ?? [];
+    });
+    const row = rows[0];
+    return row ? {
+      orgId,
+      bankBalance: String(row.bankBalance),
+      pettyCashBalance: String(row.pettyCashBalance),
+      refreshedAt: new Date(),
+    } : {
       orgId,
       bankBalance: "0.0000",
       pettyCashBalance: "0.0000",

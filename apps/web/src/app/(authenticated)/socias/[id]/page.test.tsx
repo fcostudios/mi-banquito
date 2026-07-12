@@ -22,6 +22,7 @@ vi.mock("../../estados/actions", () => ({
 const getMember = vi.fn();
 const getMemberBalance = vi.fn();
 const listStatementArchive = vi.fn();
+const listMemberDeposits = vi.fn();
 
 vi.mock("@mi-banquito/domain", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@mi-banquito/domain")>();
@@ -33,6 +34,9 @@ vi.mock("@mi-banquito/domain", async (importOriginal) => {
     }),
     createReportingService: () => ({
       listStatementArchive,
+    }),
+    createMovementService: () => ({
+      listMemberDeposits,
     }),
   };
 });
@@ -61,6 +65,7 @@ describe("ScrMemberDetailPage", () => {
       periodCloseId: "period-close-1",
       periodLabel: "2026-06",
     }]);
+    listMemberDeposits.mockResolvedValueOnce([]);
 
     render(await ScrMemberDetailPage({
       params: Promise.resolve({ id: "22222222-2222-4222-8222-222222222222" }),
@@ -109,6 +114,7 @@ describe("ScrMemberDetailPage", () => {
         periodLabel: "2026-06",
       },
     ]);
+    listMemberDeposits.mockResolvedValueOnce([]);
 
     render(await ScrMemberDetailPage({
       params: Promise.resolve({ id: "22222222-2222-4222-8222-222222222222" }),
@@ -120,5 +126,32 @@ describe("ScrMemberDetailPage", () => {
       "href",
       "/statement-archive/public/abc.pdf",
     );
+  });
+
+  it("shows pending, regularized, and legacy-account deposit statuses", async () => {
+    getMember.mockResolvedValueOnce({
+      id: "22222222-2222-4222-8222-222222222222",
+      orgId: "11111111-1111-4111-8111-111111111111",
+      displayName: "Ana Mora",
+      status: "activo",
+      role: "aportante",
+      initialSavingsBalance: "40.0000",
+    });
+    getMemberBalance.mockResolvedValueOnce(null);
+    listStatementArchive.mockResolvedValueOnce([]);
+    listMemberDeposits.mockResolvedValueOnce([
+      { id: "one", sourceKind: "contribution", datedOn: "2026-07-10", accountName: "Cuenta personal", amount: "50.0000", reconciliationStatus: "pending" },
+      { id: "two", sourceKind: "repayment", datedOn: "2026-07-11", accountName: null, amount: "20.0000", reconciliationStatus: "regularized" },
+    ]);
+
+    render(await ScrMemberDetailPage({
+      params: Promise.resolve({ id: "22222222-2222-4222-8222-222222222222" }),
+      searchParams: Promise.resolve({}),
+    }));
+
+    const section = screen.getByRole("region", { name: "Depósitos y regularización" });
+    expect(section).toHaveTextContent("Pendiente de regularizar");
+    expect(section).toHaveTextContent("Regularizado");
+    expect(section).toHaveTextContent("Cuenta histórica sin referencia");
   });
 });

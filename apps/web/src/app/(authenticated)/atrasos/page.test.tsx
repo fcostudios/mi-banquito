@@ -11,10 +11,17 @@ vi.mock("@/lib/auth/require-session", () => ({
 }));
 
 const listAgingRows = vi.fn();
+const listActiveAccounts = vi.fn(() => Promise.resolve([
+  { id: "99999999-9999-4999-8999-999999999999", name: "Banco del grupo", last4: "1234", isGroupFund: true },
+  { id: "88888888-8888-4888-8888-888888888888", name: "Cuenta personal", last4: null, isGroupFund: false },
+]));
 
 vi.mock("@mi-banquito/domain", () => ({
   createCollectionsService: () => ({
     listAgingRows,
+  }),
+  createMovementService: () => ({
+    listActiveAccounts,
   }),
   buildChaseMessage: ({ memberName, reasonKind, periodLabel }: {
     memberName: string;
@@ -117,6 +124,8 @@ describe("ScrArAgingPage", () => {
 
     const row = screen.getByRole("article", { name: /Toitq/ });
     expect(within(row).getByRole("button", { name: "Registrar pago" })).toBeInTheDocument();
+    expect(within(row).getByRole("combobox", { name: "¿En qué cuenta entró?" })).toHaveValue("99999999-9999-4999-8999-999999999999");
+    expect(within(row).getByRole("option", { name: /Cuenta personal.*pendiente de regularizar/i })).toBeInTheDocument();
     expect(container.querySelector('input[name="cycleId"]')).toHaveValue("55555555-5555-4555-8555-555555555555");
     expect(container.querySelector('input[name="periodLabel"]')).toHaveValue("2026-06");
   });

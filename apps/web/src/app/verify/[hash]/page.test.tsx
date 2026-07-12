@@ -20,6 +20,10 @@ describe("public verifier route", () => {
       matched: true,
       groupName: "Mi Banquito",
       generatedAt: "2026-07-04T10:00:00.000Z",
+      movements: [
+        { id: "c1", kind: "contribution", datedOn: "2026-07-01", amount: "50.0000", status: "pending", label: "Aporte pendiente · Cuenta personal" },
+        { id: "t1", kind: "regularization_transfer", datedOn: "2026-07-02", amount: "50.0000", status: "regularized", label: "Transferencia para regularizar · Banco del grupo" },
+      ],
     });
 
     const response = await GET(new Request("http://localhost/verify/hash", {
@@ -34,6 +38,8 @@ describe("public verifier route", () => {
     expect(verifyStatementHash).toHaveBeenCalledWith("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     expect(html).toContain("Verificación de documento");
     expect(html).toContain("Este documento coincide con el registro del grupo Mi Banquito al 2026-07-04.");
+    expect(html).toContain("Aporte pendiente · Cuenta personal");
+    expect(html).toContain("Transferencia para regularizar · Banco del grupo");
   });
 
   it("returns minimal JSON from the public route", async () => {

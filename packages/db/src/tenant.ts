@@ -6,6 +6,10 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export const TENANT_SESSION_KEY = "app.current_org_id";
 
+export async function lockTenantMoneyWrites(tx: Transaction, orgId: string): Promise<void> {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`tenant-money:${orgId}`}, 0))`);
+}
+
 export async function withTenantTransaction<T>(
   orgId: string,
   run: (tx: Transaction) => Promise<T>,

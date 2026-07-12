@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 config({ path: "../../.env.local" });
-config({ path: "../../apps/web/.env.local", override: true });
+config({ path: "../../apps/web/.env.local" });
 
 const runIfDatabase = process.env.DATABASE_URL ? it : it.skip;
 

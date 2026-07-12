@@ -1,8 +1,10 @@
-import { and, desc, eq, gte, isNotNull, isNull, lt, lte } from "drizzle-orm";
-import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
+import { db } from "@mi-banquito/db";
+import { lockTenantMoneyWrites, withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import {
   alert,
   alertAction,
+  account,
   auditLogEntry,
   contribution,
   contributionCycle,
@@ -18,7 +20,9 @@ import {
   repayment,
   reconciliationCycle,
   statementArchive,
+  statementArtifactEvent,
   withdrawal,
+  transfer,
 } from "@mi-banquito/db/schema";
 import { type AuditWriter, writeWithAudit } from "./audit";
 import { effectiveAlertState } from "./alerts";
@@ -70,7 +74,24 @@ export type ReconciliationSnapshot = {
   monthlyCloseStatementId: string | null;
   monthlyClosePdfUri: string | null;
   canonicalPayloadHash: string | null;
+  monthlyCloseArtifactStatus: "pending" | "failed" | "ready" | null;
+  pendingRegularizations: PendingRegularization[];
 };
+
+export type PendingRegularization = {
+  id: string;
+  kind: "contribution" | "repayment";
+  memberId: string;
+  memberName: string;
+  accountId: string | null;
+  accountName: string | null;
+  amount: string;
+  datedOn: string;
+};
+
+export function canCloseWithPendingRegularizations(rows: Array<{ id: string }>): boolean {
+  return rows.length === 0;
+}
 
 export type ExecuteReconciliationInput = {
   orgId: string;
@@ -109,6 +130,11 @@ export type MonthlyCloseArtifactInput = {
   payload: ReturnType<typeof monthlyClosePayload>;
 };
 
+type PendingMonthlyCloseArtifact = MonthlyCloseArtifactInput & {
+  statementArchiveId: string;
+  attemptNumber: number;
+};
+
 export type MonthlyCloseArtifactResult = {
   pdfUri: string;
   byteSize: number;
@@ -127,16 +153,18 @@ export function buildAdjustmentWindow({ openedAt, days = DEFAULT_ADJUSTMENT_WIND
   };
 }
 
-function decimal(value: string): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    throw new Error("amount_must_be_numeric");
-  }
-  return parsed;
+function moneyUnits4(value: string | number): bigint {
+  const match = /^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(String(value));
+  if (!match) throw new Error("amount_must_be_numeric");
+  const units = BigInt(match[2] ?? "0") * BigInt(10_000) + BigInt((match[3] ?? "").padEnd(4, "0") || "0");
+  return match[1] === "-" ? -units : units;
 }
 
 function money4(value: string | number): string {
-  return Number(value).toFixed(4);
+  const units = moneyUnits4(value);
+  const negative = units < BigInt(0);
+  const absolute = negative ? -units : units;
+  return `${negative ? "-" : ""}${absolute / BigInt(10_000)}.${String(absolute % BigInt(10_000)).padStart(4, "0")}`;
 }
 
 function dateValue(value: Date | string): Date {
@@ -177,12 +205,13 @@ function isPastContributionCycle(
 }
 
 export function classifyReconciliation(input: ReconciliationClassificationInput): ReconciliationClassification {
-  const discrepancy = decimal(input.declaredBankBalance) - decimal(input.computedPoolBalance);
-  const tolerance = Math.abs(decimal(input.toleranceAmount));
+  const discrepancy = moneyUnits4(input.declaredBankBalance) - moneyUnits4(input.computedPoolBalance);
+  const toleranceUnits = moneyUnits4(input.toleranceAmount);
+  const tolerance = toleranceUnits < BigInt(0) ? -toleranceUnits : toleranceUnits;
 
   if (input.periodCloseId) {
     return {
-      discrepancyAmount: money4(discrepancy),
+      discrepancyAmount: money4FromUnits(discrepancy),
       status: "closed",
       closeAllowed: false,
     };
@@ -190,15 +219,16 @@ export function classifyReconciliation(input: ReconciliationClassificationInput)
 
   if (input.resolutionKind === "annotated_acceptance") {
     return {
-      discrepancyAmount: money4(discrepancy),
+      discrepancyAmount: money4FromUnits(discrepancy),
       status: "annotated",
       closeAllowed: true,
     };
   }
 
-  const withinTolerance = Math.abs(discrepancy) <= tolerance;
+  const absoluteDiscrepancy = discrepancy < BigInt(0) ? -discrepancy : discrepancy;
+  const withinTolerance = absoluteDiscrepancy <= tolerance;
   return {
-    discrepancyAmount: money4(discrepancy),
+    discrepancyAmount: money4FromUnits(discrepancy),
     status: withinTolerance ? "within_tolerance" : "outside_tolerance",
     closeAllowed: withinTolerance,
   };
@@ -241,8 +271,14 @@ const defaultAuditWriter: AdjustmentAuditWriter = async ({ tx, entry }) => {
   await tx.insert(auditLogEntry).values(entry);
 };
 
-const sumAmounts = (rows: Array<{ amount: string | number }>): number =>
-  rows.reduce((total, row) => total + decimal(String(row.amount)), 0);
+function money4FromUnits(units: bigint): string {
+  const negative = units < BigInt(0);
+  const absolute = negative ? -units : units;
+  return `${negative ? "-" : ""}${absolute / BigInt(10_000)}.${String(absolute % BigInt(10_000)).padStart(4, "0")}`;
+}
+
+const sumAmountUnits = (rows: Array<{ amount: string | number }>): bigint =>
+  rows.reduce((total, row) => total + moneyUnits4(row.amount), BigInt(0));
 
 function actionsByAlertId(rows: Array<typeof alertAction.$inferSelect>): Map<string, Array<typeof alertAction.$inferSelect>> {
   const grouped = new Map<string, Array<typeof alertAction.$inferSelect>>();
@@ -254,7 +290,7 @@ function actionsByAlertId(rows: Array<typeof alertAction.$inferSelect>): Map<str
 
 async function deriveCyclePoolBalance(
   tx: {
-    select(): {
+    select(selection?: unknown): {
       from(table: unknown): {
         where(...args: unknown[]): unknown;
       };
@@ -265,100 +301,182 @@ async function deriveCyclePoolBalance(
     cycle: Pick<typeof contributionCycle.$inferSelect, "id" | "opensOn" | "closesOn">;
   },
 ): Promise<string> {
-  const [contributions, repayments, withdrawals, expenses, disbursements] = await Promise.all([
-    tx.select().from(contribution)
+  const contributions = await tx.select({ amount: contribution.amount }).from(contribution)
       .where(and(
         eq(contribution.orgId, input.orgId),
         lte(contribution.datedOn, input.cycle.closesOn),
         isNull(contribution.reversesId),
-      )) as Promise<Array<{ amount: string | number }>>,
-    tx.select().from(repayment)
+        eq(contribution.reconciliationStatus, "regularized"),
+        sql`(${contribution.accountId} IS NULL OR EXISTS (
+          SELECT 1 FROM ${account} fund_account
+          WHERE fund_account.id = ${contribution.accountId}
+            AND fund_account.org_id = ${input.orgId}
+            AND fund_account.is_group_fund = true
+        ))`,
+      )) as Array<{ amount: string | number }>;
+  const repayments = await tx.select({ amount: repayment.amount }).from(repayment)
       .where(and(
         eq(repayment.orgId, input.orgId),
         lte(repayment.datedOn, input.cycle.closesOn),
         isNull(repayment.reversesId),
-      )) as Promise<Array<{ amount: string | number }>>,
-    tx.select().from(withdrawal)
+        eq(repayment.reconciliationStatus, "regularized"),
+        sql`(${repayment.accountId} IS NULL OR EXISTS (
+          SELECT 1 FROM ${account} fund_account
+          WHERE fund_account.id = ${repayment.accountId}
+            AND fund_account.org_id = ${input.orgId}
+            AND fund_account.is_group_fund = true
+        ))`,
+      )) as Array<{ amount: string | number }>;
+  const withdrawals = await tx.select({ amount: withdrawal.amount }).from(withdrawal)
       .where(and(
         eq(withdrawal.orgId, input.orgId),
         lte(withdrawal.datedOn, input.cycle.closesOn),
         isNull(withdrawal.reversesId),
-      )) as Promise<Array<{ amount: string | number }>>,
-    tx.select().from(expense)
+      )) as Array<{ amount: string | number }>;
+  const expenses = await tx.select({ amount: expense.amount }).from(expense)
       .where(and(
         eq(expense.orgId, input.orgId),
         lte(expense.incurredOn, input.cycle.closesOn),
         isNull(expense.reversesId),
-      )) as Promise<Array<{ amount: string | number }>>,
-    tx.select().from(loanDisbursement)
+      )) as Array<{ amount: string | number }>;
+  const disbursements = await tx.select({ amount: loanDisbursement.amount }).from(loanDisbursement)
       .where(and(
         eq(loanDisbursement.orgId, input.orgId),
         lte(loanDisbursement.disbursedOn, input.cycle.closesOn),
-      )) as Promise<Array<{ amount: string | number }>>,
-  ]);
+      )) as Array<{ amount: string | number }>;
+  const regularizationResult = await (tx as any).execute(sql`
+      SELECT COALESCE(SUM(amount), 0)::numeric(18, 4)::text AS total
+      FROM ${transfer}
+      WHERE org_id = ${input.orgId}
+        AND dated_on <= ${input.cycle.closesOn}
+        AND purpose = 'regularization'
+        AND reverses_id IS NULL
+    `);
+  const regularizationRows = Array.isArray(regularizationResult) ? regularizationResult : regularizationResult?.rows ?? [];
+  const regularizationTotal = moneyUnits4(String(regularizationRows[0]?.total ?? 0));
 
-  return money4(
-    sumAmounts(contributions)
-    + sumAmounts(repayments)
-    - sumAmounts(withdrawals)
-    - sumAmounts(expenses)
-    - sumAmounts(disbursements),
+  return money4FromUnits(
+    sumAmountUnits(contributions)
+    + sumAmountUnits(repayments)
+    - sumAmountUnits(withdrawals)
+    - sumAmountUnits(expenses)
+    - sumAmountUnits(disbursements)
+    + regularizationTotal,
   );
 }
 
+async function pendingRegularizationsForCycle(
+  tx: { execute(query: unknown): Promise<unknown> },
+  input: { orgId: string; opensOn: string; closesOn: string },
+): Promise<PendingRegularization[]> {
+  const result = await tx.execute(sql`
+    SELECT source.id,
+           source.kind,
+           source.member_id AS "memberId",
+           m.display_name AS "memberName",
+           source.account_id AS "accountId",
+           a.name AS "accountName",
+           source.amount::numeric(18, 4)::text AS amount,
+           source.dated_on::text AS "datedOn"
+    FROM (
+      SELECT id, 'contribution'::text AS kind, member_id, account_id, amount, dated_on
+      FROM contribution
+      WHERE org_id = ${input.orgId}
+        AND reconciliation_status = 'pending'
+        AND reverses_id IS NULL
+        AND dated_on >= ${input.opensOn}
+        AND dated_on <= ${input.closesOn}
+      UNION ALL
+      SELECT id, 'repayment'::text AS kind, member_id, account_id, amount, dated_on
+      FROM repayment
+      WHERE org_id = ${input.orgId}
+        AND reconciliation_status = 'pending'
+        AND reverses_id IS NULL
+        AND dated_on >= ${input.opensOn}
+        AND dated_on <= ${input.closesOn}
+    ) source
+    JOIN member m ON m.id = source.member_id AND m.org_id = ${input.orgId}
+    LEFT JOIN account a ON a.id = source.account_id AND a.org_id = ${input.orgId}
+    ORDER BY source.dated_on, source.kind, source.id
+  `);
+  const rows = Array.isArray(result) ? result : (result as { rows?: unknown[] })?.rows ?? [];
+  return rows as PendingRegularization[];
+}
+
 async function buildMonthlyCloseEvidence(
-  tx: { select(): any },
+  tx: { select(selection?: unknown): any; execute(query: unknown): Promise<unknown> },
   input: {
     orgId: string;
     cycle: Pick<typeof contributionCycle.$inferSelect, "opensOn" | "closesOn">;
   },
 ) {
-  const [orgRows, contributionRows, repaymentRows, withdrawalRows, expenseRows, disbursementRows, memberRows, loanRows, scheduleRows, alertRows, alertActionRows, accrualRows] = await Promise.all([
-    tx.select().from(organization)
-      .where(eq(organization.id, input.orgId)) as Promise<Array<typeof organization.$inferSelect>>,
-    tx.select().from(contribution)
+  const orgRows = await tx.select().from(organization)
+    .where(eq(organization.id, input.orgId)) as Array<typeof organization.$inferSelect>;
+  const contributionRows = await tx.select({
+      id: contribution.id,
+      datedOn: contribution.datedOn,
+      memberId: contribution.memberId,
+      amount: contribution.amount,
+      notes: contribution.notes,
+    }).from(contribution)
       .where(and(eq(contribution.orgId, input.orgId), gte(contribution.datedOn, input.cycle.opensOn), lte(contribution.datedOn, input.cycle.closesOn), isNull(contribution.reversesId)))
-      .orderBy(contribution.datedOn) as Promise<Array<typeof contribution.$inferSelect>>,
-    tx.select().from(repayment)
+      .orderBy(contribution.datedOn) as Array<Pick<typeof contribution.$inferSelect, "id" | "datedOn" | "memberId" | "amount" | "notes">>;
+  const repaymentRows = await tx.select({
+      id: repayment.id,
+      datedOn: repayment.datedOn,
+      memberId: repayment.memberId,
+      amount: repayment.amount,
+      notes: repayment.notes,
+    }).from(repayment)
       .where(and(eq(repayment.orgId, input.orgId), gte(repayment.datedOn, input.cycle.opensOn), lte(repayment.datedOn, input.cycle.closesOn), isNull(repayment.reversesId)))
-      .orderBy(repayment.datedOn) as Promise<Array<typeof repayment.$inferSelect>>,
-    tx.select().from(withdrawal)
+      .orderBy(repayment.datedOn) as Array<Pick<typeof repayment.$inferSelect, "id" | "datedOn" | "memberId" | "amount" | "notes">>;
+  const withdrawalRows = await tx.select().from(withdrawal)
       .where(and(eq(withdrawal.orgId, input.orgId), gte(withdrawal.datedOn, input.cycle.opensOn), lte(withdrawal.datedOn, input.cycle.closesOn), isNull(withdrawal.reversesId)))
-      .orderBy(withdrawal.datedOn) as Promise<Array<typeof withdrawal.$inferSelect>>,
-    tx.select().from(expense)
+      .orderBy(withdrawal.datedOn) as Array<typeof withdrawal.$inferSelect>;
+  const expenseRows = await tx.select().from(expense)
       .where(and(eq(expense.orgId, input.orgId), gte(expense.incurredOn, input.cycle.opensOn), lte(expense.incurredOn, input.cycle.closesOn), isNull(expense.reversesId)))
-      .orderBy(expense.incurredOn) as Promise<Array<typeof expense.$inferSelect>>,
-    tx.select().from(loanDisbursement)
+      .orderBy(expense.incurredOn) as Array<typeof expense.$inferSelect>;
+  const disbursementRows = await tx.select().from(loanDisbursement)
       .where(and(eq(loanDisbursement.orgId, input.orgId), gte(loanDisbursement.disbursedOn, input.cycle.opensOn), lte(loanDisbursement.disbursedOn, input.cycle.closesOn)))
-      .orderBy(loanDisbursement.disbursedOn) as Promise<Array<typeof loanDisbursement.$inferSelect>>,
-    tx.select().from(member)
+      .orderBy(loanDisbursement.disbursedOn) as Array<typeof loanDisbursement.$inferSelect>;
+  const memberRows = await tx.select().from(member)
       .where(eq(member.orgId, input.orgId))
-      .orderBy(member.displayName) as Promise<Array<typeof member.$inferSelect>>,
-    tx.select().from(loan)
+      .orderBy(member.displayName) as Array<typeof member.$inferSelect>;
+  const loanRows = await tx.select().from(loan)
       .where(eq(loan.orgId, input.orgId))
-      .orderBy(loan.createdAt) as Promise<Array<typeof loan.$inferSelect>>,
-    tx.select().from(loanSchedule)
+      .orderBy(loan.createdAt) as Array<typeof loan.$inferSelect>;
+  const scheduleRows = await tx.select().from(loanSchedule)
       .where(eq(loanSchedule.orgId, input.orgId))
-      .orderBy(loanSchedule.dueOn) as Promise<Array<typeof loanSchedule.$inferSelect>>,
-    tx.select().from(alert)
+      .orderBy(loanSchedule.dueOn) as Array<typeof loanSchedule.$inferSelect>;
+  const alertRows = await tx.select().from(alert)
       .where(eq(alert.orgId, input.orgId))
-      .orderBy(alert.createdAt) as Promise<Array<typeof alert.$inferSelect>>,
-    tx.select().from(alertAction)
+      .orderBy(alert.createdAt) as Array<typeof alert.$inferSelect>;
+  const alertActionRows = await tx.select().from(alertAction)
       .where(eq(alertAction.orgId, input.orgId))
-      .orderBy(alertAction.createdAt) as Promise<Array<typeof alertAction.$inferSelect>>,
-    tx.select().from(interestAccrual)
+      .orderBy(alertAction.createdAt) as Array<typeof alertAction.$inferSelect>;
+  const accrualRows = await tx.select().from(interestAccrual)
       .where(and(eq(interestAccrual.orgId, input.orgId), gte(interestAccrual.accruedOn, input.cycle.opensOn), lte(interestAccrual.accruedOn, input.cycle.closesOn)))
-      .orderBy(interestAccrual.accruedOn) as Promise<Array<typeof interestAccrual.$inferSelect>>,
-  ]);
+      .orderBy(interestAccrual.accruedOn) as Array<typeof interestAccrual.$inferSelect>;
   const [org] = orgRows;
+  const transferResult = await tx.execute(sql`
+    SELECT id, dated_on::text AS "datedOn", amount::numeric(18, 4)::text AS amount,
+           purpose, regularizes_kind AS "regularizesKind", regularizes_id AS "regularizesId"
+    FROM ${transfer}
+    WHERE org_id = ${input.orgId}
+      AND dated_on >= ${input.cycle.opensOn}
+      AND dated_on <= ${input.cycle.closesOn}
+      AND reverses_id IS NULL
+    ORDER BY dated_on, id
+  `);
+  const transferRows = (Array.isArray(transferResult) ? transferResult : (transferResult as { rows?: any[] })?.rows ?? []) as Array<Record<string, any>>;
   const groupedAlertActions = actionsByAlertId(alertActionRows);
-  const contributionByMember = new Map<string, number>();
-  const withdrawalByMember = new Map<string, number>();
+  const contributionByMember = new Map<string, bigint>();
+  const withdrawalByMember = new Map<string, bigint>();
   for (const row of contributionRows) {
-    contributionByMember.set(row.memberId, (contributionByMember.get(row.memberId) ?? 0) + decimal(String(row.amount)));
+    contributionByMember.set(row.memberId, (contributionByMember.get(row.memberId) ?? BigInt(0)) + moneyUnits4(String(row.amount)));
   }
   for (const row of withdrawalRows) {
-    withdrawalByMember.set(row.memberId, (withdrawalByMember.get(row.memberId) ?? 0) + decimal(String(row.amount)));
+    withdrawalByMember.set(row.memberId, (withdrawalByMember.get(row.memberId) ?? BigInt(0)) + moneyUnits4(String(row.amount)));
   }
 
   return {
@@ -373,13 +491,14 @@ async function buildMonthlyCloseEvidence(
       ...withdrawalRows.map((row) => ({ kind: "withdrawal", datedOn: row.datedOn, memberId: row.memberId, amount: money4(String(row.amount)), note: row.notes })),
       ...expenseRows.map((row) => ({ kind: "expense", datedOn: row.incurredOn, memberId: row.beneficiaryMemberId, amount: money4(String(row.amount)), note: row.purpose })),
       ...disbursementRows.map((row) => ({ kind: "loan_disbursement", datedOn: row.disbursedOn, memberId: null, amount: money4(String(row.amount)), note: row.loanId })),
+      ...transferRows.map((row) => ({ kind: "transfer", datedOn: row.datedOn, memberId: null, amount: money4(String(row.amount)), note: row.purpose })),
     ].sort((a, b) => `${a.datedOn}-${a.kind}-${a.amount}`.localeCompare(`${b.datedOn}-${b.kind}-${b.amount}`)),
     memberBalances: memberRows.map((row) => ({
       memberId: row.id,
       displayName: row.displayName,
       status: row.status,
-      monthNet: money4((contributionByMember.get(row.id) ?? 0) - (withdrawalByMember.get(row.id) ?? 0)),
-      closingSavingsEstimate: money4(decimal(String(row.initialSavingsBalance)) + (contributionByMember.get(row.id) ?? 0) - (withdrawalByMember.get(row.id) ?? 0)),
+      monthNet: money4FromUnits((contributionByMember.get(row.id) ?? BigInt(0)) - (withdrawalByMember.get(row.id) ?? BigInt(0))),
+      closingSavingsEstimate: money4FromUnits(moneyUnits4(String(row.initialSavingsBalance)) + (contributionByMember.get(row.id) ?? BigInt(0)) - (withdrawalByMember.get(row.id) ?? BigInt(0))),
     })),
     openLoans: loanRows
       .filter((row) => ["originated", "activo", "en_mora"].includes(row.status))
@@ -393,7 +512,7 @@ async function buildMonthlyCloseEvidence(
           principalAmount: money4(String(row.principalAmount)),
           status: row.status,
           nextDueOn: nextDue?.dueOn ?? null,
-          nextDueAmount: nextDue ? money4(decimal(String(nextDue.principalDue)) + decimal(String(nextDue.interestDue))) : null,
+          nextDueAmount: nextDue ? money4FromUnits(moneyUnits4(String(nextDue.principalDue)) + moneyUnits4(String(nextDue.interestDue))) : null,
         };
       }),
     activeAlerts: alertRows
@@ -417,6 +536,16 @@ async function buildMonthlyCloseEvidence(
       principalBasis: money4(String(row.principalBasis)),
       interestAmount: money4(String(row.interestAmount)),
     })),
+    movementSummary: {
+      bankFees: money4FromUnits(sumAmountUnits(expenseRows.filter((row) => row.category === "bank_fee"))),
+      supplies: money4FromUnits(sumAmountUnits(expenseRows.filter((row) => row.category === "supplies"))),
+      sharedExpenses: money4FromUnits(sumAmountUnits(expenseRows.filter((row) => row.category === "shared_expense"))),
+      operatingExpenses: money4FromUnits(sumAmountUnits(expenseRows.filter((row) => row.category === "operating"))),
+      transfers: money4FromUnits(sumAmountUnits(transferRows.map((row) => ({ amount: String(row.amount) })))),
+      netFundBalance: "0.0000",
+      pendingRegularizations: 0,
+      pendingAssertion: "cero movimientos pendientes de regularizar",
+    },
   };
 }
 
@@ -442,7 +571,9 @@ function snapshotFromRows(input: {
   reconciliation: typeof reconciliationCycle.$inferSelect;
   periodCloseId?: string | null;
   statement?: typeof statementArchive.$inferSelect | null;
+  artifactStatus?: "pending" | "failed" | "ready" | null;
   closeAllowed?: boolean;
+  pendingRegularizations?: PendingRegularization[];
 }): ReconciliationSnapshot {
   const classification = classifyReconciliation({
     declaredBankBalance: String(input.reconciliation.declaredBankBalance),
@@ -468,6 +599,8 @@ function snapshotFromRows(input: {
     monthlyCloseStatementId: input.statement?.id ?? null,
     monthlyClosePdfUri: input.statement?.pdfUri ?? null,
     canonicalPayloadHash: input.statement?.canonicalPayloadHash ?? null,
+    monthlyCloseArtifactStatus: input.artifactStatus ?? (input.statement ? "ready" : null),
+    pendingRegularizations: input.pendingRegularizations ?? [],
   };
 }
 
@@ -477,6 +610,7 @@ function emptySnapshot(input: {
   computedPoolBalance: string;
   toleranceAmount: string;
   closeAllowed: boolean;
+  pendingRegularizations?: PendingRegularization[];
 }): ReconciliationSnapshot {
   const classification = classifyReconciliation({
     declaredBankBalance: input.computedPoolBalance,
@@ -502,6 +636,8 @@ function emptySnapshot(input: {
     monthlyCloseStatementId: null,
     monthlyClosePdfUri: null,
     canonicalPayloadHash: null,
+    monthlyCloseArtifactStatus: null,
+    pendingRegularizations: input.pendingRegularizations ?? [],
   };
 }
 
@@ -521,6 +657,7 @@ function monthlyClosePayload(input: {
   openLoans?: Array<Record<string, string | null>>;
   activeAlerts?: Array<Record<string, string | null>>;
   interestAccruals?: Array<Record<string, string | null>>;
+  movementSummary?: Record<string, string | number>;
 }) {
   return {
     kind: "monthly_close",
@@ -541,6 +678,162 @@ function monthlyClosePayload(input: {
     openLoans: input.openLoans ?? [],
     activeAlerts: input.activeAlerts ?? [],
     interestAccruals: input.interestAccruals ?? [],
+    movementSummary: input.movementSummary ?? {},
+  };
+}
+
+function archivedMonthlyCloseArtifactInput(
+  archive: typeof statementArchive.$inferSelect,
+): MonthlyCloseArtifactInput {
+  if (!archive.canonicalPayload || typeof archive.canonicalPayload !== "object") {
+    throw new Error("monthly_close_canonical_payload_missing");
+  }
+  if (sha256Hex(canonicalJson(archive.canonicalPayload as any)) !== archive.canonicalPayloadHash) {
+    throw new Error("monthly_close_canonical_payload_hash_mismatch");
+  }
+  return {
+    orgId: archive.orgId,
+    periodLabel: archive.periodLabel,
+    canonicalPayloadHash: archive.canonicalPayloadHash,
+    payload: archive.canonicalPayload as ReturnType<typeof monthlyClosePayload>,
+  };
+}
+
+async function latestArtifactEvent(tx: { select(): any }, orgId: string, statementArchiveId: string) {
+  const [event] = await tx.select().from(statementArtifactEvent)
+    .where(and(
+      eq(statementArtifactEvent.orgId, orgId),
+      eq(statementArtifactEvent.statementArchiveId, statementArchiveId),
+    ))
+    .orderBy(
+      desc(statementArtifactEvent.createdAt),
+      desc(statementArtifactEvent.attemptNumber),
+      sql`CASE ${statementArtifactEvent.status} WHEN 'ready' THEN 3 WHEN 'failed' THEN 2 ELSE 1 END DESC`,
+    )
+    .limit(1);
+  return event as typeof statementArtifactEvent.$inferSelect | undefined;
+}
+
+const ARTIFACT_PENDING_LEASE_MS = 30_000;
+
+async function reserveArtifactRetry(input: {
+  tx: { select(): any; insert(table: typeof statementArtifactEvent): any };
+  archive: typeof statementArchive.$inferSelect;
+  at: Date;
+  force?: boolean;
+}): Promise<{ status: "pending" | "failed" | "ready"; task: PendingMonthlyCloseArtifact | null }> {
+  const latest = await latestArtifactEvent(input.tx, input.archive.orgId, input.archive.id);
+  if (latest?.status === "ready") return { status: "ready", task: null };
+  if (!latest && Number(input.archive.byteSize) > 0) return { status: "ready", task: null };
+  const pendingIsFresh = latest?.status === "pending"
+    && input.at.getTime() - dateValue(latest.attemptedAt).getTime() < ARTIFACT_PENDING_LEASE_MS;
+  if (pendingIsFresh && !input.force) return { status: "pending", task: null };
+
+  const attemptNumber = (latest?.attemptNumber ?? 0) + 1;
+  await input.tx.insert(statementArtifactEvent).values({
+    orgId: input.archive.orgId,
+    statementArchiveId: input.archive.id,
+    status: "pending",
+    attemptNumber,
+    byteSize: null,
+    errorCode: null,
+    attemptedAt: input.at,
+    createdAt: input.at,
+  });
+  return {
+    status: "pending",
+    task: {
+      ...archivedMonthlyCloseArtifactInput(input.archive),
+      statementArchiveId: input.archive.id,
+      attemptNumber,
+    },
+  };
+}
+
+async function appendArtifactResult(input: {
+  task: PendingMonthlyCloseArtifact;
+  at: Date;
+  result?: MonthlyCloseArtifactResult;
+  error?: unknown;
+}) {
+  await withTenantTransaction(input.task.orgId, async (tx) => {
+    const latest = await latestArtifactEvent(tx, input.task.orgId, input.task.statementArchiveId);
+    if (latest?.status === "ready") return;
+    await tx.insert(statementArtifactEvent).values({
+      orgId: input.task.orgId,
+      statementArchiveId: input.task.statementArchiveId,
+      status: input.result ? "ready" : "failed",
+      attemptNumber: input.task.attemptNumber,
+      byteSize: input.result?.byteSize ?? null,
+      errorCode: input.result ? null : String(input.error instanceof Error ? input.error.message : input.error ?? "artifact_write_failed").slice(0, 200),
+      attemptedAt: input.at,
+      createdAt: input.at,
+    }).onConflictDoNothing();
+  });
+}
+
+export type CloseArtifactRepairSummary = {
+  scannedOrganizations: number;
+  attempted: number;
+  ready: number;
+  failed: number;
+};
+
+export async function repairPendingMonthlyCloseArtifacts(input: {
+  writer: MonthlyCloseArtifactWriter;
+  now?: () => Date;
+  organizationIds?: string[];
+}): Promise<CloseArtifactRepairSummary> {
+  const at = (input.now ?? (() => new Date()))();
+  const organizations = input.organizationIds
+    ? await db.select({ id: organization.id }).from(organization).where(inArray(organization.id, input.organizationIds))
+    : await db.select({ id: organization.id }).from(organization);
+  const tasks: PendingMonthlyCloseArtifact[] = [];
+  let failed = 0;
+
+  for (const row of organizations) {
+    try {
+      const reserved = await withTenantTransaction(row.id, async (tx) => {
+        const archives = await tx.select().from(statementArchive).where(and(
+          eq(statementArchive.orgId, row.id),
+          eq(statementArchive.kind, "monthly_close"),
+        ));
+        const orgTasks: PendingMonthlyCloseArtifact[] = [];
+        for (const archive of archives) {
+          const recovery = await reserveArtifactRetry({ tx, archive, at });
+          if (recovery.task) orgTasks.push(recovery.task);
+        }
+        return orgTasks;
+      });
+      tasks.push(...reserved);
+    } catch {
+      failed += 1;
+    }
+  }
+
+  let ready = 0;
+  for (const task of tasks) {
+    try {
+      const result = await input.writer(task);
+      if (result.pdfUri !== `/statement-archive/public/${task.canonicalPayloadHash}.pdf`) {
+        throw new Error("monthly_close_artifact_uri_mismatch");
+      }
+      await appendArtifactResult({ task, at: (input.now ?? (() => new Date()))(), result });
+      ready += 1;
+    } catch (error) {
+      try {
+        await appendArtifactResult({ task, at: (input.now ?? (() => new Date()))(), error });
+      } catch {
+        // Keep later tenants repairable even when this artifact lifecycle cannot persist a terminal event.
+      }
+      failed += 1;
+    }
+  }
+  return {
+    scannedOrganizations: organizations.length,
+    attempted: tasks.length,
+    ready,
+    failed,
   };
 }
 
@@ -587,6 +880,7 @@ async function latestClosedMonthlyCloseSnapshot(
       eq(statementArchive.kind, "monthly_close"),
     ))
     .limit(1);
+  const artifactEvent = archive ? await latestArtifactEvent(tx, orgId, archive.id) : undefined;
 
   return snapshotFromRows({
     orgId,
@@ -594,6 +888,7 @@ async function latestClosedMonthlyCloseSnapshot(
     reconciliation,
     periodCloseId: closeRow.id,
     statement: archive ?? null,
+    artifactStatus: artifactEvent?.status ?? (archive?.byteSize === 0 ? "pending" : archive ? "ready" : null),
     closeAllowed: false,
   });
 }
@@ -644,6 +939,11 @@ export const createReconciliationService = (options: ReconciliationServiceOption
         }
 
         const computedPoolBalance = await deriveCyclePoolBalance(tx, { orgId, cycle });
+        const pendingRegularizations = await pendingRegularizationsForCycle(tx as any, {
+          orgId,
+          opensOn: String(cycle.opensOn),
+          closesOn: String(cycle.closesOn),
+        });
 
         const [reconciliation] = await tx.select().from(reconciliationCycle)
           .where(and(
@@ -659,6 +959,7 @@ export const createReconciliationService = (options: ReconciliationServiceOption
             computedPoolBalance,
             toleranceAmount: String(config.reconciliationToleranceAmount),
             closeAllowed: false,
+            pendingRegularizations,
           });
         }
 
@@ -676,14 +977,30 @@ export const createReconciliationService = (options: ReconciliationServiceOption
             ))
             .limit(1)
           : [];
+        const artifactEvent = archive ? await latestArtifactEvent(tx, orgId, archive.id) : undefined;
+
+        const freshClassification = classifyReconciliation({
+          declaredBankBalance: String(reconciliation.declaredBankBalance),
+          computedPoolBalance,
+          toleranceAmount: String(reconciliation.toleranceAmount),
+          resolutionKind: reconciliation.resolutionKind,
+          periodCloseId: closeRow?.id ?? reconciliation.periodCloseId,
+        });
+        const freshReconciliation = {
+          ...reconciliation,
+          computedPoolBalance,
+          discrepancyAmount: freshClassification.discrepancyAmount,
+        };
 
         return snapshotFromRows({
           orgId,
           cycle,
-          reconciliation,
+          reconciliation: freshReconciliation,
           periodCloseId: closeRow?.id ?? reconciliation.periodCloseId,
           statement: archive ?? null,
-          closeAllowed: closeAllowedForCycle,
+          artifactStatus: artifactEvent?.status ?? (archive?.byteSize === 0 ? "pending" : archive ? "ready" : null),
+          closeAllowed: closeAllowedForCycle && canCloseWithPendingRegularizations(pendingRegularizations),
+          pendingRegularizations,
         });
       });
     },
@@ -909,9 +1226,13 @@ export const createReconciliationService = (options: ReconciliationServiceOption
       });
     },
     async closePeriod(input) {
-      return withWritableTenantTransaction(input.orgId, async (tx) => {
+      let pendingArtifact: PendingMonthlyCloseArtifact | null = null;
+      const outcome: ReconciliationSnapshot | { rejection: string } = await withWritableTenantTransaction(input.orgId, async (tx) => {
         const closedAt = now();
         let auditEntry: AdjustmentAuditEntry | undefined;
+        let replayed = false;
+
+        await lockTenantMoneyWrites(tx, input.orgId);
 
         return writeWithAudit({
           write: async () => {
@@ -920,6 +1241,7 @@ export const createReconciliationService = (options: ReconciliationServiceOption
                 eq(reconciliationCycle.orgId, input.orgId),
                 eq(reconciliationCycle.id, input.reconciliationCycleId),
               ))
+              .for("update")
               .limit(1);
             if (!reconciliation) {
               throw new Error("reconciliation_cycle_not_found");
@@ -927,6 +1249,7 @@ export const createReconciliationService = (options: ReconciliationServiceOption
 
             const [cycle] = await tx.select().from(contributionCycle)
               .where(and(eq(contributionCycle.orgId, input.orgId), eq(contributionCycle.id, reconciliation.cycleId)))
+              .for("update")
               .limit(1);
             if (!cycle) {
               throw new Error("contribution_cycle_not_found");
@@ -934,10 +1257,39 @@ export const createReconciliationService = (options: ReconciliationServiceOption
             if (!isPastContributionCycle(cycle, closedAt)) {
               throw new Error("contribution_cycle_not_past");
             }
+            const pendingRegularizations = await pendingRegularizationsForCycle(tx, {
+              orgId: input.orgId,
+              opensOn: String(cycle.opensOn),
+              closesOn: String(cycle.closesOn),
+            });
+            if (!canCloseWithPendingRegularizations(pendingRegularizations)) {
+              replayed = true;
+              await auditWriter({
+                tx,
+                entry: {
+                  orgId: input.orgId,
+                  actorKind: "member",
+                  actorId: input.actorId,
+                  actionKind: "period_close.reject",
+                  subjectKind: "reconciliation_cycle",
+                  subjectId: reconciliation.id,
+                  payloadSnapshot: {
+                    reason: "period_close_pending_regularizations",
+                    pendingIds: pendingRegularizations.map((row) => row.id),
+                    pending: pendingRegularizations.map((row) => ({ id: row.id, kind: row.kind })),
+                  },
+                  reason: "period_close_pending_regularizations",
+                  at: closedAt,
+                  createdAt: closedAt,
+                },
+              });
+              return { rejection: "period_close_pending_regularizations" };
+            }
 
+            const freshComputedPoolBalance = await deriveCyclePoolBalance(tx, { orgId: input.orgId, cycle });
             const classification = classifyReconciliation({
               declaredBankBalance: String(reconciliation.declaredBankBalance),
-              computedPoolBalance: String(reconciliation.computedPoolBalance),
+              computedPoolBalance: freshComputedPoolBalance,
               toleranceAmount: String(reconciliation.toleranceAmount),
               resolutionKind: reconciliation.resolutionKind,
               periodCloseId: reconciliation.periodCloseId,
@@ -982,9 +1334,39 @@ export const createReconciliationService = (options: ReconciliationServiceOption
             }
             const closeRow = existingClose;
 
+            const [replayedArchive] = reconciliation.periodCloseId
+              ? await tx.select().from(statementArchive)
+                .where(and(
+                  eq(statementArchive.orgId, input.orgId),
+                  eq(statementArchive.periodCloseId, closeRow.id),
+                  eq(statementArchive.kind, "monthly_close"),
+                ))
+                .limit(1)
+              : [];
+            if (reconciliation.periodCloseId && replayedArchive) {
+              replayed = true;
+              const recovery = await reserveArtifactRetry({
+                tx,
+                archive: replayedArchive,
+                at: closedAt,
+              });
+              pendingArtifact = recovery.task;
+              return snapshotFromRows({
+                orgId: input.orgId,
+                cycle,
+                reconciliation,
+                periodCloseId: closeRow.id,
+                statement: replayedArchive,
+                artifactStatus: recovery.status,
+                closeAllowed: false,
+              });
+            }
+
             const [closedReconciliation] = reconciliation.periodCloseId
               ? [reconciliation]
               : await tx.update(reconciliationCycle).set({
+                computedPoolBalance: freshComputedPoolBalance,
+                discrepancyAmount: classification.discrepancyAmount,
                 closedAt: closeRow.closedAt,
                 periodCloseId: closeRow.id,
               }).where(eq(reconciliationCycle.id, reconciliation.id)).returning();
@@ -1039,19 +1421,24 @@ export const createReconciliationService = (options: ReconciliationServiceOption
               openLoans: evidence.openLoans,
               activeAlerts: evidence.activeAlerts,
               interestAccruals: evidence.interestAccruals,
+              movementSummary: {
+                ...evidence.movementSummary,
+                netFundBalance: money4(String(closedReconciliation.computedPoolBalance)),
+                pendingRegularizations: pendingRegularizations.length,
+                pendingAssertion: "cero movimientos pendientes de regularizar",
+              },
             });
             const hash = sha256Hex(canonicalJson(payload));
-            const artifact = monthlyCloseArtifactWriter
-              ? await monthlyCloseArtifactWriter({
-                orgId: input.orgId,
-                periodLabel: cycleLabelOf(cycle),
-                canonicalPayloadHash: hash,
-                payload,
-              })
-              : {
-                pdfUri: `/statement-archive/monthly-close/${hash}.pdf`,
-                byteSize: Buffer.byteLength(canonicalJson(payload), "utf8"),
-              };
+            const artifactInput = {
+              orgId: input.orgId,
+              periodLabel: cycleLabelOf(cycle),
+              canonicalPayloadHash: hash,
+              payload,
+            };
+            const artifact = {
+              pdfUri: `/statement-archive/public/${hash}.pdf`,
+              byteSize: 0,
+            };
 
             let archiveRow = existingArchive;
             if (!archiveRow) {
@@ -1062,6 +1449,7 @@ export const createReconciliationService = (options: ReconciliationServiceOption
                 periodLabel: cycleLabelOf(cycle),
                 pdfUri: artifact.pdfUri,
                 canonicalPayloadHash: hash,
+                canonicalPayload: payload,
                 generatedAt: closedAt,
                 periodCloseId: closeRow.id,
                 yearEndShareOutId: null,
@@ -1070,6 +1458,23 @@ export const createReconciliationService = (options: ReconciliationServiceOption
                 createdByKind: "system",
               }).onConflictDoNothing().returning();
               archiveRow = insertedArchive;
+              if (insertedArchive) {
+                await tx.insert(statementArtifactEvent).values({
+                  orgId: input.orgId,
+                  statementArchiveId: insertedArchive.id,
+                  status: "pending",
+                  attemptNumber: 1,
+                  byteSize: null,
+                  errorCode: null,
+                  attemptedAt: closedAt,
+                  createdAt: closedAt,
+                });
+                pendingArtifact = {
+                  ...artifactInput,
+                  statementArchiveId: insertedArchive.id,
+                  attemptNumber: 1,
+                };
+              }
             }
             if (!archiveRow) {
               [archiveRow] = await tx.select().from(statementArchive)
@@ -1108,10 +1513,12 @@ export const createReconciliationService = (options: ReconciliationServiceOption
               reconciliation: closedReconciliation,
               periodCloseId: closeRow.id,
               statement: archiveRow,
+              artifactStatus: "pending",
               closeAllowed: false,
             });
           },
           audit: async () => {
+            if (replayed) return;
             if (!auditEntry) {
               throw new Error("period close audit entry is missing");
             }
@@ -1119,6 +1526,23 @@ export const createReconciliationService = (options: ReconciliationServiceOption
           },
         });
       });
+      if ("rejection" in outcome) {
+        throw new Error(outcome.rejection);
+      }
+      if (pendingArtifact && monthlyCloseArtifactWriter) {
+        try {
+          const written = await monthlyCloseArtifactWriter(pendingArtifact);
+          if (written.pdfUri !== outcome.monthlyClosePdfUri) {
+            throw new Error("monthly_close_artifact_uri_mismatch");
+          }
+          await appendArtifactResult({ task: pendingArtifact, at: now(), result: written });
+          return { ...outcome, monthlyCloseArtifactStatus: "ready" };
+        } catch (error) {
+          await appendArtifactResult({ task: pendingArtifact, at: now(), error });
+          return { ...outcome, monthlyCloseArtifactStatus: "failed" };
+        }
+      }
+      return outcome;
     },
     async recordMonthlyCloseShareAttempt(input) {
       return withWritableTenantTransaction(input.orgId, async (tx) => {
@@ -1132,6 +1556,10 @@ export const createReconciliationService = (options: ReconciliationServiceOption
           .limit(1);
         if (!archive) {
           throw new Error("monthly_close_statement_not_found");
+        }
+        const artifactEvent = await latestArtifactEvent(tx, input.orgId, archive.id);
+        if (artifactEvent?.status !== "ready" && archive.byteSize === 0) {
+          throw new Error("monthly_close_artifact_processing");
         }
 
         await tx.insert(auditLogEntry).values({

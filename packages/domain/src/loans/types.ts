@@ -102,6 +102,7 @@ export type RecordRepaymentInput = {
   actorId: string;
   clientRequestId: string;
   loanId: string;
+  accountId: string;
   amount: string;
   datedOn: string;
   paymentMode?: RepaymentMode;

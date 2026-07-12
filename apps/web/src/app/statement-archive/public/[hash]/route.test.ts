@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET } from "./route";
+import { readPrivateStatementArtifact } from "@/lib/statement-artifact";
 
 const archiveRows = vi.fn();
 
@@ -10,6 +11,7 @@ vi.mock("@mi-banquito/db", () => ({
       from: () => ({
         where: () => ({
           limit: archiveRows,
+          orderBy: () => ({ limit: archiveRows }),
         }),
       }),
     }),
@@ -21,6 +23,8 @@ vi.mock("@/lib/statement-artifact", () => ({
 }));
 
 describe("public statement PDF route", () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it("rejects invalid hashes", async () => {
     const response = await GET(new Request("https://example.com"), {
       params: Promise.resolve({ hash: "bad.pdf" }),
@@ -45,5 +49,30 @@ describe("public statement PDF route", () => {
     });
 
     expect(response.status).toBe(404);
+  });
+
+  it("returns processing for a pending monthly close without reading Blob", async () => {
+    archiveRows
+      .mockResolvedValueOnce([{
+        id: "archive-close-1",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        kind: "monthly_close",
+        periodLabel: "junio 2026",
+        canonicalPayloadHash: "c".repeat(64),
+        byteSize: 0,
+      }])
+      .mockResolvedValueOnce([{
+        statementArchiveId: "archive-close-1",
+        status: "pending",
+        attemptNumber: 1,
+      }]);
+
+    const response = await GET(new Request("https://example.com"), {
+      params: Promise.resolve({ hash: `${"c".repeat(64)}.pdf` }),
+    });
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ status: "processing" });
+    expect(readPrivateStatementArtifact).not.toHaveBeenCalled();
   });
 });

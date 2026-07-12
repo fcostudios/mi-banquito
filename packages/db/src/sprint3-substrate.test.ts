@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 config({ path: "../../.env.local" });
-config({ path: "../../apps/web/.env.local", override: true });
+config({ path: "../../apps/web/.env.local" });
 
 const runIfDatabase = process.env.DATABASE_URL ? it : it.skip;
 
@@ -142,7 +142,7 @@ describe("Sprint 3 schema substrate", () => {
     });
   });
 
-  runIfDatabase("uses named append-only errors for ledger mutation triggers", async () => {
+  runIfDatabase("uses named append-only and regularization guards for ledger mutation triggers", async () => {
     const { db } = await import("./index");
 
     const result = await db.execute(sql`
@@ -184,10 +184,10 @@ describe("Sprint 3 schema substrate", () => {
     expect(result.rows[0]).toEqual({
       has_append_only_function: true,
       trigger_bindings: [
-        "contribution.contribution_no_mutate->raise_append_only_violation",
+        "contribution.contribution_no_mutate->allow_reconciliation_status_regularization",
         "expense.expense_no_mutate->raise_append_only_violation",
         "interest_accrual.interest_accrual_no_mutate->raise_append_only_violation",
-        "repayment.repayment_no_mutate->raise_append_only_violation",
+        "repayment.repayment_no_mutate->allow_reconciliation_status_regularization",
         "withdrawal.withdrawal_no_mutate->raise_append_only_violation",
       ],
     });

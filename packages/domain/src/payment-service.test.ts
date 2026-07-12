@@ -2,6 +2,7 @@ import { getTableName } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  account,
   auditLogEntry,
   contribution,
   groupConfig,
@@ -10,6 +11,7 @@ import {
   paymentReceipt,
   repayment,
 } from "@mi-banquito/db/schema";
+import { assertCanonicalReceiptReplay } from "./payments/service";
 
 type InsertRecord = {
   tableName: string;
@@ -51,6 +53,10 @@ class FakeSelectBuilder {
   }
 
   limit() {
+    return this;
+  }
+
+  for() {
     return this;
   }
 
@@ -107,7 +113,7 @@ class FakeInsertBuilder {
     this.committed = true;
 
     const tableName = tableNameOf(this.table);
-    if (this.db.conflictingInsertTables.has(tableName)) {
+    if (this.db.shouldFailInsert(tableName)) {
       if (this.ignoreConflict) {
         return false;
       }
@@ -158,17 +164,41 @@ class FakeDb {
   readonly selects: SelectRecord[] = [];
   readonly executedSql: string[] = [];
   readonly conflictingInsertTables: Set<string>;
+  private readonly failingAuditInsertNumber?: number;
+  private readonly accountIsGroupFund: boolean;
+  private auditInsertCount = 0;
   private inTransaction = false;
   private readonly selectResults: unknown[][];
 
-  constructor(selectResults: unknown[][], options?: { conflictingInsertTables?: string[] }) {
+  constructor(selectResults: unknown[][], options?: {
+    conflictingInsertTables?: string[];
+    failingAuditInsertNumber?: number;
+    accountIsGroupFund?: boolean;
+  }) {
     this.selectResults = [...selectResults];
     this.conflictingInsertTables = new Set(options?.conflictingInsertTables ?? []);
+    this.failingAuditInsertNumber = options?.failingAuditInsertNumber;
+    this.accountIsGroupFund = options?.accountIsGroupFund ?? true;
+  }
+
+  shouldFailInsert(tableName: string): boolean {
+    if (tableName === tableNameOf(auditLogEntry)) {
+      this.auditInsertCount += 1;
+      if (this.auditInsertCount === this.failingAuditInsertNumber) return true;
+    }
+    return this.conflictingInsertTables.has(tableName);
   }
 
   select() {
     return new FakeSelectBuilder(
-      () => this.selectResults.shift() ?? [],
+      (tableName) => tableName === tableNameOf(account)
+        ? [{
+            id: recordInput.accountId,
+            orgId: recordInput.orgId,
+            status: "active",
+            isGroupFund: this.accountIsGroupFund,
+          }]
+        : this.selectResults.shift() ?? [],
       (tableName) => {
         this.selects.push({ tableName, inTransaction: this.inTransaction });
       },
@@ -190,9 +220,15 @@ class FakeDb {
   }
 
   async transaction<T>(callback: (tx: FakeDb) => Promise<T>): Promise<T> {
+    const insertCount = this.inserts.length;
+    const updateCount = this.updates.length;
     this.inTransaction = true;
     try {
       return await callback(this);
+    } catch (error) {
+      this.inserts.splice(insertCount);
+      this.updates.splice(updateCount);
+      throw error;
     } finally {
       this.inTransaction = false;
     }
@@ -233,6 +269,7 @@ const recordInput = {
   actorId: "33333333-3333-4333-8333-333333333333",
   clientRequestId: "44444444-4444-4444-8444-444444444444",
   memberId: "22222222-2222-4222-8222-222222222222",
+  accountId: "99999999-9999-4999-8999-999999999999",
   amount: "85.0000",
   datedOn: "2026-07-09",
   paymentSource: "cash_in_meeting" as const,
@@ -241,6 +278,116 @@ const recordInput = {
 };
 
 describe("BR-26 payment service", () => {
+  it("compares submitted command fields but ignores mutable allocation outcomes on replay", () => {
+    const canonical = {
+      orgId: recordInput.orgId,
+      actorId: recordInput.actorId,
+      accountId: recordInput.accountId,
+      memberId: recordInput.memberId,
+      amount: "85.0000",
+      currencyCode: "USD",
+      datedOn: recordInput.datedOn,
+      receivedVia: recordInput.paymentSource,
+      slipPhotoId: null,
+      notes: recordInput.notes,
+      extraDecision: null,
+      targetLoanId: null,
+      targetCycleId: null,
+      overrideReason: null,
+      allocations: [{
+        kind: "contribution_current" as const,
+        amount: "85.0000",
+        sortOrder: 1,
+        currencyCode: "USD",
+        brId: "BR-26" as const,
+        groupConfigVersion: 7,
+        cycleId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+      }],
+    };
+    expect(assertCanonicalReceiptReplay(canonical, canonical)).toBeUndefined();
+
+    const mutations = [
+      { ...canonical, actorId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+      { ...canonical, accountId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+      { ...canonical, memberId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" },
+      { ...canonical, amount: "84.9999" },
+      { ...canonical, datedOn: "2026-07-08" },
+      { ...canonical, receivedVia: "bank_transfer" },
+      { ...canonical, notes: "different" },
+      { ...canonical, targetLoanId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee" },
+      { ...canonical, targetCycleId: "ffffffff-eeee-4eee-8eee-eeeeeeeeeeee" },
+    ];
+    for (const mutation of mutations) {
+      expect(() => assertCanonicalReceiptReplay(canonical, mutation)).toThrow("payment_idempotency_conflict");
+    }
+
+    const changedAllocationOutcome = {
+      ...canonical,
+      allocations: [{ ...canonical.allocations[0]!, amount: "1.0000", cycleId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee" }],
+    };
+    expect(() => assertCanonicalReceiptReplay(canonical, changedAllocationOutcome)).not.toThrow();
+  });
+
+  it("compares every known legacy command field while allowing explicitly unknown historical fields", () => {
+    const expected = {
+      orgId: recordInput.orgId,
+      actorId: recordInput.actorId,
+      accountId: recordInput.accountId,
+      memberId: recordInput.memberId,
+      amount: "85.0000",
+      datedOn: recordInput.datedOn,
+      receivedVia: recordInput.paymentSource,
+      slipPhotoId: null,
+      notes: recordInput.notes,
+      extraDecision: "loan_principal",
+      targetLoanId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      targetCycleId: null,
+      overrideReason: null,
+    };
+    const legacy = {
+      kind: "legacy_payment_command_v1",
+      legacy: true,
+      known: {
+        orgId: expected.orgId,
+        actorId: expected.actorId,
+        memberId: expected.memberId,
+        amount: expected.amount,
+        datedOn: expected.datedOn,
+        receivedVia: expected.receivedVia,
+        slipPhotoId: expected.slipPhotoId,
+        notes: expected.notes,
+        extraDecision: expected.extraDecision,
+        accountId: expected.accountId,
+      },
+      unknownFields: ["targetLoanId", "targetCycleId", "overrideReason"],
+    };
+
+    expect(() => assertCanonicalReceiptReplay(expected, legacy as never)).not.toThrow();
+    expect(() => assertCanonicalReceiptReplay({
+      ...expected,
+      targetLoanId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      targetCycleId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    }, legacy as never)).not.toThrow();
+    expect(() => assertCanonicalReceiptReplay(expected, {
+      ...legacy,
+      unknownFields: ["targetCycleId", "overrideReason"],
+    } as never)).toThrow("payment_idempotency_conflict");
+    for (const conflict of [
+      { ...expected, orgId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+      { ...expected, actorId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+      { ...expected, accountId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+      { ...expected, memberId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+      { ...expected, amount: "84.0000" },
+      { ...expected, datedOn: "2026-07-08" },
+      { ...expected, receivedVia: "bank_transfer" },
+      { ...expected, slipPhotoId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+      { ...expected, notes: "different" },
+      { ...expected, extraDecision: "future_contribution" },
+    ]) {
+      expect(() => assertCanonicalReceiptReplay(conflict, legacy as never)).toThrow("payment_idempotency_conflict");
+    }
+  });
+
   it("persists one receipt with repayment, contribution, allocation, audit, and refresh rows", async () => {
     const fakeDb = new FakeDb([
       [],
@@ -318,15 +465,46 @@ describe("BR-26 payment service", () => {
       expect(insertedRows(fakeDb, paymentAllocation)).toHaveLength(5);
       expect(insertedRows(fakeDb, repayment)).toHaveLength(1);
       expect(insertedRows(fakeDb, contribution)).toHaveLength(2);
+      expect(insertedRows(fakeDb, repayment)[0]).toMatchObject({
+        accountId: recordInput.accountId,
+        reconciliationStatus: "regularized",
+      });
+      expect(insertedRows(fakeDb, contribution)).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          accountId: recordInput.accountId,
+          reconciliationStatus: "regularized",
+        }),
+      ]));
       expect(updatedRows(fakeDb, loanSchedule)).toContainEqual({
         paidPrincipalToDate: "30.0000",
         paidInterestToDate: "10.0000",
         status: "pagado",
       });
-      expect(insertedRows(fakeDb, auditLogEntry)[0]).toMatchObject({
+      expect(insertedRows(fakeDb, auditLogEntry)).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          actionKind: "loan.repayment.create",
+          subjectKind: "repayment",
+          subjectId: insertedRows(fakeDb, repayment)[0]?.id,
+          payloadSnapshot: expect.objectContaining({
+            paymentReceiptId: expect.any(String),
+            amount: "45.0000",
+            accountId: recordInput.accountId,
+            reconciliationStatus: "regularized",
+          }),
+        }),
+        expect.objectContaining({
+          actionKind: "contribution.create",
+          subjectKind: "contribution",
+          payloadSnapshot: expect.objectContaining({
+            paymentReceiptId: expect.any(String),
+            accountId: recordInput.accountId,
+            reconciliationStatus: "regularized",
+          }),
+        }),
+        expect.objectContaining({
         actionKind: "payment.receipt.recorded",
         subjectKind: "payment_receipt",
-        payloadSnapshot: {
+        payloadSnapshot: expect.objectContaining({
           allocations: expect.arrayContaining([
             expect.objectContaining({
               kind: "contribution_overdue",
@@ -339,8 +517,10 @@ describe("BR-26 payment service", () => {
               cycleLabel: "2026-07",
             }),
           ]),
-        },
-      });
+        }),
+        }),
+      ]));
+      expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(4);
       expect(fakeDb.executedSql.filter((query) => query.includes("refresh_sprint1_read_models"))).toHaveLength(1);
       expect(fakeDb.selects.filter((entry) => entry.tableName === tableNameOf(groupConfig))).toEqual([
         { tableName: tableNameOf(groupConfig), inTransaction: true },
@@ -353,21 +533,43 @@ describe("BR-26 payment service", () => {
       [{
         id: "existing-receipt-id",
         orgId: recordInput.orgId,
+        createdBy: recordInput.actorId,
+        accountId: recordInput.accountId,
         memberId: recordInput.memberId,
         amount: recordInput.amount,
         currencyCode: "USD",
         datedOn: recordInput.datedOn,
+        receivedVia: recordInput.paymentSource,
+        slipPhotoId: null,
+        notes: recordInput.notes,
+        extraDecision: null,
         clientRequestId: recordInput.clientRequestId,
+        commandPayload: {
+          orgId: recordInput.orgId,
+          actorId: recordInput.actorId,
+          accountId: recordInput.accountId,
+          memberId: recordInput.memberId,
+          amount: recordInput.amount,
+          datedOn: recordInput.datedOn,
+          receivedVia: recordInput.paymentSource,
+          slipPhotoId: null,
+          notes: recordInput.notes,
+          extraDecision: null,
+          targetLoanId: null,
+          targetCycleId: null,
+          overrideReason: null,
+        },
       }],
       [{
         allocationKind: "contribution_current",
-        amount: "20.0000",
+        amount: "85.0000",
         sortOrder: 1,
         currencyCode: "USD",
         brId: "BR-26",
         groupConfigVersion: 7,
         cycleId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
       }],
+      [{ id: "mutable-schedule-that-must-not-be-read" }],
     ]);
 
     await withMockedDb(fakeDb, async () => {
@@ -376,12 +578,17 @@ describe("BR-26 payment service", () => {
       const result = await createPaymentService().recordMemberPayment(recordInput);
 
       expect(result.receiptId).toBe("existing-receipt-id");
+      expect(result.allocations).toEqual([
+        expect.objectContaining({ kind: "contribution_current", amount: "85.0000", cycleId: "ffffffff-ffff-4fff-8fff-ffffffffffff" }),
+      ]);
       expect(fakeDb.inserts).toHaveLength(0);
       expect(insertedRows(fakeDb, paymentReceipt)).toHaveLength(0);
       expect(insertedRows(fakeDb, paymentAllocation)).toHaveLength(0);
       expect(insertedRows(fakeDb, repayment)).toHaveLength(0);
       expect(insertedRows(fakeDb, contribution)).toHaveLength(0);
       expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(0);
+      expect(fakeDb.selects.some((entry) => entry.tableName === tableNameOf(groupConfig))).toBe(false);
+      expect(fakeDb.selects.some((entry) => entry.tableName === tableNameOf(loanSchedule))).toBe(false);
     });
   });
 
@@ -409,6 +616,96 @@ describe("BR-26 payment service", () => {
       await expect(createPaymentService().recordMemberPayment(recordInput))
         .rejects.toThrow("payment_extra_decision_required");
       expect(fakeDb.inserts).toHaveLength(0);
+    });
+  });
+
+  it("rolls back receipt and source rows when a source audit insert fails", async () => {
+    const fakeDb = new FakeDb([
+      [],
+      [{
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        orgId: recordInput.orgId,
+        version: 7,
+        contributionAmount: "20.0000",
+        currencyCode: "USD",
+      }],
+      [],
+      [],
+      [],
+      [],
+      [{
+        orgId: recordInput.orgId,
+        memberId: recordInput.memberId,
+        reasonKind: "contribution_current",
+        cycleId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        periodLabel: "2026-07",
+        dueDate: "2026-07-31",
+        amountDue: "20.0000",
+      }],
+      [],
+    ], { failingAuditInsertNumber: 1 });
+
+    await withMockedDb(fakeDb, async () => {
+      const { createPaymentService } = await import("./payments");
+      await expect(createPaymentService().recordMemberPayment({ ...recordInput, amount: "20.0000" }))
+        .rejects.toThrow("duplicate key value violates unique constraint");
+      expect(insertedRows(fakeDb, paymentReceipt)).toEqual([]);
+      expect(insertedRows(fakeDb, contribution)).toEqual([]);
+      expect(insertedRows(fakeDb, paymentAllocation)).toEqual([]);
+      expect(insertedRows(fakeDb, auditLogEntry)).toEqual([]);
+    });
+  });
+
+  it("audits a contribution source with the pending status of its personal account", async () => {
+    const cycleId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+    const fakeDb = new FakeDb([
+      [],
+      [{
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        orgId: recordInput.orgId,
+        version: 7,
+        contributionAmount: "20.0000",
+        currencyCode: "USD",
+      }],
+      [],
+      [],
+      [],
+      [],
+      [{
+        orgId: recordInput.orgId,
+        memberId: recordInput.memberId,
+        reasonKind: "contribution_current",
+        cycleId,
+        periodLabel: "2026-07",
+        dueDate: "2026-07-31",
+        amountDue: "20.0000",
+      }],
+      [],
+    ], { accountIsGroupFund: false });
+
+    await withMockedDb(fakeDb, async () => {
+      const { createPaymentService } = await import("./payments");
+      await createPaymentService().recordMemberPayment({ ...recordInput, amount: "20.0000" });
+
+      const [source] = insertedRows(fakeDb, contribution);
+      expect(source).toMatchObject({
+        accountId: recordInput.accountId,
+        reconciliationStatus: "pending",
+      });
+      expect(insertedRows(fakeDb, auditLogEntry)).toContainEqual(expect.objectContaining({
+        actionKind: "contribution.create",
+        subjectKind: "contribution",
+        subjectId: source?.id,
+        payloadSnapshot: {
+          paymentReceiptId: expect.any(String),
+          memberId: recordInput.memberId,
+          cycleId,
+          amount: "20.0000",
+          datedOn: recordInput.datedOn,
+          accountId: recordInput.accountId,
+          reconciliationStatus: "pending",
+        },
+      }));
     });
   });
 
@@ -608,11 +905,36 @@ describe("BR-26 payment service", () => {
       [{
         id: "existing-receipt-id",
         orgId: recordInput.orgId,
+        createdBy: recordInput.actorId,
+        accountId: recordInput.accountId,
         memberId: recordInput.memberId,
-        amount: recordInput.amount,
+        amount: "20.0000",
         currencyCode: "USD",
         datedOn: recordInput.datedOn,
+        receivedVia: recordInput.paymentSource,
+        slipPhotoId: null,
+        notes: recordInput.notes,
+        extraDecision: null,
         clientRequestId: recordInput.clientRequestId,
+        commandPayload: {
+          kind: "legacy_payment_command_v1",
+          legacy: true,
+          known: {
+            orgId: recordInput.orgId,
+            actorId: recordInput.actorId,
+            accountId: recordInput.accountId,
+            memberId: recordInput.memberId,
+            amount: "20.0000",
+            datedOn: recordInput.datedOn,
+            receivedVia: recordInput.paymentSource,
+            slipPhotoId: null,
+            notes: recordInput.notes,
+            extraDecision: null,
+            targetLoanId: null,
+            targetCycleId: null,
+          },
+          unknownFields: ["overrideReason"],
+        },
       }],
       [{
         allocationKind: "contribution_current",
@@ -634,6 +956,13 @@ describe("BR-26 payment service", () => {
       });
 
       expect(result.receiptId).toBe("existing-receipt-id");
+      expect(result.allocations).toEqual([
+        expect.objectContaining({
+          kind: "contribution_current",
+          amount: "20.0000",
+          cycleId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        }),
+      ]);
       expect(fakeDb.inserts).toHaveLength(0);
       expect(insertedRows(fakeDb, paymentAllocation)).toHaveLength(0);
       expect(insertedRows(fakeDb, auditLogEntry)).toHaveLength(0);

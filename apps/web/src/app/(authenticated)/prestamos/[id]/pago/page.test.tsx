@@ -26,6 +26,13 @@ vi.mock("@mi-banquito/domain", () => ({
   createPaymentService: () => ({
     previewMemberPayment,
   }),
+  createMovementService: () => ({
+    listActiveAccounts: () => Promise.resolve([
+      { id: "44444444-4444-4444-8444-444444444444", name: "Banco del grupo", last4: "1234", isGroupFund: true },
+      { id: "55555555-5555-4555-8555-555555555555", name: "Cuenta personal", last4: null, isGroupFund: false },
+    ]),
+    listActiveGroupAccounts: () => Promise.resolve([{ id: "44444444-4444-4444-8444-444444444444" }]),
+  }),
 }));
 
 describe("ScrRecordRepaymentPage", () => {
@@ -88,6 +95,8 @@ describe("ScrRecordRepaymentPage", () => {
       extraDecision: "loan_principal",
     }));
     expect(screen.getByRole("status")).toHaveTextContent("BR-26 puede aplicar este pago primero");
+    expect(screen.getByRole("combobox", { name: "¿En qué cuenta entró?" })).toHaveValue("44444444-4444-4444-8444-444444444444");
+    expect(screen.getByRole("option", { name: /Cuenta personal.*pendiente de regularizar/i })).toBeInTheDocument();
   });
 
   it("uses the guarantor member id for non-member loan disclosure preview", async () => {

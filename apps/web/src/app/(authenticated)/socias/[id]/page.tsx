@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { ButtonDestructive, ButtonPrimary, FormField, InputNumber, InputText, StatusPill } from "@mi-banquito/ui";
 import { requireTreasurer } from "@/lib/auth/require-session";
-import { createLedgerService, createReportingService, mapComplianceStatusToTone } from "@mi-banquito/domain";
+import { createLedgerService, createMovementService, createReportingService, mapComplianceStatusToTone } from "@mi-banquito/domain";
 import messages from "@/lib/i18n/en-US.json";
 import { generateMemberStatementsAction } from "../../estados/actions";
 import { transitionMemberStatusAction } from "./actions";
@@ -23,10 +23,11 @@ export default async function ScrMemberDetailPage({
   const { id } = await params;
   const { estado } = await (searchParams ?? Promise.resolve({} as { estado?: string }));
   const ledger = createLedgerService();
-  const [row, balanceRow, archivedStatements] = await Promise.all([
+  const [row, balanceRow, archivedStatements, deposits] = await Promise.all([
     ledger.getMember(session.orgId, id),
     ledger.getMemberBalance(session.orgId, id),
     createReportingService().listStatementArchive(session.orgId),
+    createMovementService().listMemberDeposits(session.orgId, id),
   ]);
   if (!row) notFound();
   const state = row.status === "activo" ? "al_dia" : "atrasado";
@@ -62,6 +63,22 @@ export default async function ScrMemberDetailPage({
           <p className="text-sm text-text-secondary">{copy.common.initialSavings}</p>
           <p className="mt-1 text-xl font-semibold text-text-primary">{row.initialSavingsBalance}</p>
         </div>
+      </section>
+
+      <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={memberCopy.depositStatusTitle}>
+        <h2 className="text-lg font-semibold text-text-primary">{memberCopy.depositStatusTitle}</h2>
+        {deposits.length === 0 ? <p className="text-sm text-text-secondary">{memberCopy.noDeposits}</p> : deposits.map((deposit) => (
+          <div className="grid gap-2 border-b border-border pb-3 sm:grid-cols-[1fr_auto] sm:items-center" key={`${deposit.sourceKind}:${deposit.id}`}>
+            <div>
+              <p className="font-medium text-text-primary">{deposit.sourceKind === "contribution" ? memberCopy.contributionDeposit : memberCopy.repaymentDeposit}</p>
+              <p className="text-sm text-text-secondary">{deposit.datedOn} · {deposit.accountName ?? memberCopy.legacyAccount}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-text-primary">USD {Number(deposit.amount).toFixed(2)}</span>
+              <StatusPill tone={deposit.reconciliationStatus === "pending" ? "warning" : "success"} label={deposit.reconciliationStatus === "pending" ? memberCopy.pendingStatus : memberCopy.regularizedStatus} />
+            </div>
+          </div>
+        ))}
       </section>
 
       <section className="grid gap-4 rounded-md border border-border bg-surface p-5 md:grid-cols-[1fr_auto] md:items-center" aria-label={memberCopy.currentBalance}>

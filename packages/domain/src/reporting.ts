@@ -4,6 +4,7 @@ import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
 import {
   auditLogEntry,
+  account,
   contribution,
   contributionCycle,
   member,
@@ -11,18 +12,26 @@ import {
   paymentAllocation,
   paymentReceipt,
   periodClose,
+  repayment,
   statementArchive,
+  statementArtifactEvent,
+  transfer,
   withdrawal,
 } from "@mi-banquito/db/schema";
 import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 
 export type VerifyResult =
-  | { matched: true; groupName: string; generatedAt: string }
+  | { matched: true; groupName: string; generatedAt: string; movements: PublicStatementMovement[]; legacy?: true; periodLabel?: string }
   | { matched: false };
+
+export type PublicStatementMovement = StatementReconciliationMovement & { label: string };
+export type StatementArchiveView = typeof statementArchive.$inferSelect & {
+  artifactStatus: "pending" | "failed" | "ready";
+};
 
 export interface ReportingService {
   readonly context: "reporting";
-  listStatementArchive(orgId: string): Promise<Array<typeof statementArchive.$inferSelect>>;
+  listStatementArchive(orgId: string): Promise<StatementArchiveView[]>;
   verifyStatementHash(hash: string): Promise<VerifyResult>;
   generateMonthlyMemberStatements(input: {
     orgId: string;
@@ -78,8 +87,25 @@ export function sha256Hex(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
 
+function moneyUnits4(value: string | number): bigint {
+  const match = /^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(String(value));
+  if (!match) throw new Error("amount_must_be_numeric");
+  const units = BigInt(match[2] ?? "0") * BigInt(10_000) + BigInt((match[3] ?? "").padEnd(4, "0") || "0");
+  return match[1] === "-" ? -units : units;
+}
+
+function money4FromUnits(units: bigint): string {
+  const negative = units < BigInt(0);
+  const absolute = negative ? -units : units;
+  return `${negative ? "-" : ""}${absolute / BigInt(10_000)}.${String(absolute % BigInt(10_000)).padStart(4, "0")}`;
+}
+
 export function money(value: string | number): string {
-  return `USD ${Number(value).toFixed(2)}`;
+  const units = moneyUnits4(value);
+  const negative = units < BigInt(0);
+  const roundedCents = ((negative ? -units : units) + BigInt(50)) / BigInt(100);
+  const whole = (roundedCents / BigInt(100)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `USD ${negative ? "-" : ""}${whole}.${String(roundedCents % BigInt(100)).padStart(2, "0")}`;
 }
 
 export type MonthlyMemberStatementCopy = {
@@ -100,7 +126,37 @@ export type MonthlyMemberStatementCopy = {
   fallbackAllocation: string;
   unknownCycle: string;
   unknownMember: string;
+  reconciliationTitle: string;
+  pendingContribution: string;
+  pendingRepayment: string;
+  regularizedContribution: string;
+  regularizedRepayment: string;
+  regularizationTransfer: string;
+  legacyAccount: string;
 };
+
+export type StatementReconciliationMovement = {
+  id: string;
+  kind: "contribution" | "repayment" | "regularization_transfer";
+  status: "pending" | "regularized";
+  amount: string;
+  datedOn: string;
+  accountName: string | null;
+};
+
+function publicMovements(
+  rows: StatementReconciliationMovement[],
+  copy: MonthlyMemberStatementCopy,
+): PublicStatementMovement[] {
+  return rows.map((movement) => {
+    const kind = movement.kind === "regularization_transfer"
+      ? copy.regularizationTransfer
+      : movement.kind === "contribution"
+        ? movement.status === "pending" ? copy.pendingContribution : copy.regularizedContribution
+        : movement.status === "pending" ? copy.pendingRepayment : copy.regularizedRepayment;
+    return { ...movement, label: `${kind} · ${movement.accountName ?? copy.legacyAccount}` };
+  });
+}
 
 export function monthlyMemberStatementPayload(input: {
   orgName: string;
@@ -110,17 +166,20 @@ export function monthlyMemberStatementPayload(input: {
   closingBalance: string;
   contributions: Array<{ id: string; amount: string; datedOn: string; slipPhotoUri: string | null }>;
   receivedPayments?: Array<{ id: string; amount: string; datedOn: string; memberName: string; details: string[] }>;
+  reconciliationMovements?: StatementReconciliationMovement[];
   withdrawals: Array<{ id: string; amount: string; datedOn: string }>;
   treasurerName: string;
   bankLast4: string | null;
   copy: MonthlyMemberStatementCopy;
 }) {
   const copy = input.copy;
+  const verificationMovements = publicMovements(input.reconciliationMovements ?? [], copy);
   return {
     kind: "monthly_member",
     orgName: input.orgName,
     periodLabel: input.periodLabel,
     member: input.member,
+    verificationMovements,
     sections: [
       {
         id: "member-monthly",
@@ -151,6 +210,20 @@ export function monthlyMemberStatementPayload(input: {
               datedOn: row.datedOn,
               details: row.details,
             })),
+          }]
+        : []),
+      ...(input.reconciliationMovements && input.reconciliationMovements.length > 0
+        ? [{
+            id: "member-reconciliation",
+            title: copy.reconciliationTitle,
+            rows: verificationMovements.map((row) => {
+              return {
+                label: row.label,
+                value: money(row.amount),
+                datedOn: row.datedOn,
+                status: row.status,
+              };
+            }),
           }]
         : []),
     ],
@@ -273,36 +346,95 @@ function monthEnd(periodLabel: string): string {
   return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
 }
 
-function money4(value: number): string {
-  return value.toFixed(4);
+function money4Sum(values: Array<string | number>): string {
+  return money4FromUnits(values.reduce((sum, value) => sum + moneyUnits4(value), BigInt(0)));
+}
+
+export function verifyResultFromArchivedPayload(input: {
+  canonicalPayloadHash: string;
+  canonicalPayload: unknown;
+  generatedAt: Date | string;
+  orgId?: string;
+  periodLabel?: string;
+  kind?: string;
+}): VerifyResult {
+  if (!input.canonicalPayload || typeof input.canonicalPayload !== "object") {
+    if (!input.orgId || !input.periodLabel || !input.kind || !/^[a-f0-9]{64}$/.test(input.canonicalPayloadHash)) {
+      return { matched: false };
+    }
+    return {
+      matched: true,
+      groupName: "Archivo historico",
+      generatedAt: input.generatedAt instanceof Date ? input.generatedAt.toISOString() : String(input.generatedAt),
+      movements: [],
+      legacy: true,
+      periodLabel: input.periodLabel,
+    };
+  }
+  const payload = input.canonicalPayload as {
+    orgName?: unknown;
+    branding?: { orgName?: unknown };
+    verificationMovements?: unknown;
+  };
+  const groupName = typeof payload.orgName === "string" ? payload.orgName : payload.branding?.orgName;
+  if (
+    typeof groupName !== "string"
+    || (payload.verificationMovements !== undefined && !Array.isArray(payload.verificationMovements))
+    || sha256Hex(canonicalJson(input.canonicalPayload as JsonValue)) !== input.canonicalPayloadHash
+  ) return { matched: false };
+  return {
+    matched: true,
+    groupName,
+    generatedAt: input.generatedAt instanceof Date ? input.generatedAt.toISOString() : String(input.generatedAt),
+    movements: (payload.verificationMovements ?? []) as PublicStatementMovement[],
+  };
 }
 
 export function createReportingService(): ReportingService {
   return {
     context: "reporting",
     async listStatementArchive(orgId) {
-      return withTenantTransaction(orgId, async (tx) => tx.select().from(statementArchive)
-        .where(eq(statementArchive.orgId, orgId))
-        .orderBy(desc(statementArchive.generatedAt)));
+      return withTenantTransaction(orgId, async (tx) => {
+        const rows = await tx.select().from(statementArchive)
+          .where(eq(statementArchive.orgId, orgId))
+          .orderBy(desc(statementArchive.generatedAt));
+        return Promise.all(rows.map(async (row) => {
+          if (row.kind !== "monthly_close") return { ...row, artifactStatus: "ready" as const };
+          const [event] = await tx.select({ status: statementArtifactEvent.status }).from(statementArtifactEvent)
+            .where(and(
+              eq(statementArtifactEvent.orgId, orgId),
+              eq(statementArtifactEvent.statementArchiveId, row.id),
+            ))
+            .orderBy(
+              desc(statementArtifactEvent.createdAt),
+              desc(statementArtifactEvent.attemptNumber),
+              sql`CASE ${statementArtifactEvent.status} WHEN 'ready' THEN 3 WHEN 'failed' THEN 2 ELSE 1 END DESC`,
+            )
+            .limit(1);
+          return {
+            ...row,
+            artifactStatus: event?.status ?? (row.byteSize === 0 ? "pending" as const : "ready" as const),
+          };
+        }));
+      });
     },
     async verifyStatementHash(hash) {
       const [row] = await db.select({
+        orgId: statementArchive.orgId,
+        kind: statementArchive.kind,
+        periodLabel: statementArchive.periodLabel,
         generatedAt: statementArchive.generatedAt,
-        groupName: organization.displayName,
+        canonicalPayloadHash: statementArchive.canonicalPayloadHash,
+        canonicalPayload: statementArchive.canonicalPayload,
       })
         .from(statementArchive)
-        .innerJoin(organization, eq(organization.id, statementArchive.orgId))
         .where(eq(statementArchive.canonicalPayloadHash, hash.toLowerCase()));
 
       if (!row) {
         return { matched: false };
       }
 
-      return {
-        matched: true,
-        groupName: row.groupName,
-        generatedAt: row.generatedAt instanceof Date ? row.generatedAt.toISOString() : String(row.generatedAt),
-      };
+      return verifyResultFromArchivedPayload(row);
     },
     async generateMonthlyMemberStatements(input) {
       return withWritableTenantTransaction(input.orgId, async (tx) => {
@@ -392,17 +524,69 @@ export function createReportingService(): ReportingService {
               sql`${withdrawal.datedOn} <= ${periodEnd}`,
             ))
             .orderBy(withdrawal.datedOn);
+          const movementResult = await tx.execute(sql`
+            SELECT source.id,
+                   source.kind,
+                   source.reconciliation_status AS status,
+                   source.amount::numeric(18, 4)::text AS amount,
+                   source.dated_on::text AS "datedOn",
+                   a.name AS "accountName"
+            FROM (
+              SELECT id, 'contribution'::text AS kind, reconciliation_status, amount, dated_on, account_id, reverses_id
+              FROM contribution
+              WHERE org_id = ${input.orgId} AND member_id = ${row.id}
+              UNION ALL
+              SELECT id, 'repayment'::text AS kind, reconciliation_status, amount, dated_on, account_id, reverses_id
+              FROM repayment
+              WHERE org_id = ${input.orgId} AND member_id = ${row.id}
+            ) source
+            LEFT JOIN account a ON a.id = source.account_id AND a.org_id = ${input.orgId}
+            WHERE source.reverses_id IS NULL
+              AND source.dated_on >= ${periodStart}
+              AND source.dated_on <= ${periodEnd}
+            UNION ALL
+            SELECT t.id,
+                   'regularization_transfer'::text AS kind,
+                   'regularized'::text AS status,
+                   t.amount::numeric(18, 4)::text AS amount,
+                   t.dated_on::text AS "datedOn",
+                   target.name AS "accountName"
+            FROM transfer t
+            JOIN account target ON target.id = t.to_account_id AND target.org_id = t.org_id
+            WHERE t.org_id = ${input.orgId}
+              AND t.purpose = 'regularization'
+              AND t.reverses_id IS NULL
+              AND t.dated_on >= ${periodStart}
+              AND t.dated_on <= ${periodEnd}
+              AND (
+                (t.regularizes_kind = 'contribution' AND EXISTS (
+                  SELECT 1 FROM contribution c WHERE c.id = t.regularizes_id AND c.org_id = t.org_id AND c.member_id = ${row.id}
+                ))
+                OR
+                (t.regularizes_kind = 'repayment' AND EXISTS (
+                  SELECT 1 FROM repayment r WHERE r.id = t.regularizes_id AND r.org_id = t.org_id AND r.member_id = ${row.id}
+                ))
+              )
+            ORDER BY "datedOn", id
+          `);
+          const reconciliationMovements = (Array.isArray(movementResult) ? movementResult : movementResult.rows ?? []) as StatementReconciliationMovement[];
 
-          const openingBalance = Number(row.initialSavingsBalance) + Number(priorContributionTotal?.total ?? 0) - Number(priorWithdrawalTotal?.total ?? 0);
-          const closingBalance = openingBalance
-            + contributions.reduce((sum, item) => sum + Number(item.amount), 0)
-            - withdrawals.reduce((sum, item) => sum + Number(item.amount), 0);
+          const openingBalance = money4Sum([
+            row.initialSavingsBalance,
+            priorContributionTotal?.total ?? "0.0000",
+            money4FromUnits(-moneyUnits4(priorWithdrawalTotal?.total ?? "0.0000")),
+          ]);
+          const closingBalance = money4Sum([
+            openingBalance,
+            ...contributions.map((item) => item.amount),
+            ...withdrawals.map((item) => money4FromUnits(-moneyUnits4(item.amount))),
+          ]);
           const payload = monthlyMemberStatementPayload({
             orgName: org?.displayName ?? "Mi Banquito",
             periodLabel: closeRow.periodLabel,
             member: { id: row.id, displayName: row.displayName },
-            openingBalance: money4(openingBalance),
-            closingBalance: money4(closingBalance),
+            openingBalance,
+            closingBalance,
             contributions: monthlyMemberStatementContributions(contributions.map((item) => ({
               id: item.id,
               amount: item.amount,
@@ -411,6 +595,7 @@ export function createReportingService(): ReportingService {
               sourceKind: item.paymentReceiptId ? "payment_receipt" : "contribution",
             }))),
             receivedPayments: monthlyMemberStatementReceivedPayments(receiptAllocations, input.statementCopy),
+            reconciliationMovements,
             withdrawals: withdrawals.map((item) => ({
               id: item.id,
               amount: item.amount,
@@ -447,6 +632,7 @@ export function createReportingService(): ReportingService {
             periodLabel: closeRow.periodLabel,
             pdfUri: artifact.pdfUri,
             canonicalPayloadHash: hash,
+            canonicalPayload: payload,
             generatedAt,
             periodCloseId: closeRow.id,
             yearEndShareOutId: null,

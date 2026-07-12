@@ -36,6 +36,7 @@ export const promise_status_enum = pgEnum("promise_status_enum", ["open", "kept"
 export const reconciliation_cycle_resolution_kind_enum = pgEnum("reconciliation_cycle_resolution_kind_enum", ["auto_within_tolerance", "resolved_by_correction", "annotated_acceptance", "adjustment"]);
 export const slip_photo_attached_to_kind_enum = pgEnum("slip_photo_attached_to_kind_enum", ["contribution", "repayment", "expense"]);
 export const statement_archive_kind_enum = pgEnum("statement_archive_kind_enum", ["monthly_close", "monthly_member", "year_end_member", "year_end_share_out", "year_end_snapshot", "balance_banquito", "year_end_economic_summary", "monthly_summary"]);
+export const statement_artifact_status_enum = pgEnum("statement_artifact_status_enum", ["pending", "failed", "ready"]);
 export const surplus_governance_decision_status_enum = pgEnum("surplus_governance_decision_status_enum", ["draft", "approved", "locked"]);
 export const user_account_status_enum = pgEnum("user_account_status_enum", ["active", "disabled"]);
 export const user_org_membership_status_enum = pgEnum("user_org_membership_status_enum", ["active", "revoked"]);
@@ -298,6 +299,7 @@ export const paymentReceipt = pgTable("payment_receipt", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   orgId: uuid("org_id").notNull(),
   memberId: uuid("member_id").references((): AnyPgColumn => member.id).notNull(),
+  accountId: uuid("account_id").references((): AnyPgColumn => account.id),
   amount: numeric("amount", { precision: 18, scale: 4 }).notNull(),
   currencyCode: text("currency_code").notNull(),
   datedOn: date("dated_on").notNull(),
@@ -305,6 +307,7 @@ export const paymentReceipt = pgTable("payment_receipt", {
   slipPhotoId: uuid("slip_photo_id").references((): AnyPgColumn => slipPhoto.id),
   notes: text("notes"),
   extraDecision: payment_extra_decision_enum("extra_decision"),
+  commandPayload: jsonb("command_payload"),
   clientRequestId: uuid("client_request_id").notNull(),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
@@ -899,7 +902,9 @@ export const periodClose = pgTable("period_close", {
   isYearEnd: boolean("is_year_end").notNull(),
   monthlyCloseStatementId: uuid("monthly_close_statement_id").references((): AnyPgColumn => statementArchive.id),
   createdAt: timestamp("created_at").notNull(),
-});
+}, (table) => [
+  unique("uq_period_close_org_id_cycle_id").on(table.orgId, table.cycleId),
+]);
 
 export const statementArchive = pgTable("statement_archive", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -909,13 +914,40 @@ export const statementArchive = pgTable("statement_archive", {
   periodLabel: text("period_label").notNull(),
   pdfUri: text("pdf_uri").notNull(),
   canonicalPayloadHash: text("canonical_payload_hash").notNull(),
+  canonicalPayload: jsonb("canonical_payload"),
+  legacyVerificationPayload: jsonb("legacy_verification_payload"),
   generatedAt: timestamp("generated_at").notNull(),
   periodCloseId: uuid("period_close_id").references((): AnyPgColumn => periodClose.id),
   yearEndShareOutId: uuid("year_end_share_out_id").references((): AnyPgColumn => yearEndShareOut.id),
   byteSize: integer("byte_size").notNull(),
   createdAt: timestamp("created_at").notNull(),
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
-});
+}, (table) => [
+  unique("uq_statement_archive_org_id_id").on(table.orgId, table.id),
+]);
+
+export const statementArtifactEvent = pgTable("statement_artifact_event", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  orgId: uuid("org_id").notNull(),
+  statementArchiveId: uuid("statement_archive_id").references((): AnyPgColumn => statementArchive.id).notNull(),
+  status: statement_artifact_status_enum("status").notNull(),
+  attemptNumber: integer("attempt_number").notNull(),
+  byteSize: integer("byte_size"),
+  errorCode: text("error_code"),
+  attemptedAt: timestamp("attempted_at").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+}, (table) => [
+  unique("uq_statement_artifact_event_attempt").on(table.orgId, table.statementArchiveId, table.attemptNumber, table.status),
+  index("idx_statement_artifact_event_archive_created").on(table.orgId, table.statementArchiveId, table.createdAt),
+  uniqueIndex("uq_statement_artifact_event_ready")
+    .on(table.orgId, table.statementArchiveId)
+    .where(sql`${table.status} = 'ready'`),
+  foreignKey({
+    name: "fk_statement_artifact_event_archive_org",
+    columns: [table.orgId, table.statementArchiveId],
+    foreignColumns: [statementArchive.orgId, statementArchive.id],
+  }),
+]);
 
 export const yearEndShareOutReversal = pgTable("year_end_share_out_reversal", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),

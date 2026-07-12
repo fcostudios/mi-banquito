@@ -7,8 +7,8 @@ import { db } from "@mi-banquito/db";
 import { withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import {
   alert,
+  account,
   auditLogEntry,
-  availableCapital,
   contribution,
   groupConfig,
   interestAccrual,
@@ -20,6 +20,7 @@ import {
   loanSchedule,
   member,
   nonMemberBorrower,
+  organization,
   repayment,
   withdrawal,
 } from "@mi-banquito/db/schema";
@@ -527,8 +528,15 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
       borrowerNonMemberId = randomUUID();
     }
 
-    const [capital] = await db.select().from(availableCapital)
-      .where(eq(availableCapital.orgId, input.orgId));
+    const [capital] = await db.select({
+      availableCapital: sql<string>`(fund_pool_balance(${input.orgId}) - COALESCE((
+        SELECT base_fund_pool
+        FROM mv_base_fund_pool_per_fiscal_year
+        WHERE org_id = ${input.orgId}
+        ORDER BY fiscal_year DESC
+        LIMIT 1
+      ), 0))::numeric(18, 4)::text`,
+    }).from(organization).where(eq(organization.id, input.orgId)).limit(1);
     const eligibility = evaluateLoanEligibility({
       requestedPrincipal: principalAmount,
       availableCapital: money4(capital?.availableCapital ?? "0.0000"),
@@ -785,6 +793,20 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
     const borrowerDisplayName = await resolveBorrowerName(input.orgId, currentLoan);
 
     await withWritableTenantTransaction(input.orgId, async (tx) => {
+      const [groupFundAccount] = await tx.select({ id: account.id }).from(account).where(and(
+        eq(account.orgId, input.orgId),
+        eq(account.status, "active"),
+        eq(account.isGroupFund, true),
+      )).limit(1);
+      if (!groupFundAccount) throw new Error("deposit_group_account_required");
+      const [selectedAccount] = await tx.select().from(account).where(and(
+        eq(account.orgId, input.orgId),
+        eq(account.id, input.accountId),
+        eq(account.status, "active"),
+      )).for("update").limit(1);
+      if (!selectedAccount) throw new Error("deposit_account_unavailable");
+      const reconciliationStatus = selectedAccount.isGroupFund ? "regularized" as const : "pending" as const;
+
       await writeWithAudit({
         write: async () => {
           await tx.insert(repayment).values({
@@ -803,6 +825,8 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
         notes: normalizeNullableText(input.notes),
         reversesId: null,
         reverseReason: null,
+        accountId: selectedAccount.id,
+        reconciliationStatus,
         clientRequestId: input.clientRequestId,
         createdAt: now,
         createdBy: input.actorId,
@@ -916,6 +940,8 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
               repaymentId,
               loanId: input.loanId,
               amount: money4(input.amount),
+              accountId: selectedAccount.id,
+              reconciliationStatus,
               split,
               paidOff,
             },

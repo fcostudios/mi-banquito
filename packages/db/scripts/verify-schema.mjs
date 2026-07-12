@@ -14,8 +14,13 @@ const MIGRATIONS_URL = new URL(
 );
 
 export const REQUIRED_FUNCTIONS = [
+  "allow_reconciliation_status_regularization",
+  "derive_deposit_reconciliation_status",
   "enforce_period_lock",
   "raise_append_only_violation",
+  "validate_regularization_transfer",
+  "fund_pool_balance",
+  "current_cash_balances",
 ];
 
 function uniqueSorted(values) {
@@ -43,6 +48,7 @@ function parsePgArray(value) {
 }
 
 export function parseExpectedSchema(sql) {
+  const staticSql = sql.replace(/'(?:''|[^'])*'/g, "''");
   const tableNames = uniqueSorted(
     [...sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+([a-z_]+)\s+\(/g)].map(
       (match) => match[1]
@@ -62,7 +68,7 @@ export function parseExpectedSchema(sql) {
       .map((match) => match[1])
   );
   const triggerTables = uniqueSorted(
-    [...sql.matchAll(/CREATE TRIGGER\s+[a-z_]+[\s\S]*?\bON\s+([a-z_]+)/g)]
+    [...staticSql.matchAll(/CREATE TRIGGER\s+[a-z_]+[\s\S]*?\bON\s+([a-z_]+)/g)]
       .map((match) => match[1])
   );
   const materializedViewNames = uniqueSorted(

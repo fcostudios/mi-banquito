@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Bell, Building2, Calendar, ListChecks, Plus, TrendingUp, Users } from "lucide-react";
-import { createLedgerService } from "@mi-banquito/domain";
+import { createLedgerService, createMovementService } from "@mi-banquito/domain";
 import { StatusPill } from "@mi-banquito/ui";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import messages from "@/lib/i18n/en-US.json";
@@ -28,9 +28,10 @@ function stateLabel(state: string) {
 export default async function ScrTreasurerHomePage() {
   const session = await requireTreasurer();
   const ledger = createLedgerService();
-  const [rows, memberSearchRows] = await Promise.all([
+  const [rows, memberSearchRows, pendingDeposits] = await Promise.all([
     ledger.listComplianceRows(session.orgId),
     ledger.searchMembersWithBalance(session.orgId),
+    createMovementService().listPendingDeposits(session.orgId),
   ]);
   const summary = rows.reduce(
     (acc, row) => {
@@ -130,7 +131,10 @@ export default async function ScrTreasurerHomePage() {
               <Bell className="h-5 w-5" aria-hidden />
             </span>
             <span className="text-sm text-text-secondary">{copy.pendingRegularization}</span>
-            <strong className="text-3xl text-text-primary">0</strong>
+            <div className="flex items-center justify-between gap-3">
+              <strong className="text-3xl text-text-primary">{pendingDeposits.length}</strong>
+              <StatusPill tone={pendingDeposits.length > 0 ? "warning" : "success"} label={pendingDeposits.length > 0 ? copy.pendingStatus : copy.regularizedStatus} />
+            </div>
             <span className="text-sm text-text-secondary">{copy.pendingRegularizationHint}</span>
           </Link>
           <Link href="/cuentas" className="grid gap-3 rounded-md border border-border bg-surface p-4">

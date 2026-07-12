@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createReconciliationService, type ReconciliationSnapshot } from "@mi-banquito/domain";
-import { ButtonPrimary, ButtonSecondary, FormField, InputNumber } from "@mi-banquito/ui";
+import { ButtonPrimary, ButtonSecondary, FormField, InputNumber, StatusPill } from "@mi-banquito/ui";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import { ecCurrency } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
@@ -57,7 +57,8 @@ export default async function ScrMonthlyClosePage({
   const state = await createReconciliationService().getMonthlyCloseState(session.orgId);
   const params = await searchParams;
   const message = resultMessage(params);
-  const canClose = Boolean(state.id) && state.closeAllowed;
+  const hasPendingRegularizations = state.pendingRegularizations.length > 0;
+  const canClose = Boolean(state.id) && state.closeAllowed && !hasPendingRegularizations;
   const canAnnotate = Boolean(state.id) && state.status === "outside_tolerance";
 
   return (
@@ -114,6 +115,34 @@ export default async function ScrMonthlyClosePage({
         </form>
       </section>
 
+      <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.pendingTitle}>
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary">{copy.pendingTitle}</h2>
+          <p className="text-sm text-text-secondary">{copy.pendingDescription}</p>
+        </div>
+        {state.pendingRegularizations.length === 0 ? (
+          <p className="text-sm font-semibold text-success">{copy.pendingEmpty}</p>
+        ) : (
+          <div className="grid gap-3">
+            {state.pendingRegularizations.map((row) => (
+              <div className="grid gap-2 border-b border-border pb-3 sm:grid-cols-[1fr_auto_auto] sm:items-center" key={`${row.kind}:${row.id}`}>
+                <div className="min-w-0">
+                  <p className="font-semibold text-text-primary">{row.memberName}</p>
+                  <p className="text-sm text-text-secondary">{row.datedOn} · {row.accountName ?? copy.legacyAccount}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-text-primary">USD {Number(row.amount).toFixed(2)}</span>
+                  <StatusPill tone="warning" label={copy.pendingStatus} />
+                </div>
+                <Link className="inline-flex min-h-12 items-center justify-center font-semibold text-primary" href={`/movimientos/registrar?regularizesKind=${row.kind}&regularizesId=${row.id}`}>
+                  {copy.regularize}
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.annotationTitle}>
         <div>
           <h2 className="text-lg font-semibold text-text-primary">{copy.annotationTitle}</h2>
@@ -136,7 +165,7 @@ export default async function ScrMonthlyClosePage({
           <input type="hidden" name="reconciliationCycleId" value={state.id} />
           <ButtonPrimary type="submit" disabled={!canClose}>{copy.close}</ButtonPrimary>
           {!canClose && state.status !== "closed" ? (
-            <p className="text-sm text-text-secondary">{copy.closeDisabled}</p>
+            <p className="text-sm text-text-secondary">{hasPendingRegularizations ? copy.pendingCloseDisabled : copy.closeDisabled}</p>
           ) : null}
         </form>
       </section>
@@ -149,15 +178,17 @@ export default async function ScrMonthlyClosePage({
               <p className="break-all text-sm text-text-secondary">{copy.hash}: {state.canonicalPayloadHash}</p>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Link href={state.monthlyClosePdfUri} className="inline-flex min-h-12 items-center rounded-md border border-primary bg-surface px-4 text-primary">
-              {copy.previewPdf}
-            </Link>
-            <form action={shareMonthlyCloseAction}>
-              <input type="hidden" name="statementArchiveId" value={state.monthlyCloseStatementId} />
-              <ButtonPrimary type="submit">{copy.shareWhatsApp}</ButtonPrimary>
-            </form>
-          </div>
+          {state.monthlyCloseArtifactStatus === "ready" ? (
+            <div className="flex flex-wrap gap-3">
+              <Link href={state.monthlyClosePdfUri} className="inline-flex min-h-12 items-center rounded-md border border-primary bg-surface px-4 text-primary">
+                {copy.previewPdf}
+              </Link>
+              <form action={shareMonthlyCloseAction}>
+                <input type="hidden" name="statementArchiveId" value={state.monthlyCloseStatementId} />
+                <ButtonPrimary type="submit">{copy.shareWhatsApp}</ButtonPrimary>
+              </form>
+            </div>
+          ) : <p className="text-sm font-semibold text-text-secondary">{copy.artifactProcessing}</p>}
         </section>
       ) : null}
     </main>

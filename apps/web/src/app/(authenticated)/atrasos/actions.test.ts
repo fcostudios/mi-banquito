@@ -48,6 +48,7 @@ const orgId = "11111111-1111-4111-8111-111111111111";
 const actorId = "33333333-3333-4333-8333-333333333333";
 const memberId = "22222222-2222-4222-8222-222222222222";
 const loanId = "44444444-4444-4444-8444-444444444444";
+const accountId = "99999999-9999-4999-8999-999999999999";
 
 function promiseFormData() {
   const formData = new FormData();
@@ -82,6 +83,7 @@ function overdueContributionFormData() {
   const formData = new FormData();
   formData.set("clientRequestId", "77777777-7777-4777-8777-777777777777");
   formData.set("memberId", memberId);
+  formData.set("accountId", accountId);
   formData.set("cycleId", "55555555-5555-4555-8555-555555555555");
   return formData;
 }
@@ -237,6 +239,7 @@ describe("atrasos actions", () => {
         actorId,
         clientRequestId: "77777777-7777-4777-8777-777777777777",
         memberId,
+        accountId,
         targetCycleId: "55555555-5555-4555-8555-555555555555",
         amount: "20.0000",
         datedOn: currentEcuadorDateString(),
@@ -275,6 +278,7 @@ describe("atrasos actions", () => {
     const redirectedTo = redirect.mock.calls[0]?.[0] ?? "";
     const redirectedParams = new URLSearchParams(redirectedTo.split("?")[1]);
     expect(redirectedParams.get("targetCycleId")).toBe("55555555-5555-4555-8555-555555555555");
+    expect(redirectedParams.get("accountId")).toBe(accountId);
     expect(redirectedParams.get("amount")).toBe("20.0000");
     expect(redirectedParams.get("notes")).toBe("Pago desde atrasos: 2026-06");
   });
@@ -313,5 +317,6 @@ describe("atrasos actions", () => {
     const redirectedTo = redirect.mock.calls[0]?.[0] ?? "";
     const redirectedParams = new URLSearchParams(redirectedTo.split("?")[1]);
     expect(redirectedParams.get("targetCycleId")).toBe("55555555-5555-4555-8555-555555555555");
+    expect(redirectedParams.get("accountId")).toBe(accountId);
   });
 });
