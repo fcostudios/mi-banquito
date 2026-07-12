@@ -4,9 +4,11 @@ import type { AdminGlobalDrift, AdminHealthSnapshot } from "@mi-banquito/domain"
 import { KpiTile, StatusPill } from "@mi-banquito/ui";
 
 import { ecDateTime } from "@/lib/format/es-ec";
+import type { DriftRunnerDeploymentStatus } from "@/lib/drift/runner";
 import messages from "@/lib/i18n/en-US.json";
 
 const copy = messages.adminHealth;
+const runnerUnavailable = messages.adminDrift.runnerUnavailable;
 const healthCopy = {
   consecutiveCleanMonths: "Meses con conciliación cero",
   stale: "Datos vencidos",
@@ -26,13 +28,14 @@ function dateTime(value: Date | null, fallback: string): string {
   return value ? ecDateTime.format(value) : fallback;
 }
 
-export function AdminHealthDashboard({ snapshots, drift, consecutiveCleanMonths }: {
+export function AdminHealthDashboard({ snapshots, drift, consecutiveCleanMonths, runnerDeployment }: {
   snapshots: AdminHealthSnapshot[];
   drift: AdminGlobalDrift | null;
   consecutiveCleanMonths: number;
+  runnerDeployment: DriftRunnerDeploymentStatus;
 }) {
   const latestDrift = drift?.exitCode ?? null;
-  const driftClean = latestDrift === 0;
+  const driftClean = runnerDeployment.ready && latestDrift === 0;
 
   return (
     <>
@@ -46,8 +49,8 @@ export function AdminHealthDashboard({ snapshots, drift, consecutiveCleanMonths 
         <div className="rounded-md border border-border bg-surface p-4" data-testid="drift_badge">
           <p className="mb-2 text-text-secondary">{copy.substrateStatus}</p>
           <StatusPill
-            tone={driftClean ? "success" : latestDrift === null ? "neutral" : "danger"}
-            label={latestDrift === null ? copy.notChecked : driftClean ? copy.noDrift : copy.driftDetected}
+            tone={!runnerDeployment.ready ? "danger" : driftClean ? "success" : latestDrift === null ? "neutral" : "danger"}
+            label={!runnerDeployment.ready ? runnerUnavailable : latestDrift === null ? copy.notChecked : driftClean ? copy.noDrift : copy.driftDetected}
           />
         </div>
       </section>
@@ -71,7 +74,7 @@ export function AdminHealthDashboard({ snapshots, drift, consecutiveCleanMonths 
             </thead>
             <tbody>
               {snapshots.map((row) => {
-                const rowDriftClean = row.driftExitCode === 0;
+                const rowDriftClean = runnerDeployment.ready && row.driftExitCode === 0;
                 const healthReliable = row.snapshotStatus === "available"
                   && row.freshness === "current"
                   && row.hasPendingReconciliation !== null
@@ -109,8 +112,8 @@ export function AdminHealthDashboard({ snapshots, drift, consecutiveCleanMonths 
                     </td>
                     <td className="px-3 py-3">
                       <StatusPill
-                        tone={rowDriftClean ? "success" : row.driftExitCode === null ? "neutral" : "danger"}
-                        label={row.driftExitCode === null ? copy.notChecked : rowDriftClean ? copy.noDrift : copy.driftDetected}
+                        tone={!runnerDeployment.ready ? "danger" : rowDriftClean ? "success" : row.driftExitCode === null ? "neutral" : "danger"}
+                        label={!runnerDeployment.ready ? runnerUnavailable : row.driftExitCode === null ? copy.notChecked : rowDriftClean ? copy.noDrift : copy.driftDetected}
                       />
                     </td>
                     <td className="px-3 py-3">

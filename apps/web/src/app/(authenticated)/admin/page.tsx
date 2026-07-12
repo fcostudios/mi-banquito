@@ -4,6 +4,7 @@ import { ButtonPrimary } from "@mi-banquito/ui";
 
 import { AdminHealthDashboard } from "@/components/admin/admin-health-dashboard";
 import { requirePlatformOperator } from "@/lib/auth/require-session";
+import { getDriftRunnerDeploymentStatus } from "@/lib/drift/runner";
 import messages from "@/lib/i18n/en-US.json";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export default async function ScrAdminHomePage() {
         snapshots={dashboard.snapshots}
         drift={dashboard.drift}
         consecutiveCleanMonths={dashboard.consecutiveCleanMonths}
+        runnerDeployment={getDriftRunnerDeploymentStatus()}
       />
     </main>
   );
