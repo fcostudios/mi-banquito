@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
 import { auditLogEntry, member } from "@mi-banquito/db/schema";
+import { withTenantTransaction } from "@mi-banquito/db/tenant";
 
 export type AuditRow = typeof auditLogEntry.$inferSelect;
 
@@ -333,11 +334,11 @@ async function memberNameMap(orgId: string, rows: AuditRow[]): Promise<Map<strin
   if (memberIds.length === 0) {
     return new Map();
   }
-  const members = await db.select({
+  const members = await withTenantTransaction(orgId, (tx) => tx.select({
     id: member.id,
     displayName: member.displayName,
   }).from(member)
-    .where(and(eq(member.orgId, orgId), inArray(member.id, memberIds)));
+    .where(and(eq(member.orgId, orgId), inArray(member.id, memberIds))));
   return new Map(members.map((row) => [row.id, row.displayName]));
 }
 
@@ -356,9 +357,9 @@ export function buildAuditPdfPayload(entries: AuditNarratedEntry[]): AuditPdfPay
 export const createAuditService = (): AuditService => ({
   context: "audit",
   async listNarratedEntries(filters) {
-    const rows = await db.select().from(auditLogEntry)
+    const rows = await withTenantTransaction(filters.orgId, (tx) => tx.select().from(auditLogEntry)
       .where(and(eq(auditLogEntry.orgId, filters.orgId)))
-      .orderBy(desc(auditLogEntry.at));
+      .orderBy(desc(auditLogEntry.at)));
     const names = await memberNameMap(filters.orgId, rows);
     return filterAuditRows({
       rows: rows.map((row) => narratedEntry(row, names)),

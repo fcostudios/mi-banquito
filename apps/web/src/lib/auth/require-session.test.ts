@@ -46,6 +46,10 @@ vi.mock("next/navigation", () => ({
   redirect: (path: string) => redirect(path),
 }));
 
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
+
 vi.mock("drizzle-orm", () => ({
   and: (...args: unknown[]) => ({ and: args }),
   desc: (...args: unknown[]) => ({ desc: args }),

@@ -53,6 +53,23 @@
     "statementError": "La exportación no se generó porque uno o más PDF están pendientes o no están disponibles.",
     "generationError": "No se pudo completar la exportación. No se registró una exportación exitosa."
   },
+  "impersonation": {
+    "start": {
+      "title": "Ver como tesorera",
+      "description": "Accede a la vista de tesorería de {{org}} para investigar un caso de soporte.",
+      "formLabel": "Inicio de impersonación",
+      "readOnlyNotice": "La sesión dura hasta 15 minutos. Las operaciones de escritura quedan bloqueadas en el servidor.",
+      "reasonLabel": "Motivo (obligatorio)",
+      "reasonHelp": "Describe el caso de soporte en al menos 10 caracteres. El motivo quedará en la bitácora.",
+      "submit": "Comenzar impersonación"
+    },
+    "banner": {
+      "title": "Viendo como tesorera en modo solo lectura",
+      "reason": "Motivo",
+      "expires": "Finaliza a las {{time}}",
+      "end": "Salir de impersonación"
+    }
+  },
   "adminCronRuns": {
     "title": "Cron status",
     "description": "Review cron history and replay a date range when recovery is needed.",

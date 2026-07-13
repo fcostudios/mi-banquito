@@ -5,6 +5,7 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["src/**/*.test.ts"],
+    fileParallelism: false,
     passWithNoTests: true,
   },
 });
