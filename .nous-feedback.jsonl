@@ -205,3 +205,77 @@
 {"story":"US-095","event":"ac_verify","ac":3,"method":"regularization-link render test and last-pending end-to-end domain integration","pass":true,"notes":"Each row links to the preselected regularization flow; covering the final pending row makes close eligible immediately."}
 {"story":"US-095","event":"ac_verify","ac":4,"method":"server-side bypass, tenant, and concurrent close tests","pass":true,"notes":"closePeriod rejects pending rows after acquiring a write-conflicting table lock; concurrent close calls produce one period close, artifact, and audit."}
 {"story":"US-095","event":"ac_verify","ac":5,"method":"monthly-close payload and PDF row contract tests","pass":true,"notes":"PDF data itemizes comisiones, insumos, gastos compartidos, gastos operativos, transferencias, net fund balance, and cero movimientos pendientes de regularizar."}
+{"story":"US-091","event":"started","agent":"codex"}
+{"story":"US-091","event":"ac_verify","ac":1,"method":"account domain and page tests","pass":true,"notes":"Account list and add/edit flow cover all declared types, name, last4, derived group-fund default, and explicit override."}
+{"story":"US-091","event":"ac_verify","ac":2,"method":"movement domain and page negative tests","pass":true,"notes":"Movement recording rejects missing active group-fund accounts and the UI renders the blocking state."}
+{"story":"US-091","event":"ac_verify","ac":3,"method":"account page render tests","pass":true,"notes":"Treasurer-personal accounts render the fuera del fondo and requiere regularizacion status."}
+{"story":"US-091","event":"ac_verify","ac":4,"method":"real PostgreSQL account lifecycle tests","pass":true,"notes":"Deactivation archives accounts without deletion and historical references remain intact."}
+{"story":"US-091","event":"ac_verify","ac":5,"method":"transactional audit tests","pass":true,"notes":"Create, edit, and deactivate each persist exactly one same-transaction audit event with tenant isolation."}
+{"story":"US-092","event":"started","agent":"codex"}
+{"story":"US-092","event":"ac_verify","ac":1,"method":"movement form desktop/mobile tests","pass":true,"notes":"Expense mode exposes group account, required category, localized amount, date, optional slip, and notes."}
+{"story":"US-092","event":"ac_verify","ac":2,"method":"schema CHECK and adversarial domain tests","pass":true,"notes":"Only governed BR-13 categories persist; empty and unknown categories are rejected at service and database boundaries."}
+{"story":"US-092","event":"ac_verify","ac":3,"method":"concurrent idempotency tests","pass":true,"notes":"org/client_request uniqueness returns one expense for replay and concurrent double-submit."}
+{"story":"US-092","event":"ac_verify","ac":4,"method":"real PostgreSQL write and audit tests","pass":true,"notes":"A paid categorized expense and matching movement.expense audit persist atomically with confirmation copy."}
+{"story":"US-092","event":"ac_verify","ac":5,"method":"cash balance and liquidity projection integration","pass":true,"notes":"Outflows reduce the selected account and total-fund projections without stale read-model behavior."}
+{"story":"US-093","event":"started","agent":"codex"}
+{"story":"US-093","event":"ac_verify","ac":1,"method":"movement mode render and action tests","pass":true,"notes":"Transfer mode exposes group-only source/destination accounts, amount, date, and notes."}
+{"story":"US-093","event":"ac_verify","ac":2,"method":"real PostgreSQL transfer tests","pass":true,"notes":"A purpose=transfer row updates both account balances exactly once."}
+{"story":"US-093","event":"ac_verify","ac":3,"method":"exact-money property and integration tests","pass":true,"notes":"Inter-account transfer changes distribution but has exact zero total-fund delta."}
+{"story":"US-093","event":"ac_verify","ac":4,"method":"negative tenant/account tests and DB constraints","pass":true,"notes":"Same-account, archived, personal, missing, and cross-tenant account selections are rejected without writes."}
+{"story":"US-093","event":"ac_verify","ac":5,"method":"transactional audit tests","pass":true,"notes":"Successful transfers write one movement.transfer audit; rejected transfers write none."}
+{"story":"US-019","event":"started","agent":"codex"}
+{"story":"US-019","event":"ac_verify","ac":1,"method":"admin health domain, page, and adversarial render tests","pass":true,"notes":"Each organization row renders name, activity, close, reconciliation, loans, A/R, drift, and fail-closed unknown/stale states."}
+{"story":"US-019","event":"ac_verify","ac":2,"method":"real PostgreSQL materialized-view integration","pass":true,"notes":"One org-set query reads mv_org_health_snapshot; real refresh ordering proves A/R changes from 100.0000 to 60.0000 before health refresh."}
+{"story":"US-019","event":"ac_verify","ac":3,"method":"two-tenant pending/clean integration","pass":true,"notes":"Open-period pending rows render danger; zero pending renders success; missing/stale snapshots never render green."}
+{"story":"US-019","event":"ac_verify","ac":4,"method":"wrong-role authorization and cross-org aggregate tests","pass":true,"notes":"Only PlatformOperator reaches the page and only approved aggregate data crosses tenant boundaries."}
+{"story":"US-019","event":"ac_verify","ac":5,"method":"page link assertions","pass":true,"notes":"Every org row links to detail, read-only impersonation, and tenant export."}
+{"story":"US-021","event":"started","agent":"codex"}
+{"story":"US-021","event":"ac_verify","ac":1,"method":"Server Action and finalized-file streaming route tests","pass":true,"notes":"The action authorizes then redirects to a route that streams a finalized audited ZIP without buffering it in memory."}
+{"story":"US-021","event":"ac_verify","ac":2,"method":"real ZIP golden and manifest tests","pass":true,"notes":"All required entity CSV files are present with deterministic headers, counts, and SHA-256 hashes."}
+{"story":"US-021","event":"ac_verify","ac":3,"method":"ZIP/PDF/README integration tests","pass":true,"notes":"Every statement PDF, manifest.json, audit_log.csv, and bilingual README are included; missing PDFs fail explicitly."}
+{"story":"US-021","event":"ac_verify","ac":4,"method":"two-tenant sentinel and private Blob tests","pass":true,"notes":"Every query and artifact path is target-org scoped and second-tenant sentinels are absent from CSV, PDF, manifest, and history."}
+{"story":"US-021","event":"ac_verify","ac":5,"method":"success/failure/disconnect audit lifecycle tests","pass":true,"notes":"ZIP finalization and private upload precede exactly one data.exported audit; failures never produce success audit."}
+{"story":"US-021","event":"ac_verify","ac":6,"method":"paginated large-fixture and deterministic backpressure tests","pass":true,"notes":"Database reads are chunked, CSV/PDF/ZIP data spool to disk, and response streams the finalized file with bounded memory."}
+{"story":"US-022","event":"started","agent":"codex"}
+{"story":"US-022","event":"ac_verify","ac":1,"method":"cross-org real PostgreSQL reader and page tests","pass":true,"notes":"Dense audit rows span organizations plus platform-level events through a narrowly scoped capability function."}
+{"story":"US-022","event":"ac_verify","ac":2,"method":"server filter and cursor adversarial tests","pass":true,"notes":"Org, actor, action, and inclusive UTC dates combine with AND semantics and strict UUID/cursor validation."}
+{"story":"US-022","event":"ac_verify","ac":3,"method":"payload viewer render test","pass":true,"notes":"Stored payload_snapshot JSON is exposed verbatim in the row detail viewer."}
+{"story":"US-022","event":"ac_verify","ac":4,"method":"streaming CSV parity tests","pass":true,"notes":"CSV streams cursor pages using the identical filtered query, RFC4180 escaping, and formula neutralization."}
+{"story":"US-022","event":"ac_verify","ac":5,"method":"wrong-role, FORCE RLS, function ACL, and append-only tests","pass":true,"notes":"Only PlatformOperator routes invoke the non-public capability and audit rows cannot be updated or deleted."}
+{"story":"US-023","event":"started","agent":"codex"}
+{"story":"US-023","event":"ac_verify","ac":1,"method":"drift page render tests","pass":true,"notes":"Persisted exit zero renders green only when runner deployment is ready; nonzero, missing, or unavailable runner renders red."}
+{"story":"US-023","event":"ac_verify","ac":2,"method":"persisted cron result page test","pass":true,"notes":"The latest drift run timestamp is rendered from cron_run."}
+{"story":"US-023","event":"ac_verify","ac":3,"method":"raw output persistence and render test","pass":true,"notes":"Ordered stdout/stderr drift report text survives persistence and renders verbatim."}
+{"story":"US-023","event":"ac_verify","ac":4,"method":"cron secret, runner contract, advisory-lock, and persistence tests","pass":true,"notes":"Vercel cron invokes the authenticated runner contract for nous_package.py drift --strict and persists exact exit/output; absent runner fails closed."}
+{"story":"US-023","event":"ac_verify","ac":5,"method":"clean/drift/runner-error adversarial tests","pass":true,"notes":"Exit 0 maps to green only with a ready runner; nonzero surfaces the failing report and runner errors cannot remain green."}
+{"story":"US-023","event":"ac_verify","ac":6,"method":"wrong-role authorization tests","pass":true,"notes":"Only authenticated PlatformOperator sessions can view drift state or IMP template."}
+{"story":"US-023","event":"deviation","notes":"The single Vercel app cannot embed the external 10k-line Nous substrate and its private Nous DB. Production uses a documented authenticated NOUS_DRIFT_RUNNER_URL contract; provisioning and live secret evidence remain deployment prerequisites."}
+{"story":"US-020","event":"started","agent":"codex"}
+{"story":"US-020","event":"ac_verify","ac":1,"method":"form validation and render tests","pass":true,"notes":"The operator page requires a meaningful reason and disables start until valid."}
+{"story":"US-020","event":"ac_verify","ac":2,"method":"production-chain real PostgreSQL integration","pass":true,"notes":"Start action atomically writes read_only lifecycle/audit, binds active treasurer membership, signs short-lived HttpOnly cookie, and redirects to tenant home."}
+{"story":"US-020","event":"ac_verify","ac":3,"method":"signed-cookie session, RLS, ALS isolation, and structural write-gate tests","pass":true,"notes":"Impersonated reads resolve exactly TESORERA in the target org through tenant RLS; request-local readOnly state cannot leak across concurrent requests."}
+{"story":"US-020","event":"ac_verify","ac":4,"method":"proxy and real domain write rejection tests","pass":true,"notes":"Unsafe requests, cron GETs, login/callback, and writable tenant transactions return Impersonation is read-only before any row or audit write."}
+{"story":"US-020","event":"ac_verify","ac":5,"method":"banner and actual end-route integration","pass":true,"notes":"Persistent banner renders across tenant pages; end inserts append-only termination, clears cookie, fixed-redirects, and duplicate end is idempotent."}
+{"story":"US-020","event":"ac_verify","ac":6,"method":"atomic lifecycle audit tests","pass":true,"notes":"Start and end audits preserve the original reason and commit atomically with append-only lifecycle events."}
+{"story":"US-020","event":"deviation","notes":"The source Impersonation table is append-only, so end state is recorded in append-only impersonation_termination instead of updating ended_at; legacy start rows keep nullable target_membership_id/expires_at while all new rows populate both."}
+{"story":"US-094","event":"build_pass","notes":"Sprint 8 final gate: serial DB/domain/web/contracts/UI tests, type-check, lint, webpack build, fresh migration-chain verification, fresh Drizzle push, API reconciliation, and movement Playwright desktop/mobile pass."}
+{"story":"US-095","event":"build_pass","notes":"Sprint 8 final gate passed with the same full evidence set."}
+{"story":"US-091","event":"build_pass","notes":"Sprint 8 final gate passed with the same full evidence set."}
+{"story":"US-092","event":"build_pass","notes":"Sprint 8 final gate passed with the same full evidence set."}
+{"story":"US-093","event":"build_pass","notes":"Sprint 8 final gate passed with the same full evidence set."}
+{"story":"US-019","event":"build_pass","notes":"Sprint 8 final gate passed with real PostgreSQL health refresh and full workspace verification."}
+{"story":"US-021","event":"build_pass","notes":"Sprint 8 final gate passed with ZIP golden, pagination/backpressure, tenant isolation, and Blob consumer contracts; live provider smoke requires deployment token."}
+{"story":"US-022","event":"build_pass","notes":"Sprint 8 final gate passed with cross-org ACL/RLS and streaming CSV verification."}
+{"story":"US-023","event":"build_pass","notes":"Sprint 8 final gate passed locally; live external Nous runner provisioning remains deployment evidence."}
+{"story":"US-020","event":"build_pass","notes":"Sprint 8 final gate passed with production-chain impersonation integration and structural write boundary."}
+{"story":"US-094","event":"done"}
+{"story":"US-095","event":"done"}
+{"story":"US-091","event":"done"}
+{"story":"US-092","event":"done"}
+{"story":"US-093","event":"done"}
+{"story":"US-019","event":"done"}
+{"story":"US-021","event":"done"}
+{"story":"US-022","event":"done"}
+{"story":"US-020","event":"done"}
+{"story":"US-023","event":"done_with_external_deferral","notes":"Code and adversarial AC verification complete; production must provision authenticated Nous runner URL/secret and execute one live drift cron smoke before operational closure."}
+{"story":"SPRINT-8","event":"implemented_with_external_verification","notes":"All Sprint 8 code, migrations, tests, adversarial reviews, and local build gates are complete. Remaining deployment evidence: live Nous drift runner/cron smoke and live Vercel Blob provider smoke. Four pre-existing nav-map alignment defects remain substrate-owned and unchanged."}
