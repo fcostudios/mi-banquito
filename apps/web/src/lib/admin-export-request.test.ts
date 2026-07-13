@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createTenantExportRequest, verifyTenantExportRequest } from "./admin-export-service";
+import { createTenantExportRequest, parseTenantExportPageOrgId, verifyTenantExportRequest } from "./admin-export-service";
 
 const request = {
   orgId: "11111111-1111-4111-8111-111111111111",
@@ -10,6 +10,13 @@ const request = {
 };
 
 describe("tenant export signed request", () => {
+  it("accepts only canonical UUID route parameters before export page database access", () => {
+    expect(parseTenantExportPageOrgId(request.orgId)).toBe(request.orgId);
+    expect(parseTenantExportPageOrgId("not-a-uuid")).toBeNull();
+    expect(parseTenantExportPageOrgId(`${request.orgId}/history`)).toBeNull();
+    expect(parseTenantExportPageOrgId(` ${request.orgId} `)).toBeNull();
+  });
+
   it("binds the request to its ids, operator, and short expiry", () => {
     const token = createTenantExportRequest(request, {
       secret: "test-export-signing-secret-with-32-bytes",

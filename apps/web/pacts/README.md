@@ -6,6 +6,21 @@ SDK against a Pact mock server and verifies private upload, download, delete, an
 contracts. The installed-SDK characterization test additionally covers Node Readable
 uploads and streamed private `get()` responses.
 
-This repository does not control Vercel's provider deployment or credentials, so it
-cannot run provider verification. The Pact artifact is consumer-side drift evidence;
-the local HTTP SDK characterization test remains a supplemental offline oracle.
+Vercel is a third-party managed provider and cannot host or execute this consumer's
+Pact provider states (for example, "the completed private tenant export exists"). A
+traditional provider verification run is therefore not available. The Pact artifact
+remains consumer-side drift evidence, and the installed-SDK characterization test is
+the deterministic offline oracle.
+
+`src/lib/vercel-blob-adapter.live.contract.test.ts` supplies provider evidence by using
+the installed SDK against the real private store: Node `Readable` put, streamed get
+with byte parity, and delete. It runs automatically when a real
+`BLOB_READ_WRITE_TOKEN` is present and otherwise skips. Set `BLOB_LIVE_REQUIRED=1` in
+the CI contract job to fail closed when the token is missing or still a placeholder:
+
+```bash
+pnpm --filter mi-banquito-web test:contract
+```
+
+The live test writes only under `contract-tests/` with a random pathname and deletes
+the object in `finally`. Never print the token or commit an environment pull file.

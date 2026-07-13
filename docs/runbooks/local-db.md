@@ -48,6 +48,25 @@ The verifier checks the committed migration expectations:
 - trigger tables present
 - update triggers present for tables with `updated_at`
 
+The cross-organization audit reader remains a `SECURITY DEFINER` function over a
+FORCE RLS table. Its SQL capability is not public: the migration creates the
+`mi_banquito_operator_audit` `NOLOGIN` role, grants only function `EXECUTE` to
+that role, and grants membership to `CURRENT_USER` when the migration and app
+share a database role. Application access still requires
+`requirePlatformOperator()` before any audit query.
+
+When migrations run as a separate owner, grant the capability explicitly to the
+runtime role after applying migrations:
+
+```sql
+GRANT mi_banquito_operator_audit TO mi_banquito_app_runtime;
+```
+
+Do not grant the function to `PUBLIC`, do not give the capability role table
+privileges, and do not disable or weaken FORCE RLS. If Neon plan permissions
+prohibit role creation, the migration uses a narrower fallback: `EXECUTE` is
+granted directly to the current runtime role only, with `PUBLIC` still revoked.
+
 ## Reset
 
 For a local-only reset:

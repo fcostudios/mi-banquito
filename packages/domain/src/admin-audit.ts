@@ -105,7 +105,12 @@ const AUDIT_CSV_HEADERS = [
 ] as const;
 
 export function auditRowsToCsv(rows: AdminAuditRow[]): string {
-  const lines = rows.map((row) => [
+  const lines = rows.map(auditRowToCsv);
+  return `${AUDIT_CSV_HEADERS.join(",")}\r\n${lines.length ? `${lines.join("\r\n")}\r\n` : ""}`;
+}
+
+function auditRowToCsv(row: AdminAuditRow): string {
+  return [
     row.id,
     row.orgId,
     row.actorKind,
@@ -116,8 +121,31 @@ export function auditRowsToCsv(rows: AdminAuditRow[]): string {
     stableJson(row.payloadSnapshot),
     row.reason,
     row.at,
-  ].map(csvCell).join(","));
-  return `${AUDIT_CSV_HEADERS.join(",")}\r\n${lines.length ? `${lines.join("\r\n")}\r\n` : ""}`;
+  ].map(csvCell).join(",");
+}
+
+export function auditRowsToCsvStream(rows: AsyncIterable<AdminAuditRow>): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  const iterator = rows[Symbol.asyncIterator]();
+  let headerPending = true;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (headerPending) {
+        headerPending = false;
+        controller.enqueue(encoder.encode(`${AUDIT_CSV_HEADERS.join(",")}\r\n`));
+        return;
+      }
+      const next = await iterator.next();
+      if (next.done) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(encoder.encode(`${auditRowToCsv(next.value)}\r\n`));
+    },
+    async cancel() {
+      await iterator.return?.();
+    },
+  });
 }
 
 function mapRow(row: AuditFunctionRow): AdminAuditRow {
@@ -165,16 +193,20 @@ export function createAdminAuditService(executor: Pick<typeof db, "execute"> = d
     };
   }
 
-  async function listAll(filters: Omit<AdminAuditFilters, "cursor" | "limit">) {
-    const rows: AdminAuditRow[] = [];
+  async function* iterate(filters: Omit<AdminAuditFilters, "cursor" | "limit">): AsyncGenerator<AdminAuditRow> {
     let cursor: string | undefined;
     do {
       const page = await list({ ...filters, cursor, limit: 500 });
-      rows.push(...page.rows);
+      for (const row of page.rows) yield row;
       cursor = page.nextCursor ?? undefined;
     } while (cursor);
+  }
+
+  async function listAll(filters: Omit<AdminAuditFilters, "cursor" | "limit">) {
+    const rows: AdminAuditRow[] = [];
+    for await (const row of iterate(filters)) rows.push(row);
     return rows;
   }
 
-  return { list, listAll };
+  return { list, iterate, listAll };
 }
