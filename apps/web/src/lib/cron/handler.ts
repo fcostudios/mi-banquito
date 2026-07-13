@@ -167,16 +167,26 @@ function priorMoraScheduleStatus(value: string | null): (typeof MORA_TRANSITIONA
     : "atrasado";
 }
 
-const DERIVED_MATERIALIZED_VIEWS = [
+const CONCURRENT_DERIVED_MATERIALIZED_VIEWS = [
   "mv_available_capital",
-  "mv_ar_aging",
   "mv_org_health_snapshot",
   "mv_liquidez_proyectada",
 ] as const;
 
 export async function refreshDerivedViews() {
   const result = await db.execute(sql`
-    SELECT materialized_view.relname AS view_name
+    SELECT
+      materialized_view.relname AS view_name,
+      EXISTS (
+        SELECT 1
+        FROM pg_index unique_index
+        WHERE unique_index.indrelid = materialized_view.oid
+          AND unique_index.indisunique
+          AND unique_index.indisvalid
+          AND unique_index.indisready
+          AND unique_index.indpred IS NULL
+          AND unique_index.indexprs IS NULL
+      ) AS supports_concurrent_refresh
     FROM pg_class materialized_view
     JOIN pg_namespace namespace ON namespace.oid = materialized_view.relnamespace
     WHERE namespace.nspname = current_schema()
@@ -187,25 +197,19 @@ export async function refreshDerivedViews() {
         'mv_org_health_snapshot',
         'mv_liquidez_proyectada'
       )
-      AND EXISTS (
-        SELECT 1
-        FROM pg_index unique_index
-        WHERE unique_index.indrelid = materialized_view.oid
-          AND unique_index.indisunique
-          AND unique_index.indisvalid
-          AND unique_index.indisready
-          AND unique_index.indpred IS NULL
-          AND unique_index.indexprs IS NULL
-      )
   `);
-  const eligibleViews = new Set(
+  const views = new Map(
     executeRows<Record<string, unknown>>(result)
-      .map((row) => row.view_name)
-      .filter((viewName): viewName is string => typeof viewName === "string"),
+      .filter((row): row is Record<string, unknown> & { view_name: string } => typeof row.view_name === "string")
+      .map((row) => [row.view_name, row.supports_concurrent_refresh === true]),
   );
 
-  for (const viewName of DERIVED_MATERIALIZED_VIEWS) {
-    if (!eligibleViews.has(viewName)) continue;
+  if (views.has("mv_ar_aging")) {
+    await db.execute(sql.raw("REFRESH MATERIALIZED VIEW mv_ar_aging"));
+  }
+
+  for (const viewName of CONCURRENT_DERIVED_MATERIALIZED_VIEWS) {
+    if (!views.get(viewName)) continue;
     await db.execute(sql.raw(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${viewName}`));
   }
 }
