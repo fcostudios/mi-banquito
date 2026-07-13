@@ -6,6 +6,7 @@ import { getDbOrgIdFromUser, getRolesFromUser } from "@/lib/auth/session-claims"
 import { hasMinRole, type AppRole } from "@/lib/auth/roles";
 import { ROUTE_ACCESS_DENIED, ROUTE_LOGIN } from "@/lib/routes";
 import { db } from "@mi-banquito/db";
+import { initializeTenantRequestContext } from "@mi-banquito/db/request-context";
 import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import { auditLogEntry, authAdminAction, member, organization, platformOperator, userAccount, userOrgMembership } from "@mi-banquito/db/schema";
 
@@ -83,6 +84,7 @@ async function getActivePlatformOperator(userId: string) {
 }
 
 export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
+  initializeTenantRequestContext();
   const bypass = getDevelopmentBypassSession();
   if (bypass && hasMinRole(bypass.roles, minRole)) {
     return bypass;

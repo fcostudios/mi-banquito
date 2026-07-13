@@ -5,8 +5,10 @@
 import { config } from "dotenv";
 import { defineConfig } from "drizzle-kit";
 
+const explicitDatabaseUrl = process.env.DATABASE_URL;
 config({ path: ".env" });
 config({ path: ".env.local", override: true });
+if (explicitDatabaseUrl) process.env.DATABASE_URL = explicitDatabaseUrl;
 
 export default defineConfig({
   schema: "./src/schema.ts",

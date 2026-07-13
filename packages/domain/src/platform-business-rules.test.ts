@@ -333,6 +333,12 @@ describe("US-024 business-rules projection", () => {
     const entries: unknown[] = [];
     vi.resetModules();
     vi.doMock("@mi-banquito/db", () => ({ db: {} }));
+    vi.doMock("@mi-banquito/db/tenant", () => ({
+      withWritableTenantTransaction: async (
+        _orgId: string,
+        run: (tx: Record<string, never>) => Promise<unknown>,
+      ) => run({}),
+    }));
 
     try {
       const { createPlatformService } = await import("./platform");
@@ -357,6 +363,7 @@ describe("US-024 business-rules projection", () => {
       ]);
     } finally {
       vi.doUnmock("@mi-banquito/db");
+      vi.doUnmock("@mi-banquito/db/tenant");
       vi.resetModules();
     }
   });

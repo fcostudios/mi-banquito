@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
-import { lockTenantMoneyWrites, withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
+import { lockTenantMoneyWrites, withSystemTenantTransaction, withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import {
   alert,
   alertAction,
@@ -756,8 +756,10 @@ async function appendArtifactResult(input: {
   result?: MonthlyCloseArtifactResult;
   error?: unknown;
 }) {
-  // tenant-write-exception: artifact repair must finalize paused or archived tenants.
-  await withTenantTransaction(input.task.orgId, async (tx) => {
+  await withSystemTenantTransaction(input.task.orgId, {
+    operation: "monthly_close_artifact_maintenance",
+    reason: "record monthly close artifact result",
+  }, async (tx) => {
     const latest = await latestArtifactEvent(tx, input.task.orgId, input.task.statementArchiveId);
     if (latest?.status === "ready") return;
     await tx.insert(statementArtifactEvent).values({
@@ -794,7 +796,10 @@ export async function repairPendingMonthlyCloseArtifacts(input: {
 
   for (const row of organizations) {
     try {
-      const reserved = await withTenantTransaction(row.id, async (tx) => {
+      const reserved = await withSystemTenantTransaction(row.id, {
+        operation: "monthly_close_artifact_maintenance",
+        reason: "reserve pending monthly close artifact repair",
+      }, async (tx) => {
         const archives = await tx.select().from(statementArchive).where(and(
           eq(statementArchive.orgId, row.id),
           eq(statementArchive.kind, "monthly_close"),

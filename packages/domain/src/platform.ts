@@ -9,7 +9,7 @@ import {
   organization,
   periodClose,
 } from "@mi-banquito/db/schema";
-import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
+import { withPlatformTransaction, withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import type { GroupConfigForm, OrganizationCreateForm } from "@mi-banquito/contracts";
 import { type AuditWriter, writeWithAudit } from "./audit";
 import { closeOverdueAlertState } from "./alerts";
@@ -462,7 +462,10 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
   return {
     context: "platform",
     async createOrganization(input, actorId, auth0) {
-      const orgId = await db.transaction(async (tx) => {
+      const orgId = await withPlatformTransaction({
+        operation: "organization_provisioning",
+        reason: "create organization and initial tenant configuration",
+      }, async (tx) => {
         const now = new Date();
         let orgId: string | undefined;
         return writeWithAudit({
@@ -530,13 +533,17 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
 
       const auth0Org = await auth0.createOrganization({ displayName: input.displayName, orgId });
       if (auth0Org.auth0OrgId) {
-        await db.update(organization)
-          .set({
+        await withPlatformTransaction({
+          operation: "organization_provider_binding",
+          reason: "persist Auth0 organization binding after provider provisioning",
+        }, async (tx) => {
+          await tx.update(organization).set({
             auth0OrgId: auth0Org.auth0OrgId,
             updatedAt: new Date(),
             updatedBy: actorId,
           })
-          .where(eq(organization.id, orgId));
+            .where(eq(organization.id, orgId));
+        });
       }
       return orgId;
     },
@@ -628,9 +635,10 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
     },
     async recordBusinessRulesView(orgId, actorId) {
       const now = new Date();
-      await auditWriter({
-        tx: db,
-        entry: {
+      await withWritableTenantTransaction(orgId, async (tx) => {
+        await auditWriter({
+          tx,
+          entry: {
           orgId,
           actorKind: "platform_operator",
           actorId,
@@ -641,7 +649,8 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
           reason: null,
           at: now,
           createdAt: now,
-        },
+          },
+        });
       });
     },
     async updateOrganizationLifecycle(input) {
@@ -653,7 +662,10 @@ export const createPlatformService = (options: PlatformServiceOptions = {}): Pla
         throw new Error("organization_lifecycle_status_invalid");
       }
 
-      return db.transaction(async (tx) => {
+      return withPlatformTransaction({
+        operation: "organization_lifecycle",
+        reason,
+      }, async (tx) => {
         const now = new Date();
         let updated: typeof organization.$inferSelect | undefined;
         let priorStatus: string | undefined;

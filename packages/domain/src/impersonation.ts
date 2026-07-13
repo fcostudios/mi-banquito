@@ -11,7 +11,11 @@ import {
   userAccount,
   userOrgMembership,
 } from "@mi-banquito/db/schema";
-import { withTenantTransaction } from "@mi-banquito/db/tenant";
+import {
+  withImpersonationLifecycleTransaction,
+  withSystemTenantTransaction,
+  withTenantTransaction,
+} from "@mi-banquito/db/tenant";
 
 const DEFAULT_TTL_MS = 15 * 60_000;
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -122,7 +126,10 @@ export function createImpersonationService(options: {
       if (!org || org.status !== "active") throw new Error("impersonation_organization_not_active");
       if (!operator) throw new Error("impersonation_operator_not_active");
 
-      return withTenantTransaction(input.orgId, async (tx) => {
+      return withImpersonationLifecycleTransaction(input.orgId, {
+        operation: "start",
+        reason,
+      }, async (tx) => {
         const treasurers = await tx
           .select({
             membershipId: userOrgMembership.id,
@@ -292,7 +299,10 @@ export function createImpersonationService(options: {
     },
 
     async terminate(input: TerminateInput): Promise<boolean> {
-      return withTenantTransaction(input.orgId, async (tx) => {
+      return withImpersonationLifecycleTransaction(input.orgId, {
+        operation: "end",
+        reason: `terminate impersonation: ${input.kind}`,
+      }, async (tx) => {
         const [start] = await tx.select().from(impersonation).where(and(
           eq(impersonation.id, input.impersonationId),
           eq(impersonation.orgId, input.orgId),
@@ -306,7 +316,10 @@ export function createImpersonationService(options: {
       const organizations = await db.select({ id: organization.id }).from(organization);
       let finalized = 0;
       for (const org of organizations) {
-        finalized += await withTenantTransaction(org.id, async (tx) => {
+        finalized += await withSystemTenantTransaction(org.id, {
+          operation: "impersonation_expiration",
+          reason: "finalize expired impersonation sessions",
+        }, async (tx) => {
           const expired = await tx.select({ start: impersonation })
             .from(impersonation)
             .leftJoin(impersonationTermination, eq(impersonationTermination.impersonationId, impersonation.id))
