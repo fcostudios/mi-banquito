@@ -8,7 +8,7 @@
   "crons": [
     {
       "path": "/api/cron/close-artifact-repair",
-      "schedule": "*/10 * * * *"
+      "schedule": "7 3 * * *"
     },
     {
       "path": "/api/cron/blob-cleanup",
@@ -32,7 +32,7 @@
     },
     {
       "path": "/api/cron/finalize-impersonations",
-      "schedule": "*/5 * * * *"
+      "schedule": "27 3 * * *"
     }
   ]
 }
