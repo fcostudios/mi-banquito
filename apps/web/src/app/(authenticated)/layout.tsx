@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileBar } from "@/components/layout/mobile-bar";
 import { OfflineQueueIndicator } from "@/components/offline/offline-queue-indicator";
+import { ImpersonationBanner } from "@/components/impersonation/impersonation-banner";
 import { getShellSession } from "@/lib/auth/require-session";
 import messages from "@/lib/i18n/en-US.json";
 
@@ -30,6 +31,13 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
           alerts={alerts}
           copy={messages.shell.header}
         />
+        {shell.impersonation ? (
+          <ImpersonationBanner
+            orgName={shell.impersonation.orgName}
+            reason={shell.impersonation.reason}
+            expiresAt={shell.impersonation.expiresAt}
+          />
+        ) : null}
         <main className="flex-1 overflow-y-auto pb-20 md:pb-0">{children}</main>
       </div>
       <MobileBar roles={shell.roles} />

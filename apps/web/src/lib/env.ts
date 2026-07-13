@@ -11,6 +11,7 @@ export const serverEnvSchema = z.object({
   AUTH0_ORGANIZATION_DB_ORG_ID: z.string().uuid().optional(),
   AUTH0_SECRET: z.string().min(32),
   CRON_SECRET: nonEmpty,
+  IMPERSONATION_COOKIE_SECRET: z.string().min(32),
   DATABASE_URL: nonEmpty,
   DB_DRIVER: z.enum(["pg", "neon", "neon-http"]).optional(),
 });
@@ -62,6 +63,8 @@ export function parseServerEnvForAuthClient(source: EnvSource = process.env): Se
       AUTH0_ORGANIZATION_DB_ORG_ID: source.AUTH0_ORGANIZATION_DB_ORG_ID,
       AUTH0_SECRET: source.AUTH0_SECRET ?? "00000000000000000000000000000000",
       CRON_SECRET: source.CRON_SECRET ?? "preview-build-cron-secret",
+      IMPERSONATION_COOKIE_SECRET:
+        source.IMPERSONATION_COOKIE_SECRET ?? "preview-build-impersonation-secret",
       DATABASE_URL:
         source.DATABASE_URL ?? "postgresql://preview:preview@localhost:5432/preview",
       DB_DRIVER:

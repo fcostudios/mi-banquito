@@ -25,6 +25,7 @@ export const group_config_created_by_kind_enum = pgEnum("group_config_created_by
 export const group_config_repayment_split_rule_enum = pgEnum("group_config_repayment_split_rule_enum", ["interest_first", "principal_first", "even_split"]);
 export const institution_kind_enum = pgEnum("institution_kind_enum", ["bank", "coop", "other"]);
 export const institution_status_enum = pgEnum("institution_status_enum", ["active", "inactive"]);
+export const impersonation_termination_kind_enum = pgEnum("impersonation_termination_kind_enum", ["operator_exit", "expired", "revoked"]);
 export const loan_borrower_kind_enum = pgEnum("loan_borrower_kind_enum", ["member", "non_member"]);
 export const loan_schedule_status_enum = pgEnum("loan_schedule_status_enum", ["pendiente", "parcial", "pagado", "atrasado", "en_mora"]);
 export const loan_status_enum = pgEnum("loan_status_enum", ["proposed", "originated", "activo", "pagado", "cancelado", "en_mora"]);
@@ -818,12 +819,21 @@ export const impersonation = pgTable("impersonation", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   orgId: uuid("org_id").notNull(),
   platformOperatorId: uuid("platform_operator_id").references((): AnyPgColumn => platformOperator.id).notNull(),
+  targetMembershipId: uuid("target_membership_id"),
   startedAt: timestamp("started_at").notNull(),
+  expiresAt: timestamp("expires_at"),
   endedAt: timestamp("ended_at"),
   reason: text("reason").notNull(),
   mode: text("mode").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
   createdAt: timestamp("created_at").notNull(),
-});
+}, (table) => [
+  unique("uq_impersonation_id_org").on(table.id, table.orgId),
+  foreignKey({
+    columns: [table.targetMembershipId, table.orgId],
+    foreignColumns: [userOrgMembership.id, userOrgMembership.orgId],
+    name: "fk_impersonation_target_membership_org",
+  }),
+]);
 
 export const cronRun = pgTable("cron_run", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -862,7 +872,27 @@ export const userOrgMembership = pgTable("user_org_membership", {
   memberId: uuid("member_id").references((): AnyPgColumn => member.id),
   grantedAt: timestamp("granted_at").notNull(),
   revokedAt: timestamp("revoked_at"),
-});
+}, (table) => [
+  unique("uq_user_org_membership_id_org").on(table.id, table.orgId),
+]);
+
+export const impersonationTermination = pgTable("impersonation_termination", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  impersonationId: uuid("impersonation_id").notNull(),
+  orgId: uuid("org_id").notNull(),
+  kind: impersonation_termination_kind_enum("kind").notNull(),
+  reason: text("reason").notNull(),
+  endedByOperatorId: uuid("ended_by_operator_id").references((): AnyPgColumn => platformOperator.id).notNull(),
+  endedAt: timestamp("ended_at").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+}, (table) => [
+  unique("uq_impersonation_termination_impersonation").on(table.impersonationId),
+  foreignKey({
+    columns: [table.impersonationId, table.orgId],
+    foreignColumns: [impersonation.id, impersonation.orgId],
+    name: "fk_impersonation_termination_impersonation_org",
+  }),
+]);
 
 export const country = pgTable("country", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),

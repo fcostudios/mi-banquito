@@ -1,0 +1,83 @@
+import { randomUUID } from "node:crypto";
+import { NextRequest, NextResponse } from "next/server";
+import { describe, expect, it } from "vitest";
+
+import { signImpersonationCookie } from "@/lib/impersonation/cookie";
+import { enforceImpersonationReadOnly } from "@/lib/impersonation/proxy-policy";
+
+const secret = "impersonation-cookie-secret-at-least-32-bytes";
+const now = new Date("2026-07-13T03:00:00.000Z");
+const subject = "auth0|operator-1";
+
+function token() {
+  return signImpersonationCookie({
+    version: 1,
+    impersonationId: randomUUID(),
+    orgId: randomUUID(),
+    targetMembershipId: randomUUID(),
+    platformOperatorId: randomUUID(),
+    authSubject: subject,
+    issuedAt: now.getTime(),
+    expiresAt: now.getTime() + 15 * 60_000,
+  }, secret);
+}
+
+function request(path: string, method = "GET", value = token(), headers?: HeadersInit) {
+  return new NextRequest(`http://localhost${path}`, {
+    method,
+    headers: {
+      cookie: `mi_banquito_impersonation=${value}`,
+      ...headers,
+    },
+  });
+}
+
+const deps = {
+  secret,
+  now: () => now,
+  getAuthSubject: async () => subject,
+  authMiddleware: async () => NextResponse.next(),
+};
+
+describe("global impersonation proxy enforcement", () => {
+  it.each([
+    ["existing account action", "/cuentas", "POST", undefined],
+    ["new movement action", "/movimientos/registrar", "POST", undefined],
+    ["arbitrary future endpoint", "/api/future-write", "POST", undefined],
+    ["server action transport", "/", "POST", { "next-action": "future-action-id" }],
+    ["unsafe method", "/api/members/1", "DELETE", undefined],
+    ["mutating cron GET", "/api/cron/daily", "GET", undefined],
+  ])("blocks %s without per-action registration", async (_label, path, method, headers) => {
+    const response = await enforceImpersonationReadOnly(request(path, method, token(), headers), deps);
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).toBe("Impersonation is read-only.");
+  });
+
+  it.each([
+    ["/api/impersonation/end", "POST"],
+    ["/auth/logout", "GET"],
+    ["/", "GET"],
+  ])("allows the explicit lifecycle/read route %s", async (path, method) => {
+    expect((await enforceImpersonationReadOnly(request(path, method), deps)).status).toBe(200);
+  });
+
+  it("clears a tampered token and never passes an unsafe request", async () => {
+    const valid = token();
+    const tampered = `${valid.slice(0, -1)}${valid.endsWith("a") ? "b" : "a"}`;
+    const response = await enforceImpersonationReadOnly(request("/api/future-write", "POST", tampered), deps);
+
+    expect(response.status).toBe(403);
+    expect(response.cookies.get("mi_banquito_impersonation")?.value).toBe("");
+  });
+
+  it("clears a cookie bound to a different authenticated subject", async () => {
+    const response = await enforceImpersonationReadOnly(request("/", "GET"), {
+      ...deps,
+      getAuthSubject: async () => "auth0|someone-else",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.cookies.get("mi_banquito_impersonation")?.value).toBe("");
+  });
+});

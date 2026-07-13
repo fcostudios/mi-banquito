@@ -1,6 +1,7 @@
 export * from "./alerts";
 export * from "./accounts";
 export * from "./admin-health";
+export * from "./impersonation";
 export * from "./admin-audit";
 export * from "./admin-export";
 export * from "./admin-drift";

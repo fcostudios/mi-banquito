@@ -625,9 +625,9 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
     if (!org) {
       throw new Error("Organization not found");
     }
-    const [config] = await db.select().from(groupConfig)
+    const [config] = await withTenantTransaction(orgId, (tx) => tx.select().from(groupConfig)
       .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)))
-      .orderBy(desc(groupConfig.version));
+      .orderBy(desc(groupConfig.version)));
     return {
       organization: org,
       config,
@@ -703,13 +703,13 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
     });
   },
   async listMembers(orgId) {
-    return db.select().from(member).where(eq(member.orgId, orgId));
+    return withTenantTransaction(orgId, (tx) => tx.select().from(member).where(eq(member.orgId, orgId)));
   },
   async listMembersWithCompliance(orgId) {
-    const [rows, states] = await Promise.all([
-      db.select().from(member).where(eq(member.orgId, orgId)).orderBy(member.displayName),
-      db.select().from(memberComplianceState).where(eq(memberComplianceState.orgId, orgId)),
-    ]);
+    const [rows, states] = await withTenantTransaction(orgId, (tx) => Promise.all([
+      tx.select().from(member).where(eq(member.orgId, orgId)).orderBy(member.displayName),
+      tx.select().from(memberComplianceState).where(eq(memberComplianceState.orgId, orgId)),
+    ]));
     const stateByMember = new Map(states.map((row) => [row.memberId, row.state as ComplianceState]));
     return rows.map((row) => {
       const complianceState = row.status === "activo"
@@ -732,14 +732,14 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
     }));
   },
   async searchMembersWithBalance(orgId) {
-    const rows = await db.select({
+    const rows = await withTenantTransaction(orgId, (tx) => tx.select({
       memberId: memberComplianceState.memberId,
       displayName: memberComplianceState.displayName,
       currentBalance: memberComplianceState.currentBalance,
       state: memberComplianceState.state,
     }).from(memberComplianceState)
       .where(eq(memberComplianceState.orgId, orgId))
-      .orderBy(memberComplianceState.displayName);
+      .orderBy(memberComplianceState.displayName));
     return rows.map((row) => ({
       ...row,
       currentBalance: String(row.currentBalance),
@@ -748,12 +748,12 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
   },
   async getMember(orgId, id) {
     // org_id ALWAYS in the where — a row id alone never crosses tenants.
-    const [row] = await db.select().from(member)
-      .where(and(eq(member.orgId, orgId), eq(member.id, id)));
+    const [row] = await withTenantTransaction(orgId, (tx) => tx.select().from(member)
+      .where(and(eq(member.orgId, orgId), eq(member.id, id))));
     return row;
   },
   async getMemberBalance(orgId, id) {
-    const [row] = await db.select({
+    const [row] = await withTenantTransaction(orgId, (tx) => tx.select({
       memberId: memberComplianceState.memberId,
       displayName: memberComplianceState.displayName,
       currentBalance: memberComplianceState.currentBalance,
@@ -762,7 +762,7 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
     }).from(memberComplianceState)
       .innerJoin(member, and(eq(member.id, memberComplianceState.memberId), eq(member.orgId, memberComplianceState.orgId)))
       .where(and(eq(memberComplianceState.orgId, orgId), eq(memberComplianceState.memberId, id)))
-      .limit(1);
+      .limit(1));
     if (!row) return undefined;
     const currentBalance = String(row.currentBalance);
     return {
@@ -847,9 +847,9 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
     });
   },
   async getCurrentGroupConfig(orgId) {
-    const [row] = await db.select().from(groupConfig)
+    const [row] = await withTenantTransaction(orgId, (tx) => tx.select().from(groupConfig)
       .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)))
-      .orderBy(desc(groupConfig.version));
+      .orderBy(desc(groupConfig.version)));
     return row;
   },
   async saveTreasurerGroupConfig(orgId, actorId, input) {
@@ -980,11 +980,11 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
     });
   },
   async listContributions(orgId) {
-    const rows = await db.select({ contribution, memberName: member.displayName })
+    const rows = await withTenantTransaction(orgId, (tx) => tx.select({ contribution, memberName: member.displayName })
       .from(contribution)
       .innerJoin(member, and(eq(member.id, contribution.memberId), eq(member.orgId, contribution.orgId)))
       .where(eq(contribution.orgId, orgId))
-      .orderBy(desc(contribution.recordedAt));
+      .orderBy(desc(contribution.recordedAt)));
     return rows.map((row) => ({ ...row.contribution, memberName: row.memberName }));
   },
   async reverseContribution(orgId, actorId, input) {
@@ -1058,8 +1058,8 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
   },
   async getBaseFundQuotaDefaults(orgId) {
     const fiscalYear = new Date().getUTCFullYear();
-    const [config] = await db.select().from(baseFundQuotaConfig)
-      .where(and(eq(baseFundQuotaConfig.orgId, orgId), eq(baseFundQuotaConfig.fiscalYear, fiscalYear)));
+    const [config] = await withTenantTransaction(orgId, (tx) => tx.select().from(baseFundQuotaConfig)
+      .where(and(eq(baseFundQuotaConfig.orgId, orgId), eq(baseFundQuotaConfig.fiscalYear, fiscalYear))));
     const members = await this.listMembers(orgId);
     return { fiscalYear, amount: config?.perMemberAmount ?? "25.0000", members };
   },

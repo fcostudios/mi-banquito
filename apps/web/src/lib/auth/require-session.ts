@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getActiveImpersonationSession, type ActiveImpersonationSession } from "@/lib/impersonation/session";
 import { and, desc, eq } from "drizzle-orm";
 import { auth0 } from "@/lib/auth0";
 import { getDbOrgIdFromUser, getRolesFromUser } from "@/lib/auth/session-claims";
@@ -13,6 +14,7 @@ export type RequiredSession = {
   actorId: string;
   orgId: string;
   roles: string[];
+  impersonation?: ActiveImpersonationSession;
 };
 
 export type PlatformSession = Omit<RequiredSession, "orgId"> & {
@@ -25,6 +27,7 @@ export type ShellSession = {
   orgId?: string;
   orgName?: string;
   roles: string[];
+  impersonation?: ActiveImpersonationSession;
 };
 
 type GateDenyReason =
@@ -95,6 +98,20 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
   if (!userId) {
     logAuthGateDenied("missing_user", { hasUserId: false, hasOrgId: Boolean(orgId), roles: claimRoles });
     redirect(ROUTE_LOGIN);
+  }
+
+  const activeImpersonation = await getActiveImpersonationSession(userId);
+  if (activeImpersonation) {
+    if (!hasMinRole(activeImpersonation.roles, minRole)) {
+      redirect(ROUTE_ACCESS_DENIED);
+    }
+    return {
+      userId,
+      actorId: activeImpersonation.actorId,
+      orgId: activeImpersonation.orgId,
+      roles: ["TESORERA"],
+      impersonation: activeImpersonation,
+    };
   }
 
   if (!orgId) {
@@ -259,6 +276,10 @@ export async function requirePlatformOperator(): Promise<PlatformSession> {
     redirect(ROUTE_LOGIN);
   }
 
+  if (await getActiveImpersonationSession(userId)) {
+    redirect(ROUTE_ACCESS_DENIED);
+  }
+
   const operator = await getActivePlatformOperator(userId);
 
   if (!operator) {
@@ -301,6 +322,18 @@ export async function getShellSession(): Promise<ShellSession> {
     redirect(ROUTE_LOGIN);
   }
 
+  const activeImpersonation = await getActiveImpersonationSession(userId);
+  if (activeImpersonation) {
+    return {
+      displayName: activeImpersonation.targetDisplayName,
+      email: activeImpersonation.targetEmail,
+      orgId: activeImpersonation.orgId,
+      orgName: activeImpersonation.orgName,
+      roles: ["TESORERA"],
+      impersonation: activeImpersonation,
+    };
+  }
+
   const platformOperatorRow = userId ? await getActivePlatformOperator(userId) : undefined;
 
   if (!userId || !orgId) {
@@ -317,7 +350,7 @@ export async function getShellSession(): Promise<ShellSession> {
     .from(organization)
     .where(eq(organization.id, orgId));
 
-  const [membership] = await db
+  const [membership] = await withTenantTransaction(orgId, async (tx) => tx
     .select({ role: userOrgMembership.role })
     .from(userAccount)
     .innerJoin(userOrgMembership, eq(userOrgMembership.userId, userAccount.id))
@@ -325,7 +358,7 @@ export async function getShellSession(): Promise<ShellSession> {
       eq(userAccount.authSubject, userId),
       eq(userOrgMembership.orgId, orgId),
       eq(userOrgMembership.status, "active"),
-    ));
+    )));
 
   const roles = claimRoles.length > 0 ? claimRoles : [membership?.role].filter((role): role is string => Boolean(role));
   return {

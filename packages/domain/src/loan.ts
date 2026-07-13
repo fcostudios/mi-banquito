@@ -4,7 +4,7 @@ export { generateReferralCommissionCredit } from "./loans/referral";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@mi-banquito/db";
-import { withWritableTenantTransaction } from "@mi-banquito/db/tenant";
+import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import {
   alert,
   account,
@@ -122,14 +122,16 @@ const sumMoney = (rows: Array<Record<string, unknown>>, key: string): string => 
   rows.reduce((total, row) => total + Number(row[key] ?? 0), 0),
 );
 
-const memberNetContributions = async (orgId: string, memberId: string): Promise<string> => {
-  const rows = await db.select().from(contribution)
+type QueryExecutor = Pick<typeof db, "select">;
+
+const memberNetContributions = async (orgId: string, memberId: string, executor: QueryExecutor = db): Promise<string> => {
+  const rows = await executor.select().from(contribution)
     .where(and(eq(contribution.orgId, orgId), eq(contribution.memberId, memberId)));
   return sumMoney(rows as Array<Record<string, unknown>>, "amount");
 };
 
-const memberNetWithdrawals = async (orgId: string, memberId: string): Promise<string> => {
-  const rows = await db.select().from(withdrawal)
+const memberNetWithdrawals = async (orgId: string, memberId: string, executor: QueryExecutor = db): Promise<string> => {
+  const rows = await executor.select().from(withdrawal)
     .where(and(eq(withdrawal.orgId, orgId), eq(withdrawal.memberId, memberId)));
   return sumMoney(rows as Array<Record<string, unknown>>, "amount");
 };
@@ -137,10 +139,11 @@ const memberNetWithdrawals = async (orgId: string, memberId: string): Promise<st
 const memberAccumulatedSavings = async (
   orgId: string,
   memberRow: typeof member.$inferSelect,
+  executor: QueryExecutor = db,
 ): Promise<string> => money4(
   Number(memberRow.initialSavingsBalance)
-    + Number(await memberNetContributions(orgId, memberRow.id))
-    - Number(await memberNetWithdrawals(orgId, memberRow.id)),
+    + Number(await memberNetContributions(orgId, memberRow.id, executor))
+    - Number(await memberNetWithdrawals(orgId, memberRow.id, executor)),
 );
 
 const savingsAfterExposureForCap = (
@@ -156,8 +159,8 @@ const savingsAfterExposureForCap = (
   return money4(remainingCapacity / ratio);
 };
 
-const memberBorrowerExposure = async (orgId: string, memberId: string): Promise<string> => {
-  const rows = await db.select().from(loan)
+const memberBorrowerExposure = async (orgId: string, memberId: string, executor: QueryExecutor = db): Promise<string> => {
+  const rows = await executor.select().from(loan)
     .where(and(eq(loan.orgId, orgId), eq(loan.borrowerMemberId, memberId)));
   return sumMoney(
     rows.filter((row) => ACTIVE_LOAN_STATUSES.has(String(row.status))) as Array<Record<string, unknown>>,
@@ -165,8 +168,8 @@ const memberBorrowerExposure = async (orgId: string, memberId: string): Promise<
   );
 };
 
-const guarantorExposure = async (orgId: string, memberId: string): Promise<string> => {
-  const rows = await db.select().from(loanGuarantor)
+const guarantorExposure = async (orgId: string, memberId: string, executor: QueryExecutor = db): Promise<string> => {
+  const rows = await executor.select().from(loanGuarantor)
     .where(and(
       eq(loanGuarantor.orgId, orgId),
       eq(loanGuarantor.guarantorMemberId, memberId),
@@ -175,8 +178,8 @@ const guarantorExposure = async (orgId: string, memberId: string): Promise<strin
   return sumMoney(rows as Array<Record<string, unknown>>, "liabilityAmount");
 };
 
-const memberActiveExposure = async (orgId: string, memberId: string): Promise<string> => money4(
-  Number(await memberBorrowerExposure(orgId, memberId)) + Number(await guarantorExposure(orgId, memberId)),
+const memberActiveExposure = async (orgId: string, memberId: string, executor: QueryExecutor = db): Promise<string> => money4(
+  Number(await memberBorrowerExposure(orgId, memberId, executor)) + Number(await guarantorExposure(orgId, memberId, executor)),
 );
 
 const openLoanStatuses = new Set(["originated", "activo", "en_mora"]);
@@ -313,14 +316,17 @@ const payerMemberIdForLoan = async (orgId: string, currentLoan: typeof loan.$inf
   return guarantor.guarantorMemberId;
 };
 
-const resolveBorrowerName = async (orgId: string, row: typeof loan.$inferSelect): Promise<string> => {
+const resolveBorrowerName = async (orgId: string, row: typeof loan.$inferSelect, executor?: QueryExecutor): Promise<string> => {
+  if (!executor) {
+    return withTenantTransaction(orgId, (tx) => resolveBorrowerName(orgId, row, tx));
+  }
   if (row.borrowerMemberId) {
-    const [borrower] = await db.select().from(member)
+    const [borrower] = await executor.select().from(member)
       .where(and(eq(member.orgId, orgId), eq(member.id, row.borrowerMemberId)));
     return borrower?.displayName ?? "Socia";
   }
   if (row.borrowerNonMemberId) {
-    const [borrower] = await db.select().from(nonMemberBorrower)
+    const [borrower] = await executor.select().from(nonMemberBorrower)
       .where(and(eq(nonMemberBorrower.orgId, orgId), eq(nonMemberBorrower.id, row.borrowerNonMemberId)));
     return borrower?.displayName ?? "No socia";
   }
@@ -333,18 +339,19 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
   return {
   context: "loan",
   async listEligibleGuarantorMembers(orgId) {
-    const [currentConfig] = await db.select().from(groupConfig)
+    return withTenantTransaction(orgId, async (tx) => {
+    const [currentConfig] = await tx.select().from(groupConfig)
       .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)))
       .orderBy(desc(groupConfig.version));
     if (!currentConfig) {
       return [];
     }
 
-    const activeMembers = await db.select().from(member)
+    const activeMembers = await tx.select().from(member)
       .where(and(eq(member.orgId, orgId), eq(member.status, "activo")));
     const membersWithCapacity = await Promise.all(activeMembers.map(async (row) => {
-      const activeExposure = await memberActiveExposure(orgId, row.id);
-      const savingsBalance = await memberAccumulatedSavings(orgId, row);
+      const activeExposure = await memberActiveExposure(orgId, row.id, tx);
+      const savingsBalance = await memberAccumulatedSavings(orgId, row, tx);
       const savingsBasis = savingsAfterExposureForCap(
         savingsBalance,
         currentConfig.loanToSavingsCapRatio,
@@ -360,11 +367,12 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
     return membersWithCapacity
       .filter((row) => row.remainingCapacity > 0)
       .map(({ id, displayName }) => ({ id, displayName }));
+    });
   },
   async listLoans(orgId) {
-    const rows = await db.select().from(loan)
+    const rows = await withTenantTransaction(orgId, (tx) => tx.select().from(loan)
       .where(eq(loan.orgId, orgId))
-      .orderBy(desc(loan.originatedOn));
+      .orderBy(desc(loan.originatedOn)));
     return Promise.all(rows.map(async (row) => ({
       id: row.id,
       borrowerName: await resolveBorrowerName(orgId, row),
@@ -376,24 +384,24 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
     })));
   },
   async getLoanDetail(orgId, loanId) {
-    const [row] = await db.select().from(loan)
-      .where(and(eq(loan.orgId, orgId), eq(loan.id, loanId)));
+    const [row] = await withTenantTransaction(orgId, (tx) => tx.select().from(loan)
+      .where(and(eq(loan.orgId, orgId), eq(loan.id, loanId))));
     if (!row) {
       return undefined;
     }
-    const [scheduleRows, feeRows, repaymentRows, accrualRows, guarantorRows, referralRows] = await Promise.all([
-      db.select().from(loanSchedule).where(and(eq(loanSchedule.orgId, orgId), eq(loanSchedule.loanId, loanId))),
-      db.select().from(loanFee).where(and(eq(loanFee.orgId, orgId), eq(loanFee.loanId, loanId))),
-      db.select().from(repayment).where(and(eq(repayment.orgId, orgId), eq(repayment.loanId, loanId))),
-      db.select().from(interestAccrual).where(and(eq(interestAccrual.orgId, orgId), eq(interestAccrual.loanId, loanId))),
-      db.select().from(loanGuarantor).where(and(eq(loanGuarantor.orgId, orgId), eq(loanGuarantor.loanId, loanId), isNull(loanGuarantor.releasedAt))),
-      db.select().from(loanReferral).where(and(eq(loanReferral.orgId, orgId), eq(loanReferral.loanId, loanId))),
-    ]);
+    const [scheduleRows, feeRows, repaymentRows, accrualRows, guarantorRows, referralRows] = await withTenantTransaction(orgId, (tx) => Promise.all([
+      tx.select().from(loanSchedule).where(and(eq(loanSchedule.orgId, orgId), eq(loanSchedule.loanId, loanId))),
+      tx.select().from(loanFee).where(and(eq(loanFee.orgId, orgId), eq(loanFee.loanId, loanId))),
+      tx.select().from(repayment).where(and(eq(repayment.orgId, orgId), eq(repayment.loanId, loanId))),
+      tx.select().from(interestAccrual).where(and(eq(interestAccrual.orgId, orgId), eq(interestAccrual.loanId, loanId))),
+      tx.select().from(loanGuarantor).where(and(eq(loanGuarantor.orgId, orgId), eq(loanGuarantor.loanId, loanId), isNull(loanGuarantor.releasedAt))),
+      tx.select().from(loanReferral).where(and(eq(loanReferral.orgId, orgId), eq(loanReferral.loanId, loanId))),
+    ]));
     const [guarantorMember] = guarantorRows[0]
-      ? await db.select().from(member).where(and(eq(member.orgId, orgId), eq(member.id, guarantorRows[0].guarantorMemberId)))
+      ? await withTenantTransaction(orgId, (tx) => tx.select().from(member).where(and(eq(member.orgId, orgId), eq(member.id, guarantorRows[0].guarantorMemberId))))
       : [];
     const [referrerMember] = referralRows[0]
-      ? await db.select().from(member).where(and(eq(member.orgId, orgId), eq(member.id, referralRows[0].referrerMemberId)))
+      ? await withTenantTransaction(orgId, (tx) => tx.select().from(member).where(and(eq(member.orgId, orgId), eq(member.id, referralRows[0].referrerMemberId))))
       : [];
     const principalRepayments = repaymentRows.map((repaymentRow) => ({
       datedOn: repaymentRow.datedOn,
