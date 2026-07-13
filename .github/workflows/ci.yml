@@ -29,6 +29,7 @@ jobs:
       AUTH0_CLIENT_ID: ci-client-id
       AUTH0_CLIENT_SECRET: ci-client-secret
       AUTH0_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      IMPERSONATION_COOKIE_SECRET: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
       AUTH0_ORGANIZATION: org_ci
       CRON_SECRET: ci-cron-secret
       NEXT_PUBLIC_API_URL: http://localhost:3000
