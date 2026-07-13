@@ -27,6 +27,7 @@ let db: typeof import("@mi-banquito/db")["db"];
 let service: ReturnType<typeof import("./admin-audit")["createAdminAuditService"]>;
 let parseAuditDateRange: typeof import("./admin-audit")["parseAuditDateRange"];
 let auditRowsToCsv: typeof import("./admin-audit")["auditRowsToCsv"];
+let auditRowsToCsvStream: typeof import("./admin-audit")["auditRowsToCsvStream"];
 
 describe("US-022 cross-organization audit", () => {
   beforeAll(async () => {
@@ -39,6 +40,7 @@ describe("US-022 cross-organization audit", () => {
     service = auditModule.createAdminAuditService();
     parseAuditDateRange = auditModule.parseAuditDateRange;
     auditRowsToCsv = auditModule.auditRowsToCsv;
+    auditRowsToCsvStream = auditModule.auditRowsToCsvStream;
 
     await db.insert(organization).values([
       {
@@ -154,6 +156,31 @@ describe("US-022 cross-organization audit", () => {
     ]);
   });
 
+  it("grants the cross-org reader only through a dedicated NOLOGIN capability role", async () => {
+    const role = await db.execute(sql`
+      SELECT rolcanlogin, pg_has_role(current_user, oid, 'MEMBER') AS runtime_is_member
+      FROM pg_roles
+      WHERE rolname = 'mi_banquito_operator_audit'
+    `);
+    expect(role.rows).toEqual([{ rolcanlogin: false, runtime_is_member: true }]);
+
+    const acl = await db.execute(sql`
+      SELECT expanded.grantee, grantee.rolname, expanded.privilege_type
+      FROM pg_proc AS procedure
+      CROSS JOIN LATERAL aclexplode(procedure.proacl) AS expanded
+      LEFT JOIN pg_roles AS grantee ON grantee.oid = expanded.grantee
+      WHERE procedure.oid = 'admin_read_audit_log(uuid,audit_log_entry_actor_kind_enum,text,timestamp with time zone,timestamp with time zone,timestamp with time zone,uuid,integer)'::regprocedure
+        AND expanded.privilege_type = 'EXECUTE'
+      ORDER BY expanded.grantee
+    `);
+    expect(acl.rows).toEqual([{
+      grantee: expect.any(Number),
+      rolname: "mi_banquito_operator_audit",
+      privilege_type: "EXECUTE",
+    }]);
+    expect(acl.rows.some((row) => row.grantee === 0)).toBe(false);
+  });
+
   it("combines typed filters, includes platform rows, and treats the end date as an inclusive UTC day", async () => {
     const range = parseAuditDateRange({ from: "2026-07-12", to: "2026-07-12" });
     const page = await service.list({
@@ -216,5 +243,45 @@ describe("US-022 cross-organization audit", () => {
     expect(csv).toContain('"{\"\"amount\"\":\"\"10.00\"\",\"\"note\"\":\"\"=SUM(A1:A2)\"\"}"');
     expect(csv).toContain('"\'=HYPERLINK(\"\"https://invalid.example\"\",\"\"ok\"\")\nsecond line"');
     expect(csv.trimEnd().split("\r\n")).toHaveLength(2);
+  });
+
+  it("streams a deterministic large RFC4180 export directly across cursor pages", async () => {
+    const at = new Date("2026-07-10T08:00:00.000Z");
+    const ids = Array.from({ length: 1_205 }, (_, index) =>
+      `70000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`,
+    );
+    await db.insert(auditLogEntry).values(ids.map((id, index) => ({
+      id,
+      orgId: ORG_A,
+      actorKind: "member" as const,
+      actorId: ACTOR_A,
+      actionKind: "bulk.export.row",
+      subjectKind: "audit_fixture",
+      subjectId: null,
+      payloadSnapshot: { index, stable: true },
+      reason: index === 602 ? "bulk,\"quoted\"\nrow" : null,
+      at,
+      createdAt: at,
+    })));
+
+    const stream = auditRowsToCsvStream(service.iterate({
+      orgId: ORG_A,
+      actionKind: "bulk.export.row",
+    }));
+    const reader = stream.getReader();
+    const chunks: string[] = [];
+    for (;;) {
+      const next = await reader.read();
+      if (next.done) break;
+      chunks.push(Buffer.from(next.value).toString("utf8"));
+    }
+
+    expect(chunks).toHaveLength(ids.length + 1);
+    expect(chunks[0]).toBe("id,org_id,actor_kind,actor_id,action_kind,subject_kind,subject_id,payload_snapshot,reason,at\r\n");
+    expect(chunks[1]).toContain(ids.at(-1));
+    expect(chunks.at(-1)).toContain(ids[0]);
+    expect(chunks.some((chunk) => chunk.includes('"bulk,""quoted""\nrow"'))).toBe(true);
+    expect(Math.max(...chunks.map((chunk) => Buffer.byteLength(chunk)))).toBeLessThan(1_024);
+    expect(chunks.slice(1).every((chunk) => chunk.endsWith("\r\n"))).toBe(true);
   });
 });

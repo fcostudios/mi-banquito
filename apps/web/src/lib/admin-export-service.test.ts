@@ -5,7 +5,7 @@ import { loadEnvFile } from "node:process";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { auditLogEntry, organization, statementArchive } from "@mi-banquito/db/schema";
+import { alert, auditLogEntry, organization, statementArchive } from "@mi-banquito/db/schema";
 import type { AdminExportBlobAdapter } from "./admin-export-service";
 
 if (!process.env.DATABASE_URL) {
@@ -87,11 +87,12 @@ describe("US-021 export orchestration", () => {
       await tx.execute(sql.raw("SET LOCAL session_replication_role = replica"));
       await tx.delete(statementArchive).where(inArray(statementArchive.orgId, [ORG_A, ORG_B]));
       await tx.delete(auditLogEntry).where(inArray(auditLogEntry.orgId, [ORG_A, ORG_B]));
+      await tx.delete(alert).where(inArray(alert.orgId, [ORG_A, ORG_B]));
       await tx.delete(organization).where(inArray(organization.id, [ORG_A, ORG_B]));
     });
   });
 
-  it("streams to Blob, records exactly one success audit afterward, and derives download history from it", async () => {
+  it("finalizes Blob and records exactly one success audit before exposing the response stream", async () => {
     let uploadedBytes = Buffer.alloc(0);
     const adapter: AdminExportBlobAdapter = {
       read: async () => blobRead(uploadedBytes) as never,
@@ -112,6 +113,12 @@ describe("US-021 export orchestration", () => {
       exportId: SUCCESS_EXPORT_ID,
       blob: adapter,
     });
+    const committedBeforeResponseRead = await withTenantTransaction(ORG_A, (tx) => tx.select().from(auditLogEntry).where(and(
+      eq(auditLogEntry.orgId, ORG_A),
+      eq(auditLogEntry.actionKind, "data.exported"),
+      eq(auditLogEntry.id, SUCCESS_EXPORT_ID),
+    )));
+    expect(committedBeforeResponseRead).toHaveLength(1);
     const responseBytes = Buffer.concat(await Array.fromAsync(Readable.fromWeb(prepared.stream as never), (chunk) => Buffer.from(chunk)));
     const result = await prepared.completion;
 
@@ -148,30 +155,31 @@ describe("US-021 export orchestration", () => {
       delete: async () => undefined,
     };
 
-    const prepared = await prepareTenantExport({
+    await expect(prepareTenantExport({
       orgId: ORG_A,
       actorId: ACTOR,
       operatorUserId: "auth0|operator-a",
       now: new Date("2026-07-12T16:00:00.000Z"),
       exportId: FAILED_EXPORT_ID,
       blob: adapter,
-    });
-    await expect(Array.fromAsync(Readable.fromWeb(prepared.stream as never))).rejects.toThrow("blob_upload_failed");
-    await expect(prepared.completion).rejects.toThrow("blob_upload_failed");
+    })).rejects.toThrow("blob_upload_failed");
 
     const audits = await withTenantTransaction(ORG_A, (tx) => tx.select({ id: auditLogEntry.id }).from(auditLogEntry).where(eq(auditLogEntry.id, FAILED_EXPORT_ID)));
     expect(audits).toEqual([]);
   });
 
-  it("writes no success audit when the client disconnects", async () => {
+  it("keeps the finalized Blob and success audit when the client disconnects", async () => {
     const exportId = randomUUID();
     let uploadFinished = false;
+    let uploadedBytes = Buffer.alloc(0);
     const adapter: AdminExportBlobAdapter = {
-      read: async () => null,
+      read: async () => blobRead(uploadedBytes) as never,
       upload: async (pathname, body) => {
+        const chunks: Buffer[] = [];
         for await (const _chunk of body) {
-          // Cancellation must destroy the upload body before it can finish.
+          chunks.push(Buffer.from(_chunk));
         }
+        uploadedBytes = Buffer.concat(chunks);
         uploadFinished = true;
         return { url: `https://private.invalid/${pathname}`, pathname };
       },
@@ -189,14 +197,16 @@ describe("US-021 export orchestration", () => {
     expect((await reader.read()).done).toBe(false);
     await reader.cancel("client_disconnected");
 
-    await expect(prepared.completion).rejects.toThrow("tenant_export_client_disconnected");
-    expect(uploadFinished).toBe(false);
+    await expect(prepared.completion).resolves.toEqual(expect.objectContaining({ exportId }));
+    expect(uploadFinished).toBe(true);
     const audits = await withTenantTransaction(ORG_A, (tx) => tx.select({ id: auditLogEntry.id }).from(auditLogEntry).where(eq(auditLogEntry.id, exportId)));
-    expect(audits).toEqual([]);
+    expect(audits).toEqual([{ id: exportId }]);
+    expect((await loadTenantExportDownload({ orgId: ORG_A, exportId, blob: adapter }))?.history.id).toBe(exportId);
   });
 
-  it("keeps a committed success when temporary cleanup fails", async () => {
+  it("keeps a committed success and reports cleanup failure to Sentry plus durable operator records", async () => {
     const exportId = randomUUID();
+    const reported: Array<{ error: Error; context: Record<string, unknown> }> = [];
     const adapter: AdminExportBlobAdapter = {
       read: async () => null,
       upload: async (pathname, body) => {
@@ -215,12 +225,29 @@ describe("US-021 export orchestration", () => {
       exportId,
       blob: adapter,
       cleanup: async () => { throw new Error("cleanup_failed"); },
+      reportError: async (error, context) => { reported.push({ error, context }); },
     });
     await Array.fromAsync(Readable.fromWeb(prepared.stream as never));
 
     await expect(prepared.completion).resolves.toEqual(expect.objectContaining({ exportId }));
-    const audits = await withTenantTransaction(ORG_A, (tx) => tx.select({ id: auditLogEntry.id }).from(auditLogEntry).where(eq(auditLogEntry.id, exportId)));
-    expect(audits).toEqual([{ id: exportId }]);
+    expect(reported).toEqual([{
+      error: expect.objectContaining({ message: "cleanup_failed" }),
+      context: expect.objectContaining({ exportId, orgId: ORG_A, phase: "response" }),
+    }]);
+    const durable = await withTenantTransaction(ORG_A, async (tx) => ({
+      cleanupAudits: await tx.select({ actionKind: auditLogEntry.actionKind }).from(auditLogEntry).where(and(
+        eq(auditLogEntry.orgId, ORG_A),
+        eq(auditLogEntry.subjectId, exportId),
+      )),
+      successAudits: await tx.select({ id: auditLogEntry.id }).from(auditLogEntry).where(eq(auditLogEntry.id, exportId)),
+      alerts: await tx.select({ alertKind: alert.alertKind, audience: alert.audience }).from(alert).where(and(
+        eq(alert.orgId, ORG_A),
+        eq(alert.subjectId, exportId),
+      )),
+    }));
+    expect(durable.successAudits).toEqual([{ id: exportId }]);
+    expect(durable.cleanupAudits).toEqual([{ actionKind: "data.export.cleanup_failed" }]);
+    expect(durable.alerts).toEqual([{ alertKind: "tenant_export_cleanup_failed", audience: "platform_operator" }]);
   });
 
   it("fails explicitly and writes no audit when a required private statement PDF is missing", async () => {

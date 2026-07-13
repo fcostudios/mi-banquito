@@ -112,6 +112,13 @@
   For ad-hoc Blob CLI smoke tests outside Vercel runtime, pass
   `--rw-token "$BLOB_READ_WRITE_TOKEN"` and clear `VERCEL_OIDC_TOKEN` for that
   command, or provide the complete OIDC pair.
+- Blob contract verification: `pnpm --filter mi-banquito-web test:contract` always
+  runs the consumer Pact and installed-SDK offline characterization. When a real
+  `BLOB_READ_WRITE_TOKEN` is available, it also performs a private Node `Readable`
+  put/get/delete against `contract-tests/`. Set `BLOB_LIVE_REQUIRED=1` for a
+  credentialed CI contract job; missing or placeholder credentials then fail closed.
+  Vercel cannot execute our consumer-defined Pact provider states, so the live SDK
+  check is the provider evidence while Pact remains the consumer contract artifact.
 
 ## Sentry
 

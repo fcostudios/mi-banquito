@@ -6,7 +6,7 @@ import { db } from "@mi-banquito/db";
 import { organization, platformOperator } from "@mi-banquito/db/schema";
 
 import { requirePlatformOperator } from "@/lib/auth/require-session";
-import { loadTenantExportHistory } from "@/lib/admin-export-service";
+import { loadTenantExportHistory, parseTenantExportPageOrgId } from "@/lib/admin-export-service";
 import messages from "@/lib/i18n/en-US.json";
 
 import { exportOrgData } from "./actions";
@@ -21,7 +21,9 @@ export default async function ScrAdminExportPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   await requirePlatformOperator();
-  const { id } = await params;
+  const { id: rawId } = await params;
+  const id = parseTenantExportPageOrgId(rawId);
+  if (!id) notFound();
   const [{ error }, [org], history, operators] = await Promise.all([
     searchParams,
     db.select({ id: organization.id, displayName: organization.displayName }).from(organization).where(eq(organization.id, id)).limit(1),

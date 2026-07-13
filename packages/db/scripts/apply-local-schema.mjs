@@ -39,6 +39,10 @@ const ADMIN_AUDIT_READER_MIGRATION_URL = new URL(
   "../src/migrations/V20260713013500__operator_audit_reader_timestamptz.sql",
   import.meta.url
 );
+const ADMIN_AUDIT_CAPABILITY_MIGRATION_URL = new URL(
+  "../src/migrations/V20260713020100__operator_audit_capability_role.sql",
+  import.meta.url
+);
 const SPRINT_1_ADDITIVE_TABLES = new Set([
   "base_fund_quota_config",
   "base_fund_quota_payment",
@@ -209,6 +213,7 @@ async function installLocalSubstrate(pool) {
   await installAppendOnlyTriggers(pool);
   await installUpdatedAtTriggers(pool);
   await pool.query(readFileSync(ADMIN_AUDIT_READER_MIGRATION_URL, "utf8"));
+  await pool.query(readFileSync(ADMIN_AUDIT_CAPABILITY_MIGRATION_URL, "utf8"));
 }
 
 export async function main() {
@@ -231,7 +236,8 @@ export async function main() {
     try {
       await installRlsPolicies(pool);
       await forceRls(pool);
-      console.log("local schema already verified; fail-closed RLS policies reconciled");
+      await pool.query(readFileSync(ADMIN_AUDIT_CAPABILITY_MIGRATION_URL, "utf8"));
+      console.log("local schema already verified; fail-closed RLS policies and operator audit ACL reconciled");
       return 0;
     } catch (err) {
       console.error(`✗ local RLS policy reconcile failed: ${err.message}`);

@@ -54,6 +54,11 @@ jobs:
         run: pnpm lint
       - name: Unit tests
         run: pnpm test
+      - name: Blob consumer and SDK contracts
+        env:
+          BLOB_LIVE_REQUIRED: ${{ vars.BLOB_LIVE_REQUIRED || '0' }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN || 'ci-vercel-blob-placeholder' }}
+        run: pnpm --filter mi-banquito-web test:contract
       - name: Build
         run: pnpm build
       - name: Install Playwright browsers

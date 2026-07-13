@@ -1,12 +1,12 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { createWriteStream } from "node:fs";
+import { createReadStream, createWriteStream } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { once } from "node:events";
-import { PassThrough, Readable, Transform, type TransformCallback } from "node:stream";
+import { Readable, Transform, type TransformCallback } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
+import * as Sentry from "@sentry/nextjs";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -16,7 +16,7 @@ import {
   type ArchiveFactory,
 } from "@mi-banquito/domain";
 import { withTenantTransaction } from "@mi-banquito/db/tenant";
-import { auditLogEntry } from "@mi-banquito/db/schema";
+import { alert, auditLogEntry } from "@mi-banquito/db/schema";
 
 import { deletePrivateBlob, readPrivateBlob, uploadPrivateBlob } from "@/lib/vercel-blob-adapter";
 
@@ -44,6 +44,10 @@ const tenantExportRequestSchema = z.object({
 }).strict();
 
 type TenantExportRequest = z.infer<typeof tenantExportRequestSchema>;
+
+export function parseTenantExportPageOrgId(value: string): string | null {
+  return z.string().uuid().safeParse(value).success ? value : null;
+}
 
 function exportSigningSecret(explicit?: string) {
   const secret = explicit ?? process.env.ADMIN_EXPORT_SIGNING_SECRET ?? process.env.AUTH0_SECRET;
@@ -148,72 +152,71 @@ function parseExportPayload(value: unknown): DataExportPayload | null {
 
 type UploadedBlob = { url: string; pathname: string };
 
-export function streamArchiveToClient<T>(input: {
-  source: Readable;
-  archiveCompletion: Promise<void>;
-  upload: (body: Readable) => Promise<UploadedBlob>;
-  finalize: (uploaded: UploadedBlob, digest: { sha256: string; sizeBytes: number }) => Promise<T>;
-  onFailure?: (uploaded: UploadedBlob | undefined) => Promise<void>;
-}) {
-  const uploadBody = new PassThrough({ highWaterMark: 64 * 1024 });
-  const iterator = input.source[Symbol.asyncIterator]();
-  const hash = createHash("sha256");
-  let sizeBytes = 0;
-  let settled = false;
-  let uploaded: UploadedBlob | undefined;
-  let resolveCompletion!: (value: T) => void;
-  let rejectCompletion!: (reason: Error) => void;
-  const completion = new Promise<T>((resolve, reject) => {
-    resolveCompletion = resolve;
-    rejectCompletion = reject;
-  });
-  const uploadPromise = input.upload(uploadBody).then((result) => {
-    uploaded = result;
-    return result;
-  });
-  void uploadPromise.catch((error) => {
-    const failure = error instanceof Error ? error : new Error(String(error));
-    input.source.destroy(failure);
-    uploadBody.destroy(failure);
-  });
+type ExportErrorContext = {
+  exportId: string;
+  orgId: string;
+  phase: "preparation" | "response";
+  cleanupKind: "temporary_directory" | "uploaded_blob";
+};
 
-  async function fail(reason: unknown) {
-    if (settled) return;
-    settled = true;
-    const error = reason instanceof Error ? reason : new Error(String(reason));
-    input.source.destroy(error);
-    uploadBody.destroy(error);
-    const completedUpload = await uploadPromise.catch(() => uploaded);
-    await input.onFailure?.(completedUpload).catch(() => undefined);
-    rejectCompletion(error);
+type ExportErrorReporter = (error: Error, context: ExportErrorContext) => void | Promise<void>;
+
+function defaultExportErrorReporter(error: Error, context: ExportErrorContext) {
+  Sentry.captureException(error, {
+    tags: {
+      feature: "tenant_export",
+      phase: context.phase,
+      cleanup_kind: context.cleanupKind,
+    },
+    extra: context,
+  });
+}
+
+function warnReportingFailure(error: unknown) {
+  process.emitWarning(`tenant_export_error_reporting_failed:${asError(error).message}`);
+}
+
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+export function finalizedFileStream<T>(input: {
+  path: string;
+  result: T;
+  cleanup: () => Promise<void>;
+}) {
+  const source = createReadStream(input.path);
+  const iterator = source[Symbol.asyncIterator]();
+  let finished = false;
+  let resolveCompletion!: (value: T) => void;
+  const completion = new Promise<T>((resolve) => { resolveCompletion = resolve; });
+
+  async function finish() {
+    if (finished) return;
+    finished = true;
+    source.destroy();
+    await input.cleanup();
+    resolveCompletion(input.result);
   }
 
   const stream = new ReadableStream<Uint8Array>({
     async pull(controller) {
-      if (settled) return;
       try {
         const next = await iterator.next();
-        if (!next.done) {
-          const bytes = Buffer.isBuffer(next.value) ? next.value : Buffer.from(next.value);
-          if (!uploadBody.write(bytes)) await once(uploadBody, "drain");
-          hash.update(bytes);
-          sizeBytes += bytes.byteLength;
-          controller.enqueue(bytes);
+        if (next.done) {
+          controller.close();
+          await finish();
           return;
         }
-        uploadBody.end();
-        const [result] = await Promise.all([uploadPromise, input.archiveCompletion]);
-        const finalized = await input.finalize(result, { sha256: hash.digest("hex"), sizeBytes });
-        settled = true;
-        resolveCompletion(finalized);
-        controller.close();
+        controller.enqueue(Buffer.isBuffer(next.value) ? next.value : Buffer.from(next.value));
       } catch (error) {
-        await fail(error);
+        await finish();
         controller.error(error);
       }
     },
     async cancel() {
-      await fail(new Error("tenant_export_client_disconnected"));
+      await iterator.return?.();
+      await finish();
     },
   });
 
@@ -229,12 +232,97 @@ export async function prepareTenantExport(input: {
   blob?: AdminExportBlobAdapter;
   archiveFactory?: ArchiveFactory;
   cleanup?: (directory: string) => Promise<void>;
+  reportError?: ExportErrorReporter;
 }) {
   const now = input.now ?? new Date();
   const exportId = input.exportId ?? randomUUID();
   const blob = input.blob ?? defaultBlobAdapter;
   const cleanup = input.cleanup ?? ((directory: string) => rm(directory, { recursive: true, force: true }));
+  const reportError = input.reportError ?? defaultExportErrorReporter;
   const temporaryDirectory = await mkdtemp(join(tmpdir(), "mi-banquito-export-"));
+  const localZipPath = join(temporaryDirectory, "tenant-export.zip");
+  let uploaded: UploadedBlob | undefined;
+  let successAuditCommitted = false;
+
+  async function report(error: Error, context: ExportErrorContext) {
+    try {
+      await reportError(error, context);
+    } catch (reportingError) {
+      try {
+        Sentry.captureException(asError(reportingError), {
+          tags: { feature: "tenant_export", failure: "error_reporter" },
+          extra: context,
+        });
+      } catch (sentryError) {
+        warnReportingFailure(sentryError);
+      }
+    }
+  }
+
+  async function recordCleanupFailure(error: Error, context: ExportErrorContext) {
+    const timestamp = new Date();
+    try {
+      await withTenantTransaction(input.orgId, async (tx) => {
+        await tx.insert(alert).values({
+          orgId: input.orgId,
+          alertKind: "tenant_export_cleanup_failed",
+          severity: "medium",
+          audience: "platform_operator",
+          subjectKind: "tenant_export",
+          subjectId: exportId,
+          payload: {
+            exportId,
+            phase: context.phase,
+            cleanupKind: context.cleanupKind,
+            error: error.message,
+          },
+          dedupWindowEnd: new Date(timestamp.getTime() + 24 * 60 * 60 * 1_000),
+          dismissedAt: null,
+          dismissedBy: null,
+          snoozedUntil: null,
+          createdAt: timestamp,
+        });
+        await tx.insert(auditLogEntry).values({
+          orgId: input.orgId,
+          actorKind: "system",
+          actorId: "00000000-0000-4000-8000-000000000000",
+          actionKind: "data.export.cleanup_failed",
+          subjectKind: "tenant_export",
+          subjectId: exportId,
+          payloadSnapshot: {
+            exportId,
+            phase: context.phase,
+            cleanupKind: context.cleanupKind,
+            error: error.message,
+          },
+          reason: null,
+          at: timestamp,
+          createdAt: timestamp,
+        });
+      });
+    } catch (durabilityError) {
+      await report(asError(durabilityError), context);
+    }
+  }
+
+  async function observeCleanupFailure(error: unknown, context: ExportErrorContext) {
+    const failure = asError(error);
+    await report(failure, context);
+    await recordCleanupFailure(failure, context);
+  }
+
+  async function cleanupTemporaryDirectory(phase: ExportErrorContext["phase"]) {
+    try {
+      await cleanup(temporaryDirectory);
+    } catch (error) {
+      await observeCleanupFailure(error, {
+        exportId,
+        orgId: input.orgId,
+        phase,
+        cleanupKind: "temporary_directory",
+      });
+    }
+  }
 
   try {
     const staged = await stageTenantExportFiles({
@@ -252,49 +340,62 @@ export async function prepareTenantExport(input: {
     });
     const plan = buildStagedTenantExportPlan({ orgId: input.orgId, generatedAt: now, ...staged });
     const archive = createTenantExportArchive(plan, input.archiveFactory);
+    const zipDigest = new DigestCounter();
+    await Promise.all([
+      pipeline(archive.stream, zipDigest, createWriteStream(localZipPath, { flags: "wx" })),
+      archive.completion,
+    ]);
+    const zipSha256 = zipDigest.digest();
+    const sizeBytes = zipDigest.sizeBytes;
     const zipPath = `tenant-exports/${input.orgId}/${exportId}.zip`;
-    const streamed = streamArchiveToClient({
-      source: archive.stream,
-      archiveCompletion: archive.completion,
-      upload: (body) => blob.upload(zipPath, body, "application/zip"),
-      onFailure: async (uploaded) => {
-        if (uploaded) await blob.delete(uploaded.url);
-      },
-      finalize: async (uploaded, digest) => {
-        if (uploaded.pathname !== zipPath) throw new Error("tenant_export_blob_path_mismatch");
-        const payload: DataExportPayload = {
-          zipPath,
-          zipUri: uploaded.url,
-          zipSha256: digest.sha256,
-          sizeBytes: digest.sizeBytes,
-          manifestCounts: plan.manifest.entityRowCounts,
-          fileCount: Object.keys(plan.manifest.files).length,
-          operatorUserId: input.operatorUserId,
-        };
-        await withTenantTransaction(input.orgId, async (tx) => {
-          await tx.insert(auditLogEntry).values({
-            id: exportId,
-            orgId: input.orgId,
-            actorKind: "platform_operator",
-            actorId: input.actorId,
-            actionKind: "data.exported",
-            subjectKind: "organization",
-            subjectId: input.orgId,
-            payloadSnapshot: payload,
-            reason: null,
-            at: now,
-            createdAt: now,
-          });
-        });
-        return { exportId, manifest: plan.manifest, ...payload };
-      },
+    uploaded = await blob.upload(zipPath, createReadStream(localZipPath), "application/zip");
+    if (uploaded.pathname !== zipPath) throw new Error("tenant_export_blob_path_mismatch");
+    const payload: DataExportPayload = {
+      zipPath,
+      zipUri: uploaded.url,
+      zipSha256,
+      sizeBytes,
+      manifestCounts: plan.manifest.entityRowCounts,
+      fileCount: Object.keys(plan.manifest.files).length,
+      operatorUserId: input.operatorUserId,
+    };
+    await withTenantTransaction(input.orgId, async (tx) => {
+      await tx.insert(auditLogEntry).values({
+        id: exportId,
+        orgId: input.orgId,
+        actorKind: "platform_operator",
+        actorId: input.actorId,
+        actionKind: "data.exported",
+        subjectKind: "organization",
+        subjectId: input.orgId,
+        payloadSnapshot: payload,
+        reason: null,
+        at: now,
+        createdAt: now,
+      });
     });
-    const completion = streamed.completion.finally(async () => {
-      await cleanup(temporaryDirectory).catch(() => undefined);
+    successAuditCommitted = true;
+    const result = { exportId, manifest: plan.manifest, ...payload };
+    const response = finalizedFileStream({
+      path: localZipPath,
+      result,
+      cleanup: () => cleanupTemporaryDirectory("response"),
     });
-    return { exportId, manifest: plan.manifest, stream: streamed.stream, completion };
+    return { exportId, manifest: plan.manifest, sizeBytes, stream: response.stream, completion: response.completion };
   } catch (error) {
-    await cleanup(temporaryDirectory).catch(() => undefined);
+    if (uploaded && !successAuditCommitted) {
+      try {
+        await blob.delete(uploaded.url);
+      } catch (cleanupError) {
+        await observeCleanupFailure(cleanupError, {
+          exportId,
+          orgId: input.orgId,
+          phase: "preparation",
+          cleanupKind: "uploaded_blob",
+        });
+      }
+    }
+    await cleanupTemporaryDirectory("preparation");
     throw error;
   }
 }

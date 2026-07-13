@@ -34,11 +34,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         actorId: session.actorId,
         operatorUserId: session.userId,
       });
-      after(() => prepared.completion.then(() => undefined, () => undefined));
+      after(async () => { await prepared.completion; });
       return new NextResponse(prepared.stream, {
         headers: {
           "content-type": "application/zip",
           "content-disposition": `attachment; filename="tenant-export-${id}.zip"`,
+          "content-length": String(prepared.sizeBytes),
           "cache-control": "private, no-store",
           "x-content-type-options": "nosniff",
         },
