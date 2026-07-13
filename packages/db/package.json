@@ -7,6 +7,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./request-context": "./src/request-context.ts",
     "./schema": "./src/schema.ts",
     "./tenant": "./src/tenant.ts"
   },

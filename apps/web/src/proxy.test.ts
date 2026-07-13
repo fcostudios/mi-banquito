@@ -47,6 +47,9 @@ describe("global impersonation proxy enforcement", () => {
     ["server action transport", "/", "POST", { "next-action": "future-action-id" }],
     ["unsafe method", "/api/members/1", "DELETE", undefined],
     ["mutating cron GET", "/api/cron/daily", "GET", undefined],
+    ["Auth0 login", "/auth/login", "GET", undefined],
+    ["Auth0 callback", "/auth/callback", "GET", undefined],
+    ["nested auth route", "/auth/logout/complete", "GET", undefined],
   ])("blocks %s without per-action registration", async (_label, path, method, headers) => {
     const response = await enforceImpersonationReadOnly(request(path, method, token(), headers), deps);
 
@@ -76,6 +79,16 @@ describe("global impersonation proxy enforcement", () => {
       ...deps,
       getAuthSubject: async () => "auth0|someone-else",
     });
+
+    expect(response.status).toBe(200);
+    expect(response.cookies.get("mi_banquito_impersonation")?.value).toBe("");
+  });
+
+  it("clears a tampered cookie on a read GET and continues safely", async () => {
+    const valid = token();
+    const tampered = `${valid.slice(0, -1)}${valid.endsWith("a") ? "b" : "a"}`;
+
+    const response = await enforceImpersonationReadOnly(request("/socias", "GET", tampered), deps);
 
     expect(response.status).toBe(200);
     expect(response.cookies.get("mi_banquito_impersonation")?.value).toBe("");

@@ -96,6 +96,7 @@ async function withMockedDb<T>(fakeDb: FakeDb, callback: () => Promise<T>): Prom
   vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
   vi.doMock("@mi-banquito/db/tenant", () => ({
     withTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<T>) => run(fakeDb),
+    withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<T>) => run(fakeDb),
   }));
   try {
     return await callback();

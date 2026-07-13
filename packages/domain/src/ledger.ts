@@ -779,8 +779,10 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
     };
   },
   async createMember(orgId, input) {
-    const [row] = await db.insert(member).values({ ...input, orgId }).returning();
-    return row;
+    return withWritableTenantTransaction(orgId, async (tx) => {
+      const [row] = await tx.insert(member).values({ ...input, orgId }).returning();
+      return row;
+    });
   },
   async createMemberWithAudit(orgId, actorId, input) {
     const now = new Date();

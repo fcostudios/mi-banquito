@@ -6,7 +6,7 @@ import { getDbOrgIdFromUser, getRolesFromUser } from "@/lib/auth/session-claims"
 import { hasMinRole, type AppRole } from "@/lib/auth/roles";
 import { ROUTE_ACCESS_DENIED, ROUTE_LOGIN } from "@/lib/routes";
 import { db } from "@mi-banquito/db";
-import { withTenantTransaction } from "@mi-banquito/db/tenant";
+import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import { auditLogEntry, authAdminAction, member, organization, platformOperator, userAccount, userOrgMembership } from "@mi-banquito/db/schema";
 
 export type RequiredSession = {
@@ -172,7 +172,7 @@ export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
       const now = new Date();
       const pendingMemberId = pendingMembership.memberId;
       const pendingUserAccountId = pendingMembership.userAccountId;
-      await withTenantTransaction(orgId, async (tx) => {
+      await withWritableTenantTransaction(orgId, async (tx) => {
         const [inviteAction] = await tx
           .select({
             id: authAdminAction.id,
