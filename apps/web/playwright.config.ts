@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "sprint8-movements.spec.ts",
   timeout: 60_000,
   expect: { timeout: 5_000 },
   retries: 0,

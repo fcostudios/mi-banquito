@@ -65,4 +65,6 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter mi-banquito-web exec playwright install --with-deps chromium
       - name: Playwright smoke tests
-        run: pnpm --filter mi-banquito-web test:e2e --project=chromium-desktop
+        run: |
+          pnpm --filter mi-banquito-web test:e2e --project=chromium-desktop
+          pnpm --filter mi-banquito-web test:e2e:movements --project=chromium-desktop
