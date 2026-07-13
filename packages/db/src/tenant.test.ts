@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import pg from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
+import { runWithTenantRequestContext } from "./request-context";
 
 config({ path: "../../.env.local" });
 config({ path: "../../.env" });
@@ -138,6 +139,52 @@ describe("tenant RLS transaction helper", () => {
         await pool.query("ROLLBACK");
       }
     } finally {
+      await pool.end();
+    }
+  });
+
+  runIfDatabase("allows only named system maintenance to bypass request read-only", async () => {
+    const { withSystemTenantTransaction, withWritableTenantTransaction } = dbModule;
+    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    const orgId = randomUUID();
+    const actor = randomUUID();
+    try {
+      await pool.query(`
+        INSERT INTO organization (
+          id, display_name, country_code, currency_code, timezone, default_language,
+          status, created_at, created_by, created_by_kind
+        ) VALUES ($1, 'System helper test', 'EC', 'USD', 'America/Guayaquil', 'es-EC', 'active', now(), $2, 'system')
+      `, [orgId, actor]);
+
+      await runWithTenantRequestContext({ readOnly: true, orgId }, async () => {
+        await expect(withWritableTenantTransaction(orgId, async () => undefined))
+          .rejects.toThrow("impersonation_read_only");
+        await expect(withSystemTenantTransaction(orgId, {
+          operation: "monthly_close_artifact_maintenance",
+          reason: "recover a pending artifact",
+        }, async (tx) => {
+          await tx.execute(sql.raw(`SET LOCAL ROLE ${testRole}`));
+          await tx.execute(sql`
+            INSERT INTO member (
+              org_id, display_name, joined_on, role, status,
+              initial_savings_balance, created_at, created_by, created_by_kind
+            ) VALUES (
+              ${orgId}, 'System maintenance member', CURRENT_DATE, 'aportante', 'activo',
+              0, now(), ${actor}, 'system'
+            )
+          `);
+        })).resolves.toBeUndefined();
+        await expect(withSystemTenantTransaction(orgId, {
+          operation: "forged_operation" as "monthly_close_artifact_maintenance",
+          reason: "not allowlisted",
+        }, async () => undefined)).rejects.toThrow("system_tenant_operation_not_allowed");
+      });
+
+      const persisted = await pool.query("SELECT display_name FROM member WHERE org_id = $1", [orgId]);
+      expect(persisted.rows).toEqual([{ display_name: "System maintenance member" }]);
+    } finally {
+      await pool.query("DELETE FROM member WHERE org_id = $1", [orgId]);
+      await pool.query("DELETE FROM organization WHERE id = $1", [orgId]);
       await pool.end();
     }
   });

@@ -14,12 +14,21 @@ export function getTenantRequestContext(): TenantRequestContext {
 }
 
 export function establishTenantRequestContext(context: TenantRequestContext): void {
-  tenantRequestStorage.enterWith(Object.freeze({ ...context }));
+  const active = tenantRequestStorage.getStore();
+  if (active) {
+    Object.assign(active, context);
+    return;
+  }
+  tenantRequestStorage.enterWith({ ...context });
+}
+
+export function initializeTenantRequestContext(): void {
+  tenantRequestStorage.enterWith({ readOnly: false });
 }
 
 export function runWithTenantRequestContext<T>(
   context: TenantRequestContext,
   run: () => T,
 ): T {
-  return tenantRequestStorage.run(Object.freeze({ ...context }), run);
+  return tenantRequestStorage.run({ ...context }, run);
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  initializeTenantRequestContext,
   establishTenantRequestContext,
   getTenantRequestContext,
   runWithTenantRequestContext,
@@ -54,6 +55,25 @@ describe("tenant request context", () => {
     });
 
     await Promise.resolve();
+    expect(getTenantRequestContext()).toEqual({
+      readOnly: true,
+      orgId: "org-target",
+      operatorId: "operator",
+    });
+  });
+
+  it("narrows the caller context when impersonation resolves after an await", async () => {
+    async function resolveImpersonation() {
+      initializeTenantRequestContext();
+      await Promise.resolve();
+      establishTenantRequestContext({
+        readOnly: true,
+        orgId: "org-target",
+        operatorId: "operator",
+      });
+    }
+
+    await resolveImpersonation();
     expect(getTenantRequestContext()).toEqual({
       readOnly: true,
       orgId: "org-target",

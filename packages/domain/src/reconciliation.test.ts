@@ -180,6 +180,11 @@ const mockTenantDb = (fakeDb: FakeDb) => {
     lockTenantMoneyWrites: async () => undefined,
     withTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) =>
       fakeDb.transaction(run),
+    withSystemTenantTransaction: async (
+      _orgId: string,
+      _context: { operation: string; reason: string },
+      run: (tx: FakeDb) => Promise<unknown>,
+    ) => fakeDb.transaction(run),
     withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<unknown>) =>
       fakeDb.transaction(run),
   }));

@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 
 import { db } from "@mi-banquito/db";
 import { auditLogEntry, pilotLogEntry } from "@mi-banquito/db/schema";
+import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 
 export type PilotChecklistInput = {
   observedOn: string;
@@ -78,14 +79,15 @@ export function evaluatePilotExitChecklist(rows: PilotChecklistInput[]): PilotEx
 export function createPilotService() {
   return {
     async listEntries(orgId: string): Promise<PilotLogEntry[]> {
-      const rows = await db.select().from(pilotLogEntry)
+      const rows = await withTenantTransaction(orgId, (tx) => tx.select().from(pilotLogEntry)
         .where(eq(pilotLogEntry.orgId, orgId))
-        .orderBy(desc(pilotLogEntry.observedOn));
+        .orderBy(desc(pilotLogEntry.observedOn)));
       return rows.map(normalizePilotRow);
     },
     async addEntry(input: AddPilotLogEntryInput): Promise<PilotLogEntry> {
-      const now = new Date();
-      const [row] = await db.insert(pilotLogEntry).values({
+      return withWritableTenantTransaction(input.orgId, async (tx) => {
+        const now = new Date();
+        const [row] = await tx.insert(pilotLogEntry).values({
         orgId: input.orgId,
         observedOn: input.observedOn,
         vocabularyAnswer: input.vocabularyAnswer,
@@ -99,11 +101,11 @@ export function createPilotService() {
         createdAt: now,
       }).returning();
 
-      if (!row) {
-        throw new Error("pilot_log_entry_not_created");
-      }
+        if (!row) {
+          throw new Error("pilot_log_entry_not_created");
+        }
 
-      await db.insert(auditLogEntry).values({
+        await tx.insert(auditLogEntry).values({
         orgId: input.orgId,
         actorKind: "platform_operator",
         actorId: input.actorId,
@@ -116,7 +118,8 @@ export function createPilotService() {
         createdAt: now,
       });
 
-      return normalizePilotRow(row);
+        return normalizePilotRow(row);
+      });
     },
   };
 }

@@ -197,9 +197,10 @@ describe("US-022 cross-organization audit", () => {
     ]);
     expect(page.nextCursor).toBeNull();
 
-    const unfiltered = await service.list({ limit: 100 });
-    expect(unfiltered.rows.some((row) => row.orgId === null && row.actionKind === "platform.maintenance")).toBe(true);
-    expect(unfiltered.rows.some((row) => row.orgId === ORG_B && row.actionKind === "interest.accrued")).toBe(true);
+    const platformRows = await service.list({ actionKind: "platform.maintenance", limit: 10 });
+    const tenantRows = await service.list({ orgId: ORG_B, actionKind: "interest.accrued", limit: 10 });
+    expect(platformRows.rows.some((row) => row.orgId === null && row.actionKind === "platform.maintenance")).toBe(true);
+    expect(tenantRows.rows.some((row) => row.orgId === ORG_B && row.actionKind === "interest.accrued")).toBe(true);
   });
 
   it("uses stable (at desc, id desc) cursor ordering without duplicates", async () => {

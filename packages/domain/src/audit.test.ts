@@ -186,6 +186,7 @@ const withMockedDb = async <T>(fakeDb: FakeDb, callback: () => Promise<T>): Prom
   vi.resetModules();
   vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
   vi.doMock("@mi-banquito/db/tenant", () => ({
+    withPlatformTransaction: async (_context: unknown, run: (tx: FakeDb) => Promise<T>) => fakeDb.transaction(() => run(fakeDb)),
     withTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<T>) => fakeDb.transaction(() => run(fakeDb)),
     withWritableTenantTransaction: async (_orgId: string, run: (tx: FakeDb) => Promise<T>) => fakeDb.transaction(() => run(fakeDb)),
   }));

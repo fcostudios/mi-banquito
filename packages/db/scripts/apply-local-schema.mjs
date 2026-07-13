@@ -20,6 +20,7 @@ import {
   readMigrationSql,
 } from "./verify-schema.mjs";
 
+const explicitDatabaseUrl = process.env.DATABASE_URL;
 for (const path of [
   new URL("../../../.env", import.meta.url),
   new URL("../../../.env.local", import.meta.url),
@@ -30,6 +31,7 @@ for (const path of [
 ]) {
   config({ path: fileURLToPath(path), override: true });
 }
+if (explicitDatabaseUrl) process.env.DATABASE_URL = explicitDatabaseUrl;
 
 const SPRINT_1_ADDITIVE_MIGRATION_URL = new URL(
   "../src/migrations/V20260629021302__sprint_1_foundation_gaps.sql",

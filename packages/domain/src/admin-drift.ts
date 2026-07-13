@@ -2,6 +2,7 @@ import { desc, eq, sql } from "drizzle-orm";
 
 import { db as defaultDb } from "@mi-banquito/db";
 import { cronRun } from "@mi-banquito/db/schema";
+import { withPlatformTransaction } from "@mi-banquito/db/tenant";
 
 export const DRIFT_CRON_ENDPOINT = "/api/cron/drift-check";
 const DEFAULT_LOCK_KEY = "mi-banquito:admin-drift-check";
@@ -88,7 +89,10 @@ export function createPostgresAdminDriftRepository(options: {
 
   return {
     async runExclusive(work) {
-      return db.transaction(async (tx) => {
+      return withPlatformTransaction({
+        operation: "admin_drift_persistence",
+        reason: "serialize and persist the platform drift check",
+      }, async (tx) => {
         const lockResult = await tx.execute(sql`
           SELECT pg_try_advisory_xact_lock(hashtext(${lockKey})) AS acquired
         `);
