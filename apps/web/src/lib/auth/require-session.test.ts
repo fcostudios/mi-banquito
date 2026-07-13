@@ -62,6 +62,7 @@ vi.mock("@mi-banquito/db", () => ({
 
 vi.mock("@mi-banquito/db/tenant", () => ({
   withTenantTransaction: (_orgId: string, run: (tx: typeof db) => Promise<unknown>) => run(db),
+  withWritableTenantTransaction: (_orgId: string, run: (tx: typeof db) => Promise<unknown>) => run(db),
 }));
 
 vi.mock("@mi-banquito/db/schema", () => ({

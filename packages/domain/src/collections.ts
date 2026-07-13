@@ -534,7 +534,7 @@ export function createCollectionsService(): CollectionsService {
       let remindersEmitted = 0;
 
       for (const orgId of orgIds) {
-        const result = await withTenantTransaction(orgId, async (tx) => {
+        const result = await withWritableTenantTransaction(orgId, async (tx) => {
           const duePromiseRows = await tx.select().from(promise)
             .where(and(
               eq(promise.orgId, orgId),

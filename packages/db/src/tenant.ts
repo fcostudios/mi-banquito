@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "./index";
+import { getTenantRequestContext } from "./request-context";
 import { organization } from "./schema";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -37,6 +38,9 @@ export async function withWritableTenantTransaction<T>(
   orgId: string,
   run: (tx: Transaction) => Promise<T>,
 ): Promise<T> {
+  if (getTenantRequestContext().readOnly) {
+    throw new Error("impersonation_read_only");
+  }
   return withTenantTransaction(orgId, async (tx) => {
     await assertTenantWritable(tx, orgId);
     return run(tx);

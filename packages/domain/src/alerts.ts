@@ -11,7 +11,7 @@ import {
   periodClose,
   projectedLiquidity,
 } from "@mi-banquito/db/schema";
-import { withTenantTransaction } from "@mi-banquito/db/tenant";
+import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import { writeWithAudit } from "./audit";
 import {
   buildA4LiquidityLowMarginAlert,
@@ -705,7 +705,7 @@ export const createAlertsService = (): AlertsService => ({
   },
   async dismissAlert(input) {
     const now = new Date();
-    await withTenantTransaction(input.orgId, async (tx) => writeWithAudit({
+    await withWritableTenantTransaction(input.orgId, async (tx) => writeWithAudit({
       write: async () => {
         await assertActionableAlert({ tx, orgId: input.orgId, alertId: input.alertId, audience: input.audience });
         await tx.insert(alertAction).values({
@@ -737,7 +737,7 @@ export const createAlertsService = (): AlertsService => ({
   },
   async snoozeAlert(input) {
     const now = new Date();
-    await withTenantTransaction(input.orgId, async (tx) => writeWithAudit({
+    await withWritableTenantTransaction(input.orgId, async (tx) => writeWithAudit({
       write: async () => {
         await assertActionableAlert({ tx, orgId: input.orgId, alertId: input.alertId, audience: input.audience });
         await tx.insert(alertAction).values({
@@ -786,7 +786,7 @@ export const createAlertsService = (): AlertsService => ({
 
     for (const org of orgs) {
       try {
-        await withTenantTransaction(org.id, async (tx) => {
+        await withWritableTenantTransaction(org.id, async (tx) => {
           if (today.getUTCDate() === 5) {
             const prevMonthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
             const prevMonthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 0));
@@ -984,7 +984,7 @@ export const createAlertsService = (): AlertsService => ({
     for (const org of orgs) {
       summary.a4OrgsScanned += 1;
       try {
-        await withTenantTransaction(org.id, async (tx) => {
+        await withWritableTenantTransaction(org.id, async (tx) => {
           const activeA4Months = new Set<string>();
           const [config] = await tx.select({
             safetyMarginAmount: groupConfig.safetyMarginAmount,
@@ -1099,7 +1099,7 @@ export const createAlertsService = (): AlertsService => ({
       }
 
       try {
-        await withTenantTransaction(org.id, async (tx) => {
+        await withWritableTenantTransaction(org.id, async (tx) => {
           const activeA5Years = new Set<string>();
           const commitmentRows = await latestShareOutCommitmentRows({
             tx,
@@ -1221,7 +1221,7 @@ export const createAlertsService = (): AlertsService => ({
     for (const org of orgs) {
       summary.orgsScanned += 1;
       try {
-        await withTenantTransaction(org.id, async (tx) => {
+        await withWritableTenantTransaction(org.id, async (tx) => {
           const [config] = await tx.select({ config: groupConfig.config })
             .from(groupConfig)
             .where(and(eq(groupConfig.orgId, org.id), isNull(groupConfig.validTo)))

@@ -16,14 +16,11 @@ type PolicyDeps = {
   authMiddleware: (request: NextRequest) => Promise<NextResponse>;
 };
 
-function isAuthLifecycle(pathname: string): boolean {
-  return pathname === "/auth" || pathname.startsWith("/auth/")
-    || pathname === "/api/auth" || pathname.startsWith("/api/auth/");
-}
-
 function isAllowedRequest(request: NextRequest): boolean {
   const { pathname } = request.nextUrl;
-  if (isAuthLifecycle(pathname)) return true;
+  if (pathname === "/auth/logout") return true;
+  if (pathname === "/auth" || pathname.startsWith("/auth/")
+    || pathname === "/api/auth" || pathname.startsWith("/api/auth/")) return false;
   if (request.method === "POST" && pathname === "/api/impersonation/end") return true;
   if (!SAFE_METHODS.has(request.method)) return false;
   if (request.method === "GET" && pathname.startsWith("/api/cron/")) return false;

@@ -756,6 +756,7 @@ async function appendArtifactResult(input: {
   result?: MonthlyCloseArtifactResult;
   error?: unknown;
 }) {
+  // tenant-write-exception: artifact repair must finalize paused or archived tenants.
   await withTenantTransaction(input.task.orgId, async (tx) => {
     const latest = await latestArtifactEvent(tx, input.task.orgId, input.task.statementArchiveId);
     if (latest?.status === "ready") return;
