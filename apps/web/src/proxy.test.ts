@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { describe, expect, it } from "vitest";
 
 import { signImpersonationCookie } from "@/lib/impersonation/cookie";
@@ -92,5 +93,23 @@ describe("global impersonation proxy enforcement", () => {
 
     expect(response.status).toBe(200);
     expect(response.cookies.get("mi_banquito_impersonation")?.value).toBe("");
+  });
+
+  it("bypasses only the route-authorized export download stream", async () => {
+    Object.assign(process.env, {
+      APP_BASE_URL: "http://localhost:3100",
+      AUTH0_CLIENT_ID: "test-client",
+      AUTH0_CLIENT_SECRET: "test-client-secret",
+      AUTH0_DOMAIN: "example.auth0.com",
+      AUTH0_SECRET: "0123456789abcdef0123456789abcdef",
+      CRON_SECRET: "test-cron-secret",
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/test",
+    });
+    const { config } = await import("./proxy");
+    const exportPath = `/admin/orgs/${randomUUID()}/export/${randomUUID()}`;
+
+    expect(unstable_doesMiddlewareMatch({ config, url: `https://example.test${exportPath}` })).toBe(false);
+    expect(unstable_doesMiddlewareMatch({ config, url: `https://example.test${exportPath}?request=signed` })).toBe(true);
+    expect(unstable_doesMiddlewareMatch({ config, url: `https://example.test/admin/orgs/${randomUUID()}/export` })).toBe(true);
   });
 });
