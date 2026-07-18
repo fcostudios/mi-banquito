@@ -126,7 +126,7 @@ export default async function ScrTreasurerHomePage() {
         </div>
 
         <div className="grid gap-4">
-          <Link href="/cierre" className="grid gap-3 rounded-md border border-border bg-surface p-4">
+          <Link href="/movimientos/registrar" className="grid gap-3 rounded-md border border-border bg-surface p-4">
             <span className="flex h-10 w-10 items-center justify-center rounded-md bg-surface-muted text-primary">
               <Bell className="h-5 w-5" aria-hidden />
             </span>

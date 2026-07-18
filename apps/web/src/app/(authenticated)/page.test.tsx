@@ -33,7 +33,7 @@ describe("ScrTreasurerHomePage", () => {
     render(await ScrTreasurerHomePage());
 
     const closeLink = screen.getByRole("link", { name: /Pendientes de regularizar/i });
-    expect(closeLink).toHaveAttribute("href", "/cierre");
+    expect(closeLink).toHaveAttribute("href", "/movimientos/registrar");
     expect(within(closeLink).getByText("2")).toBeInTheDocument();
     expect(within(closeLink).getByText("Pendiente de regularizar")).toBeInTheDocument();
   });
