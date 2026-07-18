@@ -1021,7 +1021,7 @@ describe("BR-26 payment service", () => {
 
       const result = await createPaymentService().previewMemberPayment({
         ...recordInput,
-        amount: "120.0000",
+        amount: "140.0000",
         targetLoanId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         extraDecision: "loan_principal",
       });
@@ -1030,6 +1030,10 @@ describe("BR-26 payment service", () => {
         .filter((line) => line.kind === "loan_principal")
         .reduce((total, line) => total + Number(line.amount), 0);
       expect(principalAllocated).toBe(100);
+      expect(result.allocations).toContainEqual(expect.objectContaining({
+        kind: "contribution_current",
+        amount: "20.0000",
+      }));
       expect(result.unappliedAmount).toBe("20.0000");
       expect(result.requiresExtraDecision).toBe(true);
     });

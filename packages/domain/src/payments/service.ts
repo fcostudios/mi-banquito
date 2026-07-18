@@ -163,6 +163,11 @@ const normalizeNullableText = (value: string | null | undefined): string | null 
   return trimmed ? trimmed : null;
 };
 
+const calendarMonthEnd = (label: string): string => {
+  const [year, month] = label.split("-").map(Number);
+  return new Date(Date.UTC(year ?? 0, month ?? 0, 0)).toISOString().slice(0, 10);
+};
+
 const deterministicUuid = (seed: string): string => {
   const hex = createHash("sha256").update(seed).digest("hex");
   return [
@@ -278,8 +283,13 @@ function contributionObligationsForRows(input: {
     if (!row.id || byCycleId.has(String(row.id))) {
       continue;
     }
+    const opensOn = String(row.opensOn ?? input.datedOn);
     const closesOn = String(row.closesOn ?? input.datedOn);
-    const kind: ContributionPaymentObligation["kind"] = closesOn > input.datedOn ? "future" : "current";
+    const kind: ContributionPaymentObligation["kind"] = opensOn > input.datedOn
+      ? "future"
+      : closesOn < input.datedOn
+        ? "overdue"
+        : "current";
     byCycleId.set(String(row.id), {
       cycleId: String(row.id),
       cycleLabel: String(row.cycleLabel ?? row.id),
@@ -365,7 +375,11 @@ function contributionCycleForGroup(key: string, lines: PaymentAllocationLine[], 
   throw new Error(`payment_contribution_cycle_required:${key}`);
 }
 
-async function allocationContextForInput(query: PaymentQuery, input: RecordMemberPaymentInput): Promise<{
+async function allocationContextForInput(
+  query: PaymentQuery,
+  input: RecordMemberPaymentInput,
+  options: { persistMissingCurrentCycle?: boolean } = {},
+): Promise<{
   allocations: PaymentAllocationLine[];
   contributionObligations: ContributionPaymentObligation[];
   currencyCode: string;
@@ -394,12 +408,24 @@ async function allocationContextForInput(query: PaymentQuery, input: RecordMembe
   const cycleRows = await query.select().from(contributionCycle)
     .where(and(eq(contributionCycle.orgId, input.orgId), eq(contributionCycle.status, "open")));
 
-  const contributionObligations = contributionObligationsForRows({
+  let contributionObligations = contributionObligationsForRows({
     memberId: input.memberId,
     datedOn: input.datedOn,
     agingRows: agingRows as Row[],
     cycleRows: cycleRows as Row[],
   });
+  if (!contributionObligations.some((obligation) => obligation.kind === "current")) {
+    const currentCycle = options.persistMissingCurrentCycle
+      ? await createCurrentContributionCycle(query, input, currentConfig)
+      : currentContributionCycleDraft(input, currentConfig);
+    contributionObligations = [...contributionObligations, {
+      cycleId: String(currentCycle.id),
+      cycleLabel: String(currentCycle.cycleLabel),
+      dueOn: String(currentCycle.closesOn),
+      amountDue: money4(currentCycle.expectedAmountPerMember),
+      kind: "current",
+    }];
+  }
   const principalPrepaymentLoanId = principalPrepaymentLoanIdForInput(input);
   const allocation = allocateMemberPayment({
     orgId: input.orgId,
@@ -430,6 +456,50 @@ async function allocationContextForInput(query: PaymentQuery, input: RecordMembe
     scheduleRows: scheduleRows as Row[],
     unappliedAmount: allocation.unappliedAmount,
   };
+}
+
+function currentContributionCycleDraft(
+  input: RecordMemberPaymentInput,
+  currentConfig: typeof groupConfig.$inferSelect,
+) {
+  const cycleLabel = input.datedOn.slice(0, 7);
+  return {
+    id: deterministicUuid(`contribution_cycle:${input.orgId}:${cycleLabel}`),
+    orgId: input.orgId,
+    cycleLabel,
+    kind: currentConfig.contributionCycleKind,
+    opensOn: `${cycleLabel}-01`,
+    closesOn: calendarMonthEnd(cycleLabel),
+    expectedAmountPerMember: money4(currentConfig.contributionAmount),
+    currencyCode: currentConfig.currencyCode,
+    status: "open" as const,
+    createdBy: input.actorId,
+    createdByKind: "member" as const,
+  };
+}
+
+async function createCurrentContributionCycle(
+  query: PaymentQuery,
+  input: RecordMemberPaymentInput,
+  currentConfig: typeof groupConfig.$inferSelect,
+): Promise<typeof contributionCycle.$inferSelect> {
+  const draft = currentContributionCycleDraft(input, currentConfig);
+  const [insertedCycle] = await query.insert(contributionCycle).values({
+    ...draft,
+    createdAt: new Date(),
+  }).onConflictDoNothing().returning();
+  if (insertedCycle) {
+    return insertedCycle;
+  }
+
+  const [persistedCycle] = await query.select()
+    .from(contributionCycle)
+    .where(and(eq(contributionCycle.orgId, input.orgId), eq(contributionCycle.cycleLabel, draft.cycleLabel)))
+    .limit(1);
+  if (!persistedCycle || persistedCycle.status !== "open") {
+    throw new Error("payment_contribution_cycle_required:current");
+  }
+  return persistedCycle;
 }
 
 async function existingReceiptResult(
@@ -629,7 +699,7 @@ export function createPaymentService(): PaymentService {
 
       return withWritableTenantTransaction(input.orgId, async (tx) => {
         const depositAccount = await depositAccountForWrite(tx, input);
-        const allocation = await allocationContextForInput(tx, input);
+        const allocation = await allocationContextForInput(tx, input, { persistMissingCurrentCycle: true });
         if (allocation.requiresExtraDecision) {
           throw new Error("payment_extra_decision_required");
         }
