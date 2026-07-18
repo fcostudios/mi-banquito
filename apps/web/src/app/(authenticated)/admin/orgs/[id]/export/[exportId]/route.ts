@@ -1,4 +1,4 @@
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requirePlatformOperator } from "@/lib/auth/require-session";
@@ -34,7 +34,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         actorId: session.actorId,
         operatorUserId: session.userId,
       });
-      after(async () => { await prepared.completion; });
       return new NextResponse(prepared.stream, {
         headers: {
           "content-type": "application/zip",

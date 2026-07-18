@@ -39,4 +39,14 @@ describe("US-021/US-022 platform-operator boundary", () => {
     expect(source).not.toContain("prepareTenantExport(");
     expect(source).not.toContain("generateTenantExport(");
   });
+
+  it("lets the export stream own completion and cleanup", () => {
+    const source = readFileSync(resolve(
+      process.cwd(),
+      "src/app/(authenticated)/admin/orgs/[id]/export/[exportId]/route.ts",
+    ), "utf8");
+
+    expect(source).not.toContain("after(");
+    expect(source).not.toMatch(/import\s*\{[^}]*\bafter\b[^}]*\}\s*from\s*["']next\/server["']/);
+  });
 });
