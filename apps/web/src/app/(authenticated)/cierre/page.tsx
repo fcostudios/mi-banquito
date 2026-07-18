@@ -57,6 +57,7 @@ export default async function ScrMonthlyClosePage({
   const state = await createReconciliationService().getMonthlyCloseState(session.orgId);
   const params = await searchParams;
   const message = resultMessage(params);
+  const isClosed = state.status === "closed";
   const hasPendingRegularizations = state.pendingRegularizations.length > 0;
   const canClose = Boolean(state.id) && state.closeAllowed && !hasPendingRegularizations;
   const canAnnotate = Boolean(state.id) && state.status === "outside_tolerance";
@@ -99,7 +100,7 @@ export default async function ScrMonthlyClosePage({
           ) : null}
         </div>
 
-        <form action={executeReconciliationAction} className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+        {!isClosed ? <form action={executeReconciliationAction} className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
           <input type="hidden" name="cycleId" value={state.cycleId} />
           <FormField labelKey={copy.declaredBalance}>
             <InputNumber
@@ -112,10 +113,10 @@ export default async function ScrMonthlyClosePage({
             />
           </FormField>
           <ButtonPrimary type="submit">{copy.reconcile}</ButtonPrimary>
-        </form>
+        </form> : null}
       </section>
 
-      <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.pendingTitle}>
+      {!isClosed ? <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.pendingTitle}>
         <div>
           <h2 className="text-lg font-semibold text-text-primary">{copy.pendingTitle}</h2>
           <p className="text-sm text-text-secondary">{copy.pendingDescription}</p>
@@ -141,9 +142,9 @@ export default async function ScrMonthlyClosePage({
             ))}
           </div>
         )}
-      </section>
+      </section> : null}
 
-      <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.annotationTitle}>
+      {!isClosed ? <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.annotationTitle}>
         <div>
           <h2 className="text-lg font-semibold text-text-primary">{copy.annotationTitle}</h2>
           <p className="text-sm text-text-secondary">{copy.annotationHelp}</p>
@@ -168,7 +169,7 @@ export default async function ScrMonthlyClosePage({
             <p className="text-sm text-text-secondary">{hasPendingRegularizations ? copy.pendingCloseDisabled : copy.closeDisabled}</p>
           ) : null}
         </form>
-      </section>
+      </section> : null}
 
       {state.monthlyCloseStatementId && state.monthlyClosePdfUri ? (
         <section className="grid gap-4 rounded-md border border-border bg-surface p-5" aria-label={copy.archiveTitle}>

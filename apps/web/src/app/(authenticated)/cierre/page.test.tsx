@@ -130,6 +130,10 @@ describe("ScrMonthlyClosePage", () => {
     render(await ScrMonthlyClosePage({ searchParams: Promise.resolve({ closed: "1" }) }));
 
     expect(screen.getByText("Mes cerrado.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guardar conciliación" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guardar nota" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cerrar mes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Movimientos pendientes de regularizar" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Abrir PDF" })).toHaveAttribute(
       "href",
       expect.stringContaining("/statement-archive/monthly-close/"),
