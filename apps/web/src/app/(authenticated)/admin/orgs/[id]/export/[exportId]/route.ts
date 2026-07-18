@@ -7,6 +7,7 @@ import {
   prepareTenantExport,
   verifyTenantExportRequest,
 } from "@/lib/admin-export-service";
+import { redirectToGeneratedExportDownload } from "@/lib/admin-export-response";
 
 const UUID = z.string().uuid();
 
@@ -34,14 +35,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         actorId: session.actorId,
         operatorUserId: session.userId,
       });
-      return new NextResponse(prepared.stream, {
-        headers: {
-          "content-type": "application/zip",
-          "content-disposition": `attachment; filename="tenant-export-${id}.zip"`,
-          "content-length": String(prepared.sizeBytes),
-          "cache-control": "private, no-store",
-          "x-content-type-options": "nosniff",
-        },
+      return redirectToGeneratedExportDownload({
+        requestUrl: request.url,
+        orgId: id,
+        exportId,
+        stream: prepared.stream,
+        completion: prepared.completion,
       });
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("tenant_export_request_")) {

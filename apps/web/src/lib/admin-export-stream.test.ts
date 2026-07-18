@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { finalizedFileStream } from "./admin-export-service";
+import { redirectToGeneratedExportDownload } from "./admin-export-response";
 
 const directories: string[] = [];
 
@@ -35,6 +36,35 @@ describe("finalized tenant export file stream", () => {
     await reader.cancel("client_disconnected");
 
     await expect(finalized.completion).resolves.toBe(result);
+    expect(cleaned).toBe(1);
+  });
+
+  it("cleans the temporary stream and redirects generation to the durable Blob download", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mi-banquito-export-redirect-test-"));
+    directories.push(directory);
+    const path = join(directory, `${randomUUID()}.zip`);
+    await writeFile(path, Buffer.from("durable-export"));
+    let cleaned = 0;
+    const orgId = randomUUID();
+    const exportId = randomUUID();
+    const finalized = finalizedFileStream({
+      path,
+      result: { exportId },
+      cleanup: async () => { cleaned += 1; },
+    });
+
+    const response = await redirectToGeneratedExportDownload({
+      requestUrl: `https://mi-banquito.example/admin/orgs/${orgId}/export/${exportId}?request=signed`,
+      orgId,
+      exportId,
+      ...finalized,
+    });
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      `https://mi-banquito.example/admin/orgs/${orgId}/export/${exportId}`,
+    );
+    await expect(finalized.completion).resolves.toEqual({ exportId });
     expect(cleaned).toBe(1);
   });
 });

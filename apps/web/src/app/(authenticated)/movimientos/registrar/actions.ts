@@ -57,7 +57,7 @@ function parseScalarFields(formData: FormData, keys: readonly string[], options:
   const result: Record<string, string> = {};
 
   for (const key of formData.keys()) {
-    if (!allowed.has(key)) throw new z.ZodError([]);
+    if (!allowed.has(key) && !key.startsWith("$ACTION_")) throw new z.ZodError([]);
   }
   for (const key of keys) {
     const values = formData.getAll(key);
