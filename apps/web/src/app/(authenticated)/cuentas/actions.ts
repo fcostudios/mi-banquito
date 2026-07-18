@@ -31,7 +31,7 @@ function errorCode(error: unknown): string {
 function scalarFields(formData: FormData, keys: readonly string[]): Record<string, string> {
   const allowed = new Set(keys);
   for (const key of formData.keys()) {
-    if (!allowed.has(key)) throw new z.ZodError([]);
+    if (!allowed.has(key) && !key.startsWith("$ACTION_")) throw new z.ZodError([]);
   }
   return Object.fromEntries(keys.map((key) => {
     const values = formData.getAll(key);

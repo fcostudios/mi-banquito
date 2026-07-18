@@ -111,6 +111,18 @@ describe("account server actions", () => {
     expect(rows[0]).toMatchObject({ clientRequestId, name: "Banco de acciones" });
   });
 
+  it("accepts the React server-action metadata included by native browser submissions", async () => {
+    const formData = validFormData();
+    formData.set("$ACTION_ID_saveAccountAction", "");
+
+    await expectRedirect(() => saveAccountAction(formData), "/cuentas?saved=created");
+
+    const rows = await withTenantTransaction(ORG_ID, (tx) =>
+      tx.select().from(account).where(eq(account.orgId, ORG_ID)));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ name: "Banco de acciones", type: "group_bank" });
+  });
+
   it.each([
     ["File scalar", (formData: FormData) => formData.set("name", new File(["Banco"], "name.txt", { type: "text/plain" }))],
     ["missing request UUID", (formData: FormData) => formData.delete("clientRequestId")],
