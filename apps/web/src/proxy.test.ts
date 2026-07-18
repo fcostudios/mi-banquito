@@ -105,10 +105,47 @@ describe("global impersonation proxy enforcement", () => {
       CRON_SECRET: "test-cron-secret",
       DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/test",
     });
-    const { config } = await import("./proxy");
+    const { config, routeProxyRequest } = await import("./proxy");
     const exportPath = `/admin/orgs/${randomUUID()}/export/${randomUUID()}`;
 
-    expect(unstable_doesMiddlewareMatch({ config, url: `https://example.test${exportPath}` })).toBe(false);
+    let authMiddlewareCalls = 0;
+    const proxyDeps = {
+      secret,
+      now: () => now,
+      getAuthSubject: async () => null,
+      authMiddleware: async () => {
+        authMiddlewareCalls += 1;
+        return NextResponse.next();
+      },
+    };
+
+    const downloadResponse = await routeProxyRequest(
+      new NextRequest(`https://example.test${exportPath}`),
+      proxyDeps,
+    );
+
+    expect(downloadResponse.headers.get("x-middleware-next")).toBe("1");
+    expect(authMiddlewareCalls).toBe(0);
+
+    await routeProxyRequest(
+      new NextRequest(`https://example.test${exportPath}?request=`),
+      proxyDeps,
+    );
+
+    expect(authMiddlewareCalls).toBe(0);
+
+    await routeProxyRequest(
+      new NextRequest(`https://example.test${exportPath}?request=signed`),
+      proxyDeps,
+    );
+    await routeProxyRequest(
+      new NextRequest(`https://example.test/admin/orgs/${randomUUID()}/export`),
+      proxyDeps,
+    );
+
+    expect(authMiddlewareCalls).toBe(2);
+
+    expect(unstable_doesMiddlewareMatch({ config, url: `https://example.test${exportPath}` })).toBe(true);
     expect(unstable_doesMiddlewareMatch({ config, url: `https://example.test${exportPath}?request=signed` })).toBe(true);
     expect(unstable_doesMiddlewareMatch({ config, url: `https://example.test/admin/orgs/${randomUUID()}/export` })).toBe(true);
   });
