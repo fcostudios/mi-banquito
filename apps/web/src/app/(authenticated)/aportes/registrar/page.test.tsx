@@ -33,6 +33,8 @@ describe("ScrRecordContributionPage", () => {
   it("defaults aporte payment source to cash in meeting", async () => {
     const { container } = render(await ScrRecordContributionPage({ searchParams: Promise.resolve({}) }));
 
+    expect(screen.getByRole("heading", { level: 1, name: "Registrar pago de socia" })).toBeInTheDocument();
+    expect(screen.getByText(/primero las obligaciones de préstamo/i)).toBeInTheDocument();
     expect(screen.getByText("Origen del pago")).toBeInTheDocument();
     expect(container.querySelector('select[name="paymentSource"]')).toHaveValue("cash_in_meeting");
     expect(screen.getByRole("combobox", { name: "¿En qué cuenta entró?" })).toHaveValue("44444444-4444-4444-8444-444444444444");

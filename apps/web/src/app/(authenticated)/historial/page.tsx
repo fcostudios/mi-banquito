@@ -52,6 +52,7 @@ export default async function ScrHistoryPage({
   const query = await searchParams;
   const memberId = searchValue(query.memberId);
   const actionKind = searchValue(query.actionKind);
+  const saved = searchValue(query.saved);
   const from = searchValue(query.from);
   const to = searchValue(query.to);
   const entries = await createAuditService().listNarratedEntries({
@@ -68,6 +69,12 @@ export default async function ScrHistoryPage({
         <h1 className="text-2xl font-bold text-text-primary">{copy.title}</h1>
         <p className="mt-2 text-text-secondary">{copy.description}</p>
       </header>
+
+      {saved ? (
+        <div className="rounded-md border border-success bg-surface p-4 text-success" role="status">
+          {copy.paymentSaved}
+        </div>
+      ) : null}
 
       <form method="get" className="grid gap-4 rounded-md border border-border bg-surface p-5 md:grid-cols-5">
         <FormField labelKey={copy.memberId}>

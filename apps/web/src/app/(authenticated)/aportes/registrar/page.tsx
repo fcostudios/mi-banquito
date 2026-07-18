@@ -34,7 +34,17 @@ export default async function ScrRecordContributionPage({
     createMovementService().listActiveAccounts(session.orgId),
   ]);
   const params = await searchParams;
-  const errorMessage = params?.error ? decodeURIComponent(params.error) : undefined;
+  const errorMessages: Record<string, string> = {
+    "slip-required": copy.contributions.slipRequired,
+    "invalid-form": copy.contributions.invalid,
+    "group-account-required": copy.contributions.noGroupAccountBody,
+    "account-unavailable": copy.contributions.accountUnavailable,
+    "group-config-required": copy.contributions.groupConfigRequired,
+    "cycle-required": copy.contributions.cycleRequired,
+    "idempotency-conflict": copy.contributions.idempotencyConflict,
+    "action-failed": copy.contributions.failed,
+  };
+  const errorMessage = params?.error ? errorMessages[params.error] ?? copy.contributions.failed : undefined;
   const showConfirmation = params?.confirm === "1";
   const clientRequestId = params?.clientRequestId || randomUUID();
   const defaultMemberId = params?.memberId ?? members[0]?.id;
@@ -52,6 +62,10 @@ export default async function ScrRecordContributionPage({
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
       <h1 className="text-2xl font-bold text-text-primary">{copy.contributions.title}</h1>
+      <div className="rounded-md border border-warning-text bg-warning-bg p-4 text-text-primary">
+        <h2 className="font-semibold">{copy.contributions.allocationTitle}</h2>
+        <p className="mt-1 text-sm">{copy.contributions.allocationBody}</p>
+      </div>
       {!hasGroupAccount ? (
         <div className="rounded-md border border-warning-text bg-warning-bg p-4 text-text-primary" role="alert">
           <h2 className="font-semibold">{copy.contributions.noGroupAccountTitle}</h2>

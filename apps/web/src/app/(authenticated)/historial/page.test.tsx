@@ -41,11 +41,13 @@ vi.mock("@mi-banquito/domain", () => ({
 describe("ScrHistoryPage", () => {
   it("shows the same readable movement name in result cards that filters use", async () => {
     const { container } = render(await ScrHistoryPage({
-      searchParams: Promise.resolve({}),
+      searchParams: Promise.resolve({ saved: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
     }));
     const card = screen.getByText("Pancho registró un pago de $16.00 el 2026-07-02.").closest("article");
 
     expect(card).not.toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("Pago registrado");
+    expect(screen.getByRole("status")).toHaveTextContent("distribución aplicada");
     expect(within(card!).getByText("Pago registrado")).toBeInTheDocument();
     expect(within(card!).getByText("02/07/2026, 05:00")).toBeInTheDocument();
     expect(within(card!).getByText("Nota")).toBeInTheDocument();

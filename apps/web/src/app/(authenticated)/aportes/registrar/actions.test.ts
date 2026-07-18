@@ -42,6 +42,12 @@ describe("recordContributionAction", () => {
     redirect.mockClear();
     revalidatePath.mockClear();
     recordMemberPayment.mockReset();
+    recordMemberPayment.mockResolvedValue({
+      receiptId: "66666666-6666-4666-8666-666666666666",
+      allocations: [],
+      unappliedAmount: "0.0000",
+      requiresExtraDecision: false,
+    });
     requireTreasurer.mockReset();
     requireTreasurer.mockResolvedValue({
       orgId: "11111111-1111-4111-8111-111111111111",
@@ -58,16 +64,16 @@ describe("recordContributionAction", () => {
     await expect(recordContributionAction(formData)).rejects.toThrow("NEXT_REDIRECT:/aportes/registrar?error=");
 
     expect(recordMemberPayment).not.toHaveBeenCalled();
-    expect(decodeURIComponent(redirect.mock.calls[0]?.[0] ?? "")).toContain(
-      "Para transferencia bancaria o depósito desde caja chica, registra un comprobante antes de guardar el aporte.",
-    );
+    expect(redirect.mock.calls[0]?.[0]).toBe("/aportes/registrar?error=slip-required");
   });
 
-  it("records default aportes through the BR-26 member payment service", async () => {
+  it("records the BR-26 member payment and opens its persisted allocation history", async () => {
     const { recordContributionAction } = await import("./actions");
     const formData = baseFormData();
 
-    await recordContributionAction(formData);
+    await expect(recordContributionAction(formData)).rejects.toThrow(
+      "NEXT_REDIRECT:/historial?actionKind=payment.receipt.recorded&memberId=22222222-2222-4222-8222-222222222222&saved=66666666-6666-4666-8666-666666666666",
+    );
 
     expect(recordMemberPayment).toHaveBeenCalledWith(expect.objectContaining({
       orgId: "11111111-1111-4111-8111-111111111111",
@@ -79,6 +85,15 @@ describe("recordContributionAction", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/atrasos");
     expect(revalidatePath).toHaveBeenCalledWith("/historial");
     expect(revalidatePath).toHaveBeenCalledWith("/liquidez");
+  });
+
+  it("preserves a safe domain error code when the selected account is unavailable", async () => {
+    recordMemberPayment.mockRejectedValue(new Error("deposit_account_unavailable"));
+    const { recordContributionAction } = await import("./actions");
+
+    await expect(recordContributionAction(baseFormData())).rejects.toThrow(
+      "NEXT_REDIRECT:/aportes/registrar?error=account-unavailable",
+    );
   });
 
   it("redirects to extra-money confirmation when BR-26 needs a decision", async () => {
