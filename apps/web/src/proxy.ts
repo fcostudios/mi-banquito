@@ -15,5 +15,11 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)"],
+  matcher: [
+    {
+      source: "/admin/orgs/:id/export/:exportId",
+      has: [{ type: "query", key: "request" }],
+    },
+    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|admin/orgs/[^/]+/export/[^/]+(?:/|$)).*)",
+  ],
 };
