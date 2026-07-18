@@ -224,7 +224,10 @@ describe("movement server actions", () => {
     const clientRequestId = randomUUID();
     const path = "/movimientos/registrar?saved=transfer&category=transfer&currency=USD&amount=7.2500";
 
-    await expectRedirect(() => recordTransferAction(transferForm(clientRequestId)), path);
+    const browserSubmission = transferForm(clientRequestId);
+    browserSubmission.set("$ACTION_ID_recordTransferAction", "");
+
+    await expectRedirect(() => recordTransferAction(browserSubmission), path);
     await expectRedirect(() => recordTransferAction(transferForm(clientRequestId)), path);
 
     const rows = await withTenantTransaction(ORG_ID, (tx) => tx.select().from(transfer)

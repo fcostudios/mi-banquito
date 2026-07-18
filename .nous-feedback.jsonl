@@ -279,3 +279,9 @@
 {"story":"US-020","event":"done"}
 {"story":"US-023","event":"done_with_external_deferral","notes":"Code and adversarial AC verification complete; production must provision authenticated Nous runner URL/secret and execute one live drift cron smoke before operational closure."}
 {"story":"SPRINT-8","event":"implemented_with_external_verification","notes":"All Sprint 8 code, migrations, tests, adversarial reviews, and local build gates are complete. Remaining deployment evidence: live Nous drift runner/cron smoke and live Vercel Blob provider smoke. Four pre-existing nav-map alignment defects remain substrate-owned and unchanged."}
+{"story":"US-091","event":"feedback","notes":"Production regression repair: movement server actions now accept React native $ACTION_ metadata while continuing to reject arbitrary unknown fields."}
+{"story":"US-091","event":"ac_verify","notes":"Adversarial verification passed: browser-shaped transfer succeeds, idempotent replay remains exact, and unauthorized or arbitrary-field submissions remain rejected."}
+{"story":"US-021","event":"feedback","notes":"Production export generated and uploaded successfully but the same-request temporary response stream failed on mobile; generation now redirects to the durable tenant-scoped Blob download after cleanup."}
+{"story":"US-021","event":"ac_verify","notes":"Adversarial verification passed: redirect strips the signed generation request, preserves the fixed tenant/export path, waits for Blob completion, and cancels the temporary stream exactly once."}
+{"story":"US-091","event":"build_pass","notes":"Regression gate: type-check, lint, full workspace tests, and production build passed."}
+{"story":"US-021","event":"build_pass","notes":"Export handoff regression gate: type-check, lint, full workspace tests, and production build passed."}
