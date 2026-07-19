@@ -321,7 +321,7 @@ rtk git commit -m "fix(db): reconcile fail-closed tenant RLS (US-008)"
 - Create: `packages/db/scripts/neon-ci-workflow.test.mjs`
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] **Step 1: Write the failing workflow contract**
+- [x] **Step 1: Write the failing workflow contract**
 
 Read `.github/workflows/ci.yml` and assert it contains:
 
@@ -339,13 +339,13 @@ expect(workflow).toContain("src/fail-closed-rls.test.ts");
 
 The expected verifier count is one local run plus two Neon runs.
 
-- [ ] **Step 2: Run the workflow contract and confirm RED**
+- [x] **Step 2: Run the workflow contract and confirm RED**
 
 Run: `rtk pnpm --filter @mi-banquito/db exec vitest run scripts/neon-ci-workflow.test.mjs`
 
 Expected: FAIL because CI has no Neon branch action.
 
-- [ ] **Step 3: Add the trusted-PR Neon workflow steps**
+- [x] **Step 3: Add the trusted-PR Neon workflow steps**
 
 After dependency installation, calculate a 24-hour RFC3339 expiry and create a branch only for same-repository PRs:
 
@@ -381,13 +381,13 @@ After dependency installation, calculate a 24-hour RFC3339 expiry and create a b
 
 Do not print `db_url`. Forked PRs retain the existing local PostgreSQL gate and cannot access Neon credentials.
 
-- [ ] **Step 4: Run the workflow contract and confirm GREEN**
+- [x] **Step 4: Run the workflow contract and confirm GREEN**
 
 Run: `rtk pnpm --filter @mi-banquito/db exec vitest run scripts/neon-ci-workflow.test.mjs`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the CI path**
+- [x] **Step 5: Commit the CI path**
 
 ```bash
 rtk git add .github/workflows/ci.yml packages/db/scripts/neon-ci-workflow.test.mjs
