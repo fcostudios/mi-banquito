@@ -226,7 +226,7 @@ rtk git commit -m "feat(db): add fiscal-year interest gains view (US-008)"
 - Modify: `packages/db/scripts/apply-local-schema.mjs`
 - Modify: `packages/db/src/tenant.test.ts`
 
-- [ ] **Step 1: Write the failing real-Postgres RLS test**
+- [x] **Step 1: Write the failing real-Postgres RLS test**
 
 Create the `mi_banquito_rls_test` NOLOGIN role, grant it to `current_user`, grant schema/table access, and in isolated transactions assert:
 
@@ -243,13 +243,13 @@ expect((await client.query("SELECT org_id FROM member")).rows).toEqual([{ org_id
 
 Also attempt an insert whose `org_id` differs from the current setting and assert PostgreSQL error `42501`, proving `WITH CHECK`.
 
-- [ ] **Step 2: Run the RLS test against the stale inherited branch and confirm RED**
+- [x] **Step 2: Run the RLS test against the stale inherited branch and confirm RED**
 
 Run: `rtk pnpm --filter @mi-banquito/db exec vitest run src/fail-closed-rls.test.ts`
 
 Expected: FAIL with `22P02` for missing/empty context or a policy-definition verifier failure.
 
-- [ ] **Step 3: Add the idempotent reconciliation migration**
+- [x] **Step 3: Add the idempotent reconciliation migration**
 
 Iterate public base tables with `org_id`, validate identifiers through `format('%I', ...)`, and execute for each table:
 
@@ -262,7 +262,7 @@ CREATE POLICY %I ON %I
   WITH CHECK (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid);
 ```
 
-- [ ] **Step 4: Add the narrow US-008 repair branch**
+- [x] **Step 4: Add the narrow US-008 repair branch**
 
 Define URLs for both new migrations and accept only these health errors:
 
@@ -273,9 +273,9 @@ const US_008_REPAIR_OBJECTS = new Set([
 ]);
 ```
 
-The predicate must reject missing tables, functions, triggers, constraints, or any unexpected object. For an accepted inherited schema, execute the view migration, the policy migration, and `installLocalSubstrate(pool)`, then collect health again and fail unless `evaluateSchemaHealth` is green.
+The predicate must reject missing tables, functions, triggers, constraints, or any unexpected object. For an accepted inherited schema, execute only the view and policy migrations, then collect health again and fail unless `evaluateSchemaHealth` is green. Do not invoke the broad local-substrate installer: it would overwrite later regularization-aware Sprint 8 trigger bindings.
 
-- [ ] **Step 5: Make the shared tenant test portable to Neon**
+- [x] **Step 5: Make the shared tenant test portable to Neon**
 
 In `tenant.test.ts` add this after role creation:
 
@@ -285,7 +285,7 @@ GRANT ${testRole} TO CURRENT_USER;
 
 This changes only test authority on disposable/local databases and does not alter application roles or policies.
 
-- [ ] **Step 6: Apply locally and confirm GREEN**
+- [x] **Step 6: Apply locally and confirm GREEN**
 
 Run:
 
@@ -297,7 +297,7 @@ rtk pnpm --filter @mi-banquito/db exec vitest run src/fail-closed-rls.test.ts sr
 
 Expected: schema apply and verification succeed; all selected tests pass.
 
-- [ ] **Step 7: Re-run apply and verification to prove idempotency**
+- [x] **Step 7: Re-run apply and verification to prove idempotency**
 
 Run:
 
@@ -308,7 +308,7 @@ rtk node packages/db/scripts/verify-schema.mjs
 
 Expected: both commands exit 0 and report an already verified schema/reconciled policies.
 
-- [ ] **Step 8: Commit the policy and repair path**
+- [x] **Step 8: Commit the policy and repair path**
 
 ```bash
 rtk git add packages/db/src/migrations/V20260719115020__fail_closed_tenant_policies.sql packages/db/scripts/apply-local-schema.mjs packages/db/src/fail-closed-rls.test.ts packages/db/src/tenant.test.ts
