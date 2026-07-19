@@ -49,4 +49,17 @@ describe("US-021/US-022 platform-operator boundary", () => {
     expect(source).not.toContain("after(");
     expect(source).not.toMatch(/import\s*\{[^}]*\bafter\b[^}]*\}\s*from\s*["']next\/server["']/);
   });
+
+  it("redirects a signed replay before attempting generation again", () => {
+    const source = readFileSync(resolve(
+      process.cwd(),
+      "src/app/(authenticated)/admin/orgs/[id]/export/[exportId]/route.ts",
+    ), "utf8");
+    const existingExportLookup = source.indexOf("await loadTenantExportHistory(id)");
+    const generation = source.indexOf("await prepareTenantExport(");
+
+    expect(existingExportLookup).toBeGreaterThan(0);
+    expect(generation).toBeGreaterThan(existingExportLookup);
+    expect(source).toContain("redirectToTenantExportDownload(");
+  });
 });

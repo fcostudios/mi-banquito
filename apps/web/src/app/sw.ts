@@ -4,7 +4,9 @@
 // into scope (the project tsconfig targets DOM, not WebWorker), so `tsc`
 // resolves the service-worker global type instead of TS2552.
 import { defaultCache } from "@serwist/next/worker";
-import { Serwist } from "serwist";
+import { NetworkOnly, Serwist } from "serwist";
+
+import { isTenantExportRoutePath } from "@/lib/admin-export-route-policy";
 
 declare const self: ServiceWorkerGlobalScope & {
   __SW_MANIFEST: (string | { url: string; revision: string | null })[];
@@ -15,7 +17,15 @@ const serwist = new Serwist({
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
+  runtimeCaching: [
+    {
+      matcher: ({ sameOrigin, url: { pathname } }) =>
+        sameOrigin && isTenantExportRoutePath(pathname),
+      method: "GET",
+      handler: new NetworkOnly(),
+    },
+    ...defaultCache,
+  ],
 });
 
 self.addEventListener("message", (event) => {
