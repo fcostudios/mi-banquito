@@ -6,7 +6,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { finalizedFileStream } from "./admin-export-service";
-import { redirectToGeneratedExportDownload } from "./admin-export-response";
+import {
+  redirectToGeneratedExportDownload,
+  redirectToTenantExportDownload,
+} from "./admin-export-response";
 
 const directories: string[] = [];
 
@@ -15,6 +18,21 @@ afterEach(async () => {
 });
 
 describe("finalized tenant export file stream", () => {
+  it("redirects a replayed generation request to the durable archive without regenerating", () => {
+    const orgId = randomUUID();
+    const exportId = randomUUID();
+    const response = redirectToTenantExportDownload({
+      requestUrl: `https://mi-banquito.example/admin/orgs/${orgId}/export/${exportId}?request=replayed`,
+      orgId,
+      exportId,
+    });
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      `https://mi-banquito.example/admin/orgs/${orgId}/export/${exportId}`,
+    );
+  });
+
   it("streams from disk and treats cancellation as cleanup after a committed result", async () => {
     const directory = await mkdtemp(join(tmpdir(), "mi-banquito-stream-test-"));
     directories.push(directory);
