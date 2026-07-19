@@ -9,8 +9,13 @@ export const dynamic = "force-dynamic";
 const copy = messages.adminOrgs.config;
 const groupCopy = messages.sprint1.group;
 
-export default async function ScrGroupConfigPage() {
+export default async function ScrGroupConfigPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ editar?: string }>;
+}) {
   const session = await requireTreasurer();
+  const editing = (await searchParams)?.editar === "1";
   const config = await createLedgerService().getCurrentGroupConfig(session.orgId);
   const json = config?.config && typeof config.config === "object" ? config.config as {
     baseFundQuota?: { fiscalYear?: number; perMemberAmount?: string };
@@ -29,6 +34,7 @@ export default async function ScrGroupConfigPage() {
         <p className="mt-2 text-sm text-text-secondary">{groupCopy.newLoans}</p>
       </header>
       <form action={saveTreasurerGroupConfigAction} className="grid gap-4 rounded-md border border-border bg-surface p-5 md:grid-cols-2">
+        <fieldset name="group-rules" disabled={!editing} className="contents">
         <FormField labelKey={copy.contributionCycleKind}>
           <Select name="contributionCycleKind" defaultValue={config?.contributionCycleKind ?? "monthly"}>
             <option value="monthly">{copy.monthly}</option>
@@ -103,8 +109,18 @@ export default async function ScrGroupConfigPage() {
         <FormField labelKey={copy.moraThresholdDays}>
           <InputNumber name="moraThresholdDays" defaultValue={config?.moraThresholdDays ?? 15} min="1" max="365" step="1" />
         </FormField>
+        </fieldset>
         <div className="md:col-span-2">
-          <ButtonPrimary type="submit" labelKey={messages.sprint1.common.save} />
+          {editing ? (
+            <ButtonPrimary type="submit" labelKey={messages.sprint1.common.save} />
+          ) : (
+            <a
+              href="/grupo?editar=1"
+              className="inline-flex min-h-12 items-center justify-center rounded-md bg-primary px-5 font-semibold text-surface"
+            >
+              {groupCopy.edit}
+            </a>
+          )}
         </div>
       </form>
     </main>

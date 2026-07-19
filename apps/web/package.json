@@ -12,7 +12,7 @@
     "test:contract": "vitest run --config vitest.config.ts src/lib/vercel-blob-adapter.pact.test.ts src/lib/vercel-blob-adapter.contract.test.ts src/lib/vercel-blob-adapter.live.contract.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:movements": "playwright test --config playwright.movements.config.ts",
-    "lint:ds": "node ../../scripts/check-status-pill.mjs ../.. && node ../../scripts/check-hardcoded-color.mjs ../.. && node ../../scripts/check-hardcoded-string.mjs ../.. && node ../../scripts/check-lucide-allowlist.mjs ../.. && node ../../scripts/sprint1-ui-closure-gate.mjs ../.. && node ../../scripts/sprint2-closure-gate.mjs ../.. && node ../../scripts/sprint3-closure-gate.mjs ../.. && node ../../scripts/sprint4-closure-gate.mjs ../.. && node ../../scripts/sprint5-closure-gate.mjs ../..",
+    "lint:ds": "node ../../scripts/check-status-pill.mjs ../.. && node ../../scripts/check-hardcoded-color.mjs ../.. && node ../../scripts/check-hardcoded-string.mjs ../.. && node ../../scripts/check-lucide-allowlist.mjs ../.. && node ../../scripts/check-a11y.mjs ../.. && node ../../scripts/sprint1-ui-closure-gate.mjs ../.. && node ../../scripts/sprint2-closure-gate.mjs ../.. && node ../../scripts/sprint3-closure-gate.mjs ../.. && node ../../scripts/sprint4-closure-gate.mjs ../.. && node ../../scripts/sprint5-closure-gate.mjs ../..",
     "lint:a11y": "node ../../scripts/check-a11y.mjs ../.."
   },
   "dependencies": {
@@ -45,6 +45,7 @@
     "@types/pg": "^8.11.10",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "axe-core": "4.12.0",
     "drizzle-kit": "^0.30.1",
     "eslint": "^9.17.0",
     "eslint-config-next": "^15.1.0",

@@ -1,6 +1,6 @@
 # Deferred External Blockers
 
-Last updated: 2026-07-02
+Last updated: 2026-07-18
 
 This file is the durable memory for Sprint 0 work that passed the local repo gate
 but still needs external account evidence, manual acceptance, or a product
@@ -19,7 +19,7 @@ corresponding `.nous-feedback.jsonl` event is recorded.
 | US-006 | Sentry environment variables are pending. Core Auth0/DB/cron/blob vars are configured. | `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` stored in Vercel after Sentry exists. |
 | US-010 | Real-device PWA install checks. Lighthouse PWA passes locally, but Android and iOS install behavior needs manual evidence. | Android install prompt evidence and iOS Add-to-Home-Screen evidence on real devices. |
 | US-011 | Auth0 session-to-tenant DB request E2E. Local helper/RLS tests pass, but the live passwordless session path is not proven. | E2E login followed by a tenant-scoped DB-backed request proving org isolation. |
-| US-013 | Neon PR migration dry-run. GitHub checks and branch protection are verified, but CI currently verifies against local Postgres rather than a per-PR Neon branch. | CI or manual PR run using a Neon preview branch for schema push/verify. |
+| US-013 | Neon PR migration dry-run. GitHub checks, branch protection, and the blocking axe-core browser gate are verified, but CI currently verifies against local Postgres rather than a per-PR Neon branch. | CI or manual PR run using a Neon preview branch for schema push/verify. |
 | US-015 | Auth0 magic-link E2E. Redirect works, but magic-link email delivery, callback session establishment, expiry handling, and treasurer-email evidence are pending. | Full passwordless email login run with callback/session evidence and expected error-path checks. |
 
 ## Resolved Since Previous Closure
@@ -45,7 +45,20 @@ Sprint 0 is declared fully closed:
 Sprint 1 has no additional external blocker list of its own. It is closed with
 the Sprint 0 external deferrals still active. The Sprint 1 implementation and UI
 closure gates are recorded in `.nous-feedback.jsonl` for US-016, US-017,
-US-025, US-026, US-027, US-028, US-029, US-030, US-031, and US-032.
+US-025, US-026, US-027, US-028, US-029, US-030, US-031, and US-032. The
+2026-07-18 audit added complete per-AC lifecycle evidence and corrected the
+read-only group rules, contribution upload/confirmation, reversal-dialog, and
+base-fund duplicate/config invariants before re-verifying the workspace.
+
+## Repository Gate Discrepancy
+
+This is not an external account blocker, but it prevents claiming the literal
+`DEFINITION_OF_DONE.md` schema command passed. The CI-authoritative fresh DB path
+(`apply-local-schema.mjs` then `verify-schema.mjs`) passes. `drizzle-kit push`
+alone omits migration-only RLS/views/constraints, while running it after the
+committed migrations proposes destructive drift and fails on the composite
+payment-allocation FK dependency. Reconcile the documented Drizzle command with
+the migration-authoritative CI path before treating both as interchangeable.
 
 ## Sprint 2 Closure Note
 

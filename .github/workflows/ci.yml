@@ -53,6 +53,8 @@ jobs:
         run: pnpm type-check
       - name: Lint
         run: pnpm lint
+      - name: Sprint 0-1 lifecycle and acceptance evidence
+        run: pnpm audit:sprints0-1
       - name: Unit tests
         run: pnpm test
       - name: Blob consumer and SDK contracts
@@ -64,7 +66,7 @@ jobs:
         run: pnpm build
       - name: Install Playwright browsers
         run: pnpm --filter mi-banquito-web exec playwright install --with-deps chromium
-      - name: Playwright smoke tests
+      - name: Playwright smoke and axe accessibility tests
         run: |
           pnpm --filter mi-banquito-web test:e2e --project=chromium-desktop
           pnpm --filter mi-banquito-web test:e2e:movements --project=chromium-desktop

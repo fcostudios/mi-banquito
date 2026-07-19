@@ -39,6 +39,21 @@ describe("ScrRecordContributionPage", () => {
     expect(container.querySelector('select[name="paymentSource"]')).toHaveValue("cash_in_meeting");
     expect(screen.getByRole("combobox", { name: "¿En qué cuenta entró?" })).toHaveValue("44444444-4444-4444-8444-444444444444");
     expect(screen.getByRole("option", { name: /Cuenta personal.*pendiente de regularizar/i })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Buscar socia por nombre" })).toBeInTheDocument();
+    expect(container.querySelector('input[name="slipPhoto"]')).toHaveAttribute("accept", "image/jpeg,image/png,image/webp");
+  });
+
+  it("shows the specified inline confirmation after a successful aporte", async () => {
+    render(await ScrRecordContributionPage({
+      searchParams: Promise.resolve({
+        saved: "1",
+        memberId: "22222222-2222-4222-8222-222222222222",
+        amount: "10.00",
+        datedOn: "2026-07-01",
+      }),
+    }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Aporte de Ana registrado — USD 10.00, 2026-07-01");
   });
 
   it("renders one-tap BR-26 extra-money decisions during confirmation", async () => {

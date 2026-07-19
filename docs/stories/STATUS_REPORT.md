@@ -1,7 +1,7 @@
 # Sprint 0 Status Report
 
 Generated: 2026-06-29
-Closure updated: 2026-06-30
+Closure updated: 2026-07-18
 
 ## Summary
 
@@ -21,11 +21,48 @@ of the deferred account/manual-evidence items is explicitly pulled back into an
 active sprint. The unresolved account/manual items remain tracked in
 `DEFERRED_EXTERNAL_BLOCKERS.md` and `.nous-feedback.jsonl`.
 
-Sprint 1 is closed as **implemented and verified**, with the same Sprint 0
+Sprint 1 is closed as **implemented and adversarially re-verified**, with the same Sprint 0
 external deferrals still inherited for live Auth0/passwordless, Sentry, Better
-Stack, device-install, and Neon-preview evidence. Sprint 1-specific stories have
-`done` events in `.nous-feedback.jsonl`; follow-on sprint work starts at Sprint 2
-in `SPRINT_PLAN.md`.
+Stack, device-install, and Neon-preview evidence. On 2026-07-18 the audit repaired
+missing lifecycle/per-AC evidence and fixed real AC gaps in group-rule read-only
+mode, contribution capture/confirmation, append-only reversals, and annual
+base-fund quota enforcement. The current `apply-local-schema` + `verify-schema`
+CI gate passes; the stale literal `drizzle-kit push` sequence in
+`DEFINITION_OF_DONE.md` remains inconsistent with migration-only substrate and
+is recorded as a repository gate discrepancy rather than a passing check.
+
+## Sprint 0-1 Re-verification — 2026-07-18
+
+- Production deployment `dpl_E4CbDDrtMbkwjLBvLSceC2jc2PrP` is READY and serves
+  `https://mi-banquito.vercel.app`; `/api/health` returns HTTP 200 with
+  `{"status":"ok"}`, the manifest/icons resolve, and `/auth/login` redirects to
+  the configured Auth0 organization/callback.
+- GitHub `main` protection requires strict `verify` and `design-system` checks.
+  Recent CI/design-system and Vercel preview checks are green.
+- `pnpm audit:sprints0-1` now enforces `started`, `build_pass`, and a passing
+  `ac_verify` event for every AC on every story carrying a `done` event.
+- US-013 AC-5 is now a blocking axe-core browser scan; the former
+  `continue-on-error` placeholder was removed.
+- US-028 now renders `/grupo` read-only first and enters edit mode only through
+  `Editar reglas`.
+- US-029 now has partial-name member search, real constrained image capture
+  (5 MB input cap, 1024 px long edge), idempotent persistence, and the specified
+  inline success confirmation.
+- US-030 now exposes a destructive confirmation dialog from contribution rows,
+  requires a reason, appends the reversal, suppresses duplicate affordances,
+  and refreshes compliance/aging read models.
+- US-032 now requires the fiscal-year quota configuration, rejects duplicate
+  member/year payments instead of overwriting them, and supports constrained
+  optional receipt capture.
+- Verification passed: type-check, lint, full workspace tests against Postgres
+  (59 DB, 366 domain, 272 web, 5 UI, 2 contracts), webpack production build,
+  Playwright 3/3 including axe, and a fresh SQL substrate verification (52
+  tables, 47 forced-RLS/policy tables, 42 unique constraints).
+- Known gate discrepancy: `drizzle-kit push` alone does not install migration-only
+  RLS/views/constraints; running it after committed migrations proposes destructive
+  drift and hits a dependent composite FK. CI correctly uses
+  `apply-local-schema.mjs` + `verify-schema.mjs`; the documentation/tooling paths
+  still need reconciliation.
 
 Sprint 2 is closed as **implemented and locally verified**, with inherited
 Sprint 0 external deferrals still active for live Auth0/passwordless and
@@ -69,7 +106,7 @@ and a Sprint 3 closure gate. Local verification passed on 2026-07-03:
 | Story | Status | Evidence | Remaining Work |
 |---|---|---|---|
 | US-001 | Local Verified | Turborepo, package scripts, lockfile, type-check/lint/test/build all pass. | Official story can be marked done after team accepts local evidence. |
-| US-002 | Verified / Custom Domain Decision Pending | Vercel project `prj_QMN7SAslw9mlL8C5JqLXOBrQI8hJ` exists; production deployment `dpl_ETstPbBc5aSNWLoMaV2NwPSdxuAG` is READY; production aliases include `mi-banquito.vercel.app`, `mi-banquito-francisco-lomas-projects.vercel.app`, and `mi-banquito-git-main-francisco-lomas-projects.vercel.app`; production `/api/health` returns `{"status":"ok"}`; `/auth/login` redirects to Auth0 with the stable production callback. | Confirm whether the Vercel domain satisfies the story or a separate custom domain is required. |
+| US-002 | Verified / Custom Domain Decision Pending | Vercel project `prj_QMN7SAslw9mlL8C5JqLXOBrQI8hJ` exists; production deployment `dpl_E4CbDDrtMbkwjLBvLSceC2jc2PrP` is READY; production aliases include `mi-banquito.vercel.app`, `mi-banquito-francisco-lomas-projects.vercel.app`, and the git-main alias; production `/api/health` returns `{"status":"ok"}`; `/auth/login` redirects to Auth0 with the stable production callback. | Confirm whether the Vercel domain satisfies the story or a separate custom domain is required. |
 | US-003 | Verified / Auto Preview Strategy Pending | Neon project `cool-shape-96550274` exists; production branch `br-bold-cake-aiq95mz3` and manual preview branch `br-summer-bird-ai0g8tui` both have read-write computes. Fresh local Docker DB schema push/apply/verify passes. | Confirm automatic per-PR Neon branch lifecycle and 7-day cleanup strategy. |
 | US-004 | Partial / Auth0 Redirect Verified | Auth0 app config documented; production `GET /auth/login` redirects to the real Auth0 tenant with organization `org_Chul6oWgE2ZzCNvE` and callback `https://mi-banquito-francisco-lomas-projects.vercel.app/auth/callback`; DB UUID claim mapping tested. | Passwordless connection, account-side Action claim configuration, and full callback/session evidence remain. |
 | US-005 | Partial / Blob Verified | Observability/blob runbook exists; `/api/health` is verified; Vercel Blob store `mi-banquito-artifacts` (`store_io0PnZdqgZSFmHEy`) is active, private, linked to the project, and configured for Production, Preview, and Development. | Sentry project/DSN, Better Stack monitor, and env confirmation. |
@@ -79,8 +116,8 @@ and a Sprint 3 closure gate. Local verification passed on 2026-07-03:
 | US-009 | Local Verified With Deviation | `packages/ui` token projection is tested against canonical `packages/design-system/tokens.json`; lint passes. | Original duplicate `tokens.v1.json`/strings/icon allow-list paths are accepted as a deviation, not implemented literally. |
 | US-010 | Local Verified / Manual Install Pending | App Router manifest, 192/512/apple icons, token-sourced theme color, Serwist `sw.js`, Playwright icon/service-worker checks, mobile shell test, and Lighthouse 11 PWA score `1.00` pass. | Real-device Android prompt and iOS Add-to-Home-Screen confirmation remain manual acceptance evidence. |
 | US-011 | Local Verified / Auth0 E2E Pending | Namespaced Auth0 tenant/role claim helper tested; unauthenticated tenant query path redirects before DB query; `withTenantTransaction` sets `app.current_org_id`; cross-tenant RLS behavior test passes under a non-superuser role. | Full Auth0 session-to-DB-request E2E remains pending with passwordless login. |
-| US-012 | Production Config Verified / Cron Secret Check Pending | Root `vercel.json` schedules `/api/cron/accrue-interest`, `/api/cron/award-treasurer-compensation`, and `/api/cron/drift-check`; deployed production Vercel config includes all three schedules and cron lambdas; unauthenticated production cron request returns `401`; route-handler unit tests prove the bearer path accepts `CRON_SECRET`. | Production authenticated cron invocation still needs the actual production `CRON_SECRET`; `vercel env pull` exposes the key name here but not its value. |
-| US-013 | GitHub Gate Verified / Neon PR Dry-Run Pending | GitHub remote is configured; `main` is protected with strict required checks `verify` and `design-system`, admin enforcement, linear history, and conversation resolution; latest `main` runs for `ci` and `design-system` passed. | Real Neon preview migration dry-run remains pending because CI currently verifies against local Postgres, not a per-PR Neon branch. |
+| US-012 | Production Verified | Root `vercel.json` schedules the production cron routes; deployed config includes them; unauthenticated requests return `401`; on 2026-07-02 an authenticated accrue-interest invocation returned HTTP 200 with a successful summary. | None for the Sprint 0 cron acceptance item. |
+| US-013 | GitHub/Axe Gate Verified / Neon PR Dry-Run Pending | `main` is protected with strict required checks `verify` and `design-system`, admin enforcement, linear history, and conversation resolution. Type-check/lint/test/frozen-lockfile gates run, and axe-core now scans key authenticated screens as a blocking Playwright check. | Real Neon preview migration dry-run remains pending because CI currently verifies against local Postgres, not a per-PR Neon branch. |
 | US-014 | Local Verified | BR-01 declining-balance rule has a golden fixture at `packages/domain/rules/__fixtures__/BR-01__1000_4pct_10mo_with_admin_fee.json`; property-style invariants run in `pnpm test`. | Deliberate mutation check remains a review exercise, not a committed failing test. |
 | US-015 | Partial / Auth0 Redirect Verified | Auth0 SDK route mounts locally and on deployed preview; `/auth/login` returns a real Auth0 authorize redirect. | Real magic-link passwordless email flow, callback session establishment, expiry handling, and treasurer-email E2E verification remain. |
 
@@ -113,14 +150,15 @@ These are the remaining items needed before every Sprint 0 story can honestly be
 | US-009 | Accept documented token-source deviation or implement literal story file paths for locked tokens/strings/icon allow-list. |
 | US-010 | Verify Android install prompt and iOS Add-to-Home-Screen behavior on real devices; offline behavior remains richer than the Sprint 0 shell check. |
 | US-011 | Complete real Auth0 session-to-tenant DB request E2E after passwordless login is live. |
-| US-012 | Verify authenticated production cron invocation with the actual production `CRON_SECRET`, or accept route/unit/deployment evidence for Sprint 0. |
+| US-012 | Resolved 2026-07-02: authenticated production cron invocation returned HTTP 200. |
 | US-013 | Add/confirm PR Neon migration dry-run target if the story requires Neon rather than local Postgres CI verification. |
 | US-014 | Review/accept the BR-01 fixture and property-style harness as the Sprint 0 business-rule test gate. |
 | US-015 | Complete real Auth0 magic-link/passwordless email E2E through callback/session, including expiry/error handling and treasurer email evidence. |
 
 ## Final Local Verification
 
-Passed on 2026-06-29:
+Original gate passed on 2026-06-29. The 2026-07-18 re-verification passed the
+commands below, with the `drizzle-kit push` discrepancy documented above:
 
 - `rtk pnpm type-check`
 - `rtk pnpm lint`
@@ -130,6 +168,9 @@ Passed on 2026-06-29:
 - `rtk pnpm --filter mi-banquito-web test:e2e --project=chromium-desktop`
 - `rtk pnpm dlx lighthouse@11.7.1 http://localhost:3000 --only-categories=pwa --chrome-flags='--headless=new --no-sandbox' --output=json --output-path=/tmp/mi-banquito-lighthouse-pwa-closure.json --quiet`
 - `rtk pnpm audit:sprint0`
+- `rtk pnpm audit:sprints0-1`
+- `rtk pnpm --filter mi-banquito-web exec playwright test --config playwright.movements.config.ts --project=chromium-desktop` (3 passed, including axe)
+- fresh DB `node packages/db/scripts/apply-local-schema.mjs && node packages/db/scripts/verify-schema.mjs`
 
 Known non-fatal warning: the Auth0 SDK emits a DPoP dynamic dependency webpack warning.
 

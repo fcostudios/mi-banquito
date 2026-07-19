@@ -24,6 +24,7 @@ export default defineConfig({
     env: {
       E2E_AUTH_BYPASS: "1",
       AUTH0_ORGANIZATION_DB_ORG_ID: orgId,
+      IMPERSONATION_COOKIE_SECRET: "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
     },
   },
   projects: [

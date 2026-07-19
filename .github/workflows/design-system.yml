@@ -16,11 +16,5 @@ jobs:
         run: node scripts/check-hardcoded-string.mjs .
       - name: Lucide allow-list
         run: node scripts/check-lucide-allowlist.mjs .
-      # IMP-248 / I04 — a11y is NOT ENFORCED yet: the runner exits non-zero
-      # on purpose (no false green). `continue-on-error` keeps it VISIBLE
-      # in CI (a red-but-non-blocking step) without failing the whole
-      # design-system gate. Drop `continue-on-error` once a real axe run
-      # is wired so it becomes a hard gate.
-      - name: "a11y / axe (NOT ENFORCED — wire axe-core)"
-        continue-on-error: true
+      - name: a11y / axe wiring
         run: node scripts/check-a11y.mjs .

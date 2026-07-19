@@ -45,6 +45,10 @@ const ADMIN_AUDIT_CAPABILITY_MIGRATION_URL = new URL(
   "../src/migrations/V20260713020100__operator_audit_capability_role.sql",
   import.meta.url
 );
+const BASE_FUND_QUOTA_SLIP_KIND_MIGRATION_URL = new URL(
+  "../src/migrations/V20260718133600__base_fund_quota_slip_kind.sql",
+  import.meta.url
+);
 const SPRINT_1_ADDITIVE_TABLES = new Set([
   "base_fund_quota_config",
   "base_fund_quota_payment",
@@ -209,6 +213,17 @@ async function forceRls(pool) {
   );
 }
 
+async function applyBaseFundQuotaSlipKind(pool) {
+  const result = await pool.query(
+    "SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'slip_photo_attached_to_kind_enum') AS exists"
+  );
+  if (!result.rows[0]?.exists) {
+    return;
+  }
+
+  await pool.query(readFileSync(BASE_FUND_QUOTA_SLIP_KIND_MIGRATION_URL, "utf8"));
+}
+
 async function installLocalSubstrate(pool) {
   await installRlsPolicies(pool);
   await forceRls(pool);
@@ -234,6 +249,13 @@ export async function main() {
 
   const existingHealth = await currentSchemaHealth(databaseUrl);
   const pool = new pg.Pool({ connectionString: databaseUrl });
+  try {
+    await applyBaseFundQuotaSlipKind(pool);
+  } catch (err) {
+    console.error(`✗ local additive migration apply failed: ${err.message}`);
+    await pool.end();
+    return 1;
+  }
   if (existingHealth?.ok) {
     try {
       await installRlsPolicies(pool);
@@ -328,6 +350,7 @@ export async function main() {
   const sql = readMigrationSql();
   try {
     await pool.query(sql);
+    await applyBaseFundQuotaSlipKind(pool);
     await installUpdatedAtTriggers(pool);
     console.log("local SQL migration applied");
     return 0;

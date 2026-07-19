@@ -1,4 +1,4 @@
-import { createAuditService, narratedAuditActionKinds } from "@mi-banquito/domain";
+import { createAuditService, createLedgerService, narratedAuditActionKinds, reversalSentence } from "@mi-banquito/domain";
 import {
   ButtonPrimary,
   FormField,
@@ -8,6 +8,7 @@ import {
 import { requireTreasurer } from "@/lib/auth/require-session";
 import { ecDateTime } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
+import { ReversalDialog } from "./reversal-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -55,13 +56,17 @@ export default async function ScrHistoryPage({
   const saved = searchValue(query.saved);
   const from = searchValue(query.from);
   const to = searchValue(query.to);
-  const entries = await createAuditService().listNarratedEntries({
-    orgId: session.orgId,
-    memberId,
-    actionKind,
-    from,
-    to,
-  });
+  const [entries, contributions] = await Promise.all([
+    createAuditService().listNarratedEntries({
+      orgId: session.orgId,
+      memberId,
+      actionKind,
+      from,
+      to,
+    }),
+    createLedgerService().listContributions(session.orgId),
+  ]);
+  const reversedIds = new Set(contributions.flatMap((row) => row.reversesId ? [row.reversesId] : []));
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6" data-screen="SCR-history">
@@ -112,6 +117,28 @@ export default async function ScrHistoryPage({
           <ButtonPrimary type="submit" labelKey={copy.applyFilters} />
         </div>
       </form>
+
+      <section className="grid gap-3" aria-labelledby="contribution-history-title">
+        <h2 className="text-xl font-semibold text-text-primary" id="contribution-history-title">{copy.contributionsTitle}</h2>
+        {contributions.filter((row) => !row.reversesId).map((row) => (
+          <article className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-border bg-surface p-4" key={row.id}>
+            <p>{row.memberName} — {row.currencyCode} {Number(row.amount).toFixed(2)}, {row.datedOn}</p>
+            {reversedIds.has(row.id) ? <span className="text-sm text-text-secondary">{copy.alreadyReversed}</span> : (
+              <ReversalDialog
+                contributionId={row.id}
+                copy={{
+                  open: copy.reverseOpen,
+                  title: copy.reverseTitle,
+                  reason: copy.reverseReason,
+                  cancel: copy.reverseCancel,
+                  confirm: copy.reverseConfirm,
+                }}
+                sentence={reversalSentence({ memberName: row.memberName, amount: row.amount, datedOn: row.datedOn })}
+              />
+            )}
+          </article>
+        ))}
+      </section>
 
       <section className="grid gap-3">
         {entries.length === 0 ? (

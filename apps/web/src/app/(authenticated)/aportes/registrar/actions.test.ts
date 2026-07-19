@@ -85,6 +85,7 @@ describe("recordContributionAction", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/atrasos");
     expect(revalidatePath).toHaveBeenCalledWith("/historial");
     expect(revalidatePath).toHaveBeenCalledWith("/liquidez");
+    expect(redirect.mock.calls.at(-1)?.[0]).toContain("memberId=22222222-2222-4222-8222-222222222222");
   });
 
   it("preserves a safe domain error code when the selected account is unavailable", async () => {

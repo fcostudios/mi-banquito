@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { loadEnvFile } from "node:process";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import axe from "axe-core";
 import { Pool } from "pg";
 
 const ACTOR_ID = randomUUID();
@@ -9,6 +10,22 @@ const ACCOUNT_REQUEST_IDS = [randomUUID(), randomUUID()] as const;
 
 let pool: Pool;
 let orgId: string;
+
+async function expectNoAxeViolations(page: Page) {
+  const tags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+  await page.addScriptTag({ content: axe.source });
+  const results = await page.evaluate(async (runOnlyTags) => {
+    const axeApi = (window as unknown as Window & { axe: typeof axe }).axe;
+    return axeApi.run(document, { runOnly: { type: "tag", values: runOnlyTags } });
+  }, tags);
+  const summary = results.violations.map((violation) => ({
+    id: violation.id,
+    impact: violation.impact,
+    targets: violation.nodes.flatMap((node) => node.target),
+  }));
+
+  expect(summary, "axe-core found WCAG A/AA violations").toEqual([]);
+}
 
 function relativeLuminance(red: number, green: number, blue: number): number {
   const channels = [red, green, blue].map((channel) => {
@@ -137,4 +154,30 @@ test("movement form is readable, accessible, and stable at the configured viewpo
   for (const color of layout.colors) {
     expect(contrastRatio(color.foreground, color.background), color.id).toBeGreaterThanOrEqual(4.5);
   }
+
+  await expectNoAxeViolations(page);
+});
+
+test("accounts screen has no axe WCAG A/AA violations", async ({ page }) => {
+  await page.goto("/cuentas");
+  await expect(page.getByRole("heading", { level: 1, name: "Cuentas" })).toBeVisible();
+  await expect(page.getByText("Banco E2E")).toBeVisible();
+
+  await expectNoAxeViolations(page);
+});
+
+test("group rules are read-only until the treasurer chooses Editar reglas", async ({ page }) => {
+  await page.goto("/grupo");
+
+  const editRules = page.getByRole("link", { name: "Editar reglas" });
+  await expect(editRules).toBeVisible();
+  await expect(page.locator('fieldset[name="group-rules"]')).toHaveAttribute("disabled", "");
+  await expect(page.locator('input[name="contributionAmount"]')).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Guardar" })).toHaveCount(0);
+
+  await editRules.click();
+  await expect(page).toHaveURL(/\/grupo\?editar=1$/);
+  await expect(page.locator('fieldset[name="group-rules"]')).not.toHaveAttribute("disabled", "");
+  await expect(page.locator('input[name="contributionAmount"]')).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Guardar" })).toBeVisible();
 });

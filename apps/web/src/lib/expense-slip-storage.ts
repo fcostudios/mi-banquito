@@ -8,9 +8,9 @@ const MAX_IMAGE_DIMENSION = 10_000;
 const MAX_INPUT_PIXELS = 40_000_000;
 
 const SUPPORTED_FORMATS = {
-  jpeg: { mimeType: "image/jpeg", extension: "jpg" },
-  png: { mimeType: "image/png", extension: "png" },
-  webp: { mimeType: "image/webp", extension: "webp" },
+  jpeg: { format: "jpeg", mimeType: "image/jpeg", extension: "jpg" },
+  png: { format: "png", mimeType: "image/png", extension: "png" },
+  webp: { format: "webp", mimeType: "image/webp", extension: "webp" },
 } as const;
 
 type SupportedImage = (typeof SUPPORTED_FORMATS)[keyof typeof SUPPORTED_FORMATS];
@@ -73,4 +73,27 @@ export async function uploadExpenseSlip(input: { orgId: string; clientRequestId:
 
 export async function deleteExpenseSlip(uri: string): Promise<void> {
   await deletePrivateBlob(uri);
+}
+
+export async function uploadContributionSlip(input: { orgId: string; clientRequestId: string; file: File }) {
+  const source = new Uint8Array(await input.file.arrayBuffer());
+  if (source.byteLength === 0 || source.byteLength > MAX_SLIP_BYTES) {
+    throw new Error("movement_slip_invalid");
+  }
+  const image = await decodeImage(source, input.file.type);
+  const bytes = await sharp(source, {
+    failOn: "error",
+    limitInputPixels: MAX_INPUT_PIXELS,
+    sequentialRead: true,
+  }).rotate().resize({
+    width: 1024,
+    height: 1024,
+    fit: "inside",
+    withoutEnlargement: true,
+  }).toFormat(image.format).toBuffer();
+  if (bytes.byteLength > MAX_SLIP_BYTES) throw new Error("movement_slip_invalid");
+  const contentHash = createHash("sha256").update(bytes).digest("hex");
+  const pathname = `contribution-slip-candidates/${input.orgId}/${input.clientRequestId}/${randomUUID()}-${contentHash}.${image.extension}`;
+  const blob = await uploadPrivateBlob(pathname, new Blob([new Uint8Array(bytes)], { type: image.mimeType }), image.mimeType);
+  return { uri: blob.url, mimeType: image.mimeType, byteSize: bytes.byteLength, contentHash } as const;
 }

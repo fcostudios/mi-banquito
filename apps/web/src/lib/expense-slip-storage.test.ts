@@ -1,8 +1,9 @@
 import { Buffer } from "node:buffer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { put } from "@vercel/blob";
+import sharp from "sharp";
 
-import { uploadExpenseSlip } from "./expense-slip-storage";
+import { uploadContributionSlip, uploadExpenseSlip } from "./expense-slip-storage";
 
 vi.mock("@vercel/blob", () => ({
   put: vi.fn(async (pathname: string) => ({ url: `https://private.blob.invalid/${pathname}` })),
@@ -125,5 +126,24 @@ describe("expense slip structural image validation", () => {
   it("rejects a client MIME that does not match the decoded image format", async () => {
     await expect(upload(realJpeg(), "mismatch.webp", "image/webp")).rejects.toThrow("movement_slip_invalid");
     expect(put).not.toHaveBeenCalled();
+  });
+});
+
+describe("contribution slip constraints", () => {
+  it("downscales the long edge to 1024 pixels before upload", async () => {
+    const source = await sharp({
+      create: { width: 2048, height: 1200, channels: 3, background: "white" },
+    }).jpeg().toBuffer();
+
+    await uploadContributionSlip({
+      orgId: ORG_ID,
+      clientRequestId: REQUEST_ID,
+      file: new File([new Uint8Array(source)], "large.jpg", { type: "image/jpeg" }),
+    });
+
+    const uploaded = vi.mocked(put).mock.calls.at(-1)?.[1];
+    expect(uploaded).toBeInstanceOf(Blob);
+    const metadata = await sharp(Buffer.from(await (uploaded as Blob).arrayBuffer())).metadata();
+    expect(Math.max(metadata.width ?? 0, metadata.height ?? 0)).toBe(1024);
   });
 });
