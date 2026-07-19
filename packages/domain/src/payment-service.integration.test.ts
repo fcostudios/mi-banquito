@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { loadEnvFile } from "node:process";
 import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -13,6 +14,14 @@ import {
   paymentAllocation,
   paymentReceipt,
 } from "@mi-banquito/db/schema";
+
+if (!process.env.DATABASE_URL) {
+  try {
+    loadEnvFile("../../apps/web/.env.local");
+  } catch {
+    // beforeAll reports the actionable configuration error.
+  }
+}
 
 const ORG_A = randomUUID();
 const ORG_B = randomUUID();
@@ -49,6 +58,7 @@ describe("payment service with PostgreSQL", () => {
   });
 
   afterAll(async () => {
+    if (!db) return;
     for (const orgId of [ORG_A, ORG_B]) {
       await db.transaction(async (tx) => {
         await tx.execute(sql.raw("SET LOCAL session_replication_role = replica"));

@@ -36,11 +36,11 @@
 
 | Story | Name | Sprint | Status | File |
 |-------|------|--------|--------|------|
-| **US-091** | Treasurer sets up and manages the group's accounts | Sprint 8 | ⬜ backlog | [r1_chg_us_091.md](sprint-8/r1_chg_us_091.md) |
-| **US-092** | Treasurer records a categorized fund movement (fee / supplies / shared expense) | Sprint 8 | ⬜ backlog | [r1_chg_us_092.md](sprint-8/r1_chg_us_092.md) |
-| **US-093** | Treasurer records an inter-account transfer (bookkeeping) | Sprint 8 | ⬜ backlog | [r1_chg_us_093.md](sprint-8/r1_chg_us_093.md) |
-| **US-094** | Treasurer regularizes a deposit that landed in a non-group account *(crown jewel | Sprint 8 | ⬜ backlog | [r1_chg_us_094.md](sprint-8/r1_chg_us_094.md) |
-| **US-095** | Period close blocks while unregularized movements exist (reconciliation panel) | Sprint 8 | ⬜ backlog | [r1_chg_us_095.md](sprint-8/r1_chg_us_095.md) |
+| **US-091** | Treasurer sets up and manages the group's accounts | Sprint 8 | ✅ dev_done | [r1_chg_us_091.md](sprint-8/r1_chg_us_091.md) |
+| **US-092** | Treasurer records a categorized fund movement (fee / supplies / shared expense) | Sprint 8 | ✅ dev_done | [r1_chg_us_092.md](sprint-8/r1_chg_us_092.md) |
+| **US-093** | Treasurer records an inter-account transfer (bookkeeping) | Sprint 8 | ✅ dev_done | [r1_chg_us_093.md](sprint-8/r1_chg_us_093.md) |
+| **US-094** | Treasurer regularizes a deposit that landed in a non-group account *(crown jewel | Sprint 8 | ✅ dev_done | [r1_chg_us_094.md](sprint-8/r1_chg_us_094.md) |
+| **US-095** | Period close blocks while unregularized movements exist (reconciliation panel) | Sprint 8 | ✅ dev_done | [r1_chg_us_095.md](sprint-8/r1_chg_us_095.md) |
 | **US-096** | Treasurer starts an extraordinary / solidarity collection | Sprint 9 | ⬜ backlog | [r2_chg_us_096.md](sprint-9/r2_chg_us_096.md) |
 | **US-097** | Treasurer records a solidarity payout and closes the collection | Sprint 9 | ⬜ backlog | [r2_chg_us_097.md](sprint-9/r2_chg_us_097.md) |
 | **US-098** | Treasurer records a treasurer-compensation payout gated by a recognized amount | Sprint 9 | ⬜ backlog | [r2_chg_us_098.md](sprint-9/r2_chg_us_098.md) |

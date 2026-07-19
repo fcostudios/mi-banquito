@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ScrHistoryPage from "./page";
 
@@ -36,6 +36,17 @@ vi.mock("@mi-banquito/domain", () => ({
       },
     ]),
   }),
+  createLedgerService: () => ({
+    listContributions: () => Promise.resolve([{
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      memberName: "Ana",
+      amount: "10.0000",
+      currencyCode: "USD",
+      datedOn: "2026-07-01",
+      reversesId: null,
+    }]),
+  }),
+  reversalSentence: () => "Vas a reversar el aporte de Ana por $10.00 registrado el 2026-07-01.",
 }));
 
 describe("ScrHistoryPage", () => {
@@ -55,5 +66,15 @@ describe("ScrHistoryPage", () => {
     expect(within(card!).getByText("Aplicado a")).toBeInTheDocument();
     expect(within(card!).getByText("2026-06")).toBeInTheDocument();
     expect(container).not.toHaveTextContent("loan.repayment.create");
+  });
+
+  it("requires a reason before enabling the destructive reversal confirmation", async () => {
+    render(await ScrHistoryPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("Vas a reversar el aporte de Ana por $10.00 registrado el 2026-07-01.")).toBeInTheDocument();
+    const confirm = screen.getByRole("button", { name: "Confirmar reversión", hidden: true });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Razón de la reversión"), { target: { value: "Duplicado" } });
+    expect(confirm).toBeEnabled();
   });
 });

@@ -15,6 +15,7 @@ import {
   paymentAllocation,
   paymentReceipt,
   repayment,
+  slipPhoto,
 } from "@mi-banquito/db/schema";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import {
@@ -28,6 +29,13 @@ import {
 export type RecordMemberPaymentInput = MemberPaymentForm & {
   orgId: string;
   actorId: string;
+  slipPhoto?: {
+    id: string;
+    uri: string;
+    mimeType: "image/jpeg" | "image/png" | "image/webp";
+    byteSize: number;
+    contentHash: string;
+  };
 };
 
 export type RecordMemberPaymentResult = {
@@ -707,6 +715,30 @@ export function createPaymentService(): PaymentService {
 
         const now = new Date();
         const receiptId = deterministicUuid(`payment_receipt:${input.orgId}:${input.memberId}:${input.clientRequestId}`);
+        const loanGroups = groupLoanAllocations(allocation.allocations);
+        const contributionGroups = groupContributionAllocations(allocation.allocations);
+        const plannedRepaymentIds = new Map([...loanGroups].map(([loanId]) => [loanId, randomUUID()]));
+        const plannedContributionIds = new Map([...contributionGroups].map(([cycleKey]) => [cycleKey, randomUUID()]));
+        if (input.slipPhoto) {
+          if (input.slipPhoto.id !== input.slipPhotoId || !/^[a-f0-9]{64}$/.test(input.slipPhoto.contentHash)) {
+            throw new Error("payment_slip_invalid");
+          }
+          const contributionId = plannedContributionIds.values().next().value;
+          const repaymentId = plannedRepaymentIds.values().next().value;
+          const attachedToId = contributionId ?? repaymentId;
+          if (!attachedToId) throw new Error("payment_slip_without_allocation");
+          await tx.insert(slipPhoto).values({
+            ...input.slipPhoto,
+            orgId: input.orgId,
+            attachedToKind: contributionId ? "contribution" : "repayment",
+            attachedToId,
+            uploadedAt: now,
+            uploadedBy: input.actorId,
+            uploadedByKind: ACTOR_KIND,
+            contributionId: null,
+            repaymentId: null,
+          });
+        }
         const childLinks: ChildLinks = {
           repayments: new Map(),
           contributions: new Map(),
@@ -739,8 +771,8 @@ export function createPaymentService(): PaymentService {
         }
 
         let childOrder = 1;
-        for (const [loanId, lines] of groupLoanAllocations(allocation.allocations)) {
-          const repaymentId = randomUUID();
+        for (const [loanId, lines] of loanGroups) {
+          const repaymentId = plannedRepaymentIds.get(loanId)!;
           const repaymentAmount = sumLines(lines);
           childLinks.repayments.set(loanId, repaymentId);
           await tx.insert(repayment).values({
@@ -792,8 +824,8 @@ export function createPaymentService(): PaymentService {
         }
 
         let extraSavingsCycleId: string | null = null;
-        for (const [cycleKey, lines] of groupContributionAllocations(allocation.allocations)) {
-          const contributionId = randomUUID();
+        for (const [cycleKey, lines] of contributionGroups) {
+          const contributionId = plannedContributionIds.get(cycleKey)!;
           const contributionAmount = sumLines(lines);
           const cycleId = cycleIdForContributionGroup({
             allocationLines: allocation.allocations,

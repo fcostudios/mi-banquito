@@ -1,9 +1,26 @@
 #!/usr/bin/env node
-// IMP-241/IMP-248 a11y/axe CI step (US-013). NOT WIRED YET — exits NON-ZERO
-// on purpose so it never reports a false green. Wire it to a real
-// axe-core / @axe-core/playwright run against the built app, then this
-// flips to exit 0 once it actually verifies pages.
-// TODO: run @axe-core against the built app in CI.
-console.error("[a11y] NOT ENFORCED — no a11y check is wired. " +
-  "Wire @axe-core/playwright against the built app in CI before relying on this gate.");
-process.exit(1);
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const root = resolve(process.argv[2] ?? ".");
+const files = {
+  package: readFileSync(resolve(root, "apps/web/package.json"), "utf8"),
+  spec: readFileSync(resolve(root, "apps/web/e2e/sprint8-movements.spec.ts"), "utf8"),
+  ci: readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8"),
+};
+
+const requirements = [
+  [files.package.includes('"axe-core"'), "axe-core dependency"],
+  [files.spec.includes('from "axe-core"'), "Playwright axe import"],
+  [files.spec.includes("axeApi.run("), "axe analysis call"],
+  [files.spec.includes("results.violations"), "axe violation assertion"],
+  [files.ci.includes("test:e2e:movements"), "blocking CI execution"],
+];
+
+const missing = requirements.filter(([present]) => !present).map(([, label]) => label);
+if (missing.length > 0) {
+  console.error(`[a11y] missing enforced axe wiring: ${missing.join(", ")}`);
+  process.exit(1);
+}
+
+console.log("[a11y] axe-core Playwright gate is wired and blocking in CI");

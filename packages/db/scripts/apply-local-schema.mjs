@@ -45,6 +45,10 @@ const ADMIN_AUDIT_CAPABILITY_MIGRATION_URL = new URL(
   "../src/migrations/V20260713020100__operator_audit_capability_role.sql",
   import.meta.url
 );
+const BASE_FUND_QUOTA_SLIP_KIND_MIGRATION_URL = new URL(
+  "../src/migrations/V20260718133600__base_fund_quota_slip_kind.sql",
+  import.meta.url
+);
 const SPRINT_1_ADDITIVE_TABLES = new Set([
   "base_fund_quota_config",
   "base_fund_quota_payment",
@@ -234,6 +238,13 @@ export async function main() {
 
   const existingHealth = await currentSchemaHealth(databaseUrl);
   const pool = new pg.Pool({ connectionString: databaseUrl });
+  try {
+    await pool.query(readFileSync(BASE_FUND_QUOTA_SLIP_KIND_MIGRATION_URL, "utf8"));
+  } catch (err) {
+    console.error(`✗ local additive migration apply failed: ${err.message}`);
+    await pool.end();
+    return 1;
+  }
   if (existingHealth?.ok) {
     try {
       await installRlsPolicies(pool);

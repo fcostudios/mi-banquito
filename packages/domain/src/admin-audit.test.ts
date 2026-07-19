@@ -20,8 +20,9 @@ const ACTOR_A = randomUUID();
 const ACTOR_B = randomUUID();
 const PLATFORM_ACTOR = randomUUID();
 const RLS_ROLE = `audit_rls_${randomUUID().replaceAll("-", "")}`;
-const TIE_OLDER_ID = "10000000-0000-4000-8000-000000000001";
-const TIE_NEWER_ID = "f0000000-0000-4000-8000-000000000001";
+const TIE_ID_SUFFIX = randomUUID().replaceAll("-", "").slice(0, 12);
+const TIE_OLDER_ID = `10000000-0000-4000-8000-${TIE_ID_SUFFIX}`;
+const TIE_NEWER_ID = `f0000000-0000-4000-8000-${TIE_ID_SUFFIX}`;
 
 let db: typeof import("@mi-banquito/db")["db"];
 let service: ReturnType<typeof import("./admin-audit")["createAdminAuditService"]>;
@@ -135,9 +136,12 @@ describe("US-022 cross-organization audit", () => {
       await tx.execute(sql`DELETE FROM audit_log_entry WHERE org_id IS NULL AND actor_id = ${PLATFORM_ACTOR}`);
       await tx.delete(organization).where(inArray(organization.id, [ORG_A, ORG_B]));
     });
-    await db.execute(sql.raw(`REVOKE SELECT ON audit_log_entry FROM ${RLS_ROLE}`));
-    await db.execute(sql.raw(`REVOKE USAGE ON SCHEMA public FROM ${RLS_ROLE}`));
-    await db.execute(sql.raw(`DROP ROLE IF EXISTS ${RLS_ROLE}`));
+    const role = await db.execute(sql`SELECT 1 FROM pg_roles WHERE rolname = ${RLS_ROLE}`);
+    if (role.rows.length > 0) {
+      await db.execute(sql.raw(`REVOKE SELECT ON audit_log_entry FROM ${RLS_ROLE}`));
+      await db.execute(sql.raw(`REVOKE USAGE ON SCHEMA public FROM ${RLS_ROLE}`));
+      await db.execute(sql.raw(`DROP ROLE ${RLS_ROLE}`));
+    }
   });
 
   it("keeps ordinary tenant reads isolated under FORCE RLS and withholds function execution", async () => {

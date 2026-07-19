@@ -11,4 +11,7 @@ export async function reverseContributionAction(formData: FormData) {
   const parsed = reverseContributionFormSchema.parse(formDataToObject(formData));
   await createLedgerService().reverseContribution(session.orgId, session.actorId, parsed);
   revalidatePath("/historial");
+  revalidatePath("/atrasos");
+  revalidatePath("/socias");
+  revalidatePath("/");
 }

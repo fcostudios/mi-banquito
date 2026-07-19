@@ -33,8 +33,15 @@ export default async function ScrRecordBaseFundQuotaPage() {
         <FormField labelKey={copy.quota.paidOn}>
           <InputText labelKey={copy.quota.paidOn} name="paidOn" type="date" defaultValue={todayISO()} required />
         </FormField>
-        <FormField labelKey={copy.contributions.slip}>
-          <InputText labelKey={copy.contributions.slip} name="slipPhotoId" />
+        <FormField controlId="quota-slip" helperTextKey={copy.contributions.slipHelp} labelKey={copy.contributions.slip}>
+          <input
+            accept="image/jpeg,image/png,image/webp"
+            capture="environment"
+            className="min-h-12 w-full rounded-md border border-border bg-surface px-4 py-2 text-text-primary file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-text-on-primary"
+            id="quota-slip"
+            name="slipPhoto"
+            type="file"
+          />
         </FormField>
         <div>
           <ButtonPrimary type="submit" labelKey={copy.quota.submit} />

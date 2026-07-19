@@ -1,9 +1,9 @@
 {
   "dirty": true,
   "dirty_paths": [
-    "Nous/System/nous_db_schema.py"
+    "Nous/Specs/fcostudios/mi-banquito/extracts/07_screens_catalog.json"
   ],
-  "git_sha": "93e83a74e93a",
+  "git_sha": "57d38d2b9b11",
   "project_id": "fcostudios__mi-banquito",
   "schema_version": 1
 }

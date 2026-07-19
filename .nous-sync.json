@@ -1,5 +1,5 @@
 {
-  "synced_at": "2026-07-10T05:54:43.083596+00:00",
+  "synced_at": "2026-07-18T19:48:42.355793+00:00",
   "project_id": "fcostudios__mi-banquito",
   "files": {
     "docs/stories/sprint-1/r1_admin_us_016.md": {
@@ -847,11 +847,11 @@
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/journey_player.html"
     },
     "docs/stories/SPRINT_PLAN.md": {
-      "hash": "6a3d852eb1a04d6b",
+      "hash": "e6c1b9131a4e84ab",
       "source": "generated"
     },
     "docs/stories/CHANGES.md": {
-      "hash": "0dabea77c18cb439",
+      "hash": "081e4125f5e55ce1",
       "source": "generated"
     },
     "docs/stories/ASSIGNMENTS.md": {
@@ -863,7 +863,7 @@
       "source": "generated"
     },
     ".nous-project.json": {
-      "hash": "e33775644925c60d",
+      "hash": "11b8bc3b350c0454",
       "source": "generated"
     },
     "docs/stories/INDEX.md": {

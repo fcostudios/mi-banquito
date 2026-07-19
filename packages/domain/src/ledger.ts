@@ -21,6 +21,7 @@ import {
   member,
   memberComplianceState,
   organization,
+  slipPhoto,
 } from "@mi-banquito/db/schema";
 import type {
   AddMemberForm,
@@ -447,7 +448,9 @@ export interface LedgerService {
   listContributions(orgId: string): Promise<Array<typeof contribution.$inferSelect & { memberName: string }>>;
   reverseContribution(orgId: string, actorId: string, input: ReverseContributionForm): Promise<void>;
   getBaseFundQuotaDefaults(orgId: string): Promise<{ fiscalYear: number; amount: string; members: MemberRow[] }>;
-  recordBaseFundQuotaPayment(orgId: string, actorId: string, input: BaseFundQuotaPaymentForm): Promise<typeof baseFundQuotaPayment.$inferSelect>;
+  recordBaseFundQuotaPayment(orgId: string, actorId: string, input: BaseFundQuotaPaymentForm & {
+    slipPhoto?: { id: string; uri: string; mimeType: "image/jpeg" | "image/png" | "image/webp"; byteSize: number; contentHash: string };
+  }): Promise<typeof baseFundQuotaPayment.$inferSelect>;
 }
 
 export type LedgerAuditTx = {
@@ -1062,16 +1065,38 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
     const fiscalYear = new Date().getUTCFullYear();
     const [config] = await withTenantTransaction(orgId, (tx) => tx.select().from(baseFundQuotaConfig)
       .where(and(eq(baseFundQuotaConfig.orgId, orgId), eq(baseFundQuotaConfig.fiscalYear, fiscalYear))));
+    if (!config) throw new Error("base_fund_quota_config_required");
     const members = await this.listMembers(orgId);
-    return { fiscalYear, amount: config?.perMemberAmount ?? "25.0000", members };
+    return { fiscalYear, amount: config.perMemberAmount, members };
   },
   async recordBaseFundQuotaPayment(orgId, actorId, input) {
     const now = new Date();
     return withWritableTenantTransaction(orgId, async (tx) => {
+      const [quotaConfig] = await tx.select({ id: baseFundQuotaConfig.id }).from(baseFundQuotaConfig)
+        .where(and(eq(baseFundQuotaConfig.orgId, orgId), eq(baseFundQuotaConfig.fiscalYear, input.fiscalYear)));
+      if (!quotaConfig) throw new Error("base_fund_quota_config_required");
       let auditEntry: AuditLogEntryInsert | undefined;
       const row = await writeWithAudit({
         write: async () => {
+          const paymentId = randomUUID();
+          if (input.slipPhoto) {
+            if (input.slipPhoto.id !== input.slipPhotoId || !/^[a-f0-9]{64}$/.test(input.slipPhoto.contentHash)) {
+              throw new Error("base_fund_quota_slip_invalid");
+            }
+            await tx.insert(slipPhoto).values({
+              ...input.slipPhoto,
+              orgId,
+              attachedToKind: "base_fund_quota_payment",
+              attachedToId: paymentId,
+              uploadedAt: now,
+              uploadedBy: actorId,
+              uploadedByKind: "member",
+              contributionId: null,
+              repaymentId: null,
+            });
+          }
           const [paid] = await tx.insert(baseFundQuotaPayment).values({
+            id: paymentId,
             orgId,
             memberId: input.memberId,
             fiscalYear: input.fiscalYear,
@@ -1083,16 +1108,6 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
             createdAt: now,
             createdBy: actorId,
             createdByKind: "member",
-          }).onConflictDoUpdate({
-            target: [baseFundQuotaPayment.orgId, baseFundQuotaPayment.memberId, baseFundQuotaPayment.fiscalYear],
-            set: {
-              amount: money4(input.amount),
-              paidOn: input.paidOn,
-              slipPhotoId: input.slipPhotoId || null,
-              createdAt: now,
-              createdBy: actorId,
-              createdByKind: "member",
-            },
           }).returning();
           auditEntry = {
             orgId,

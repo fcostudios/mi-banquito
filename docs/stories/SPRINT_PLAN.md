@@ -1,5 +1,5 @@
 <!-- nous-sprint-stamp
-generated_at: 2026-07-10T05:54:42Z
+generated_at: 2026-07-18T19:48:42Z
 current_sprint: sprint-12
 sprints_hash: a81073114fb755ff
 -->
@@ -125,7 +125,7 @@ See `docs/specs/09_architecture.md` for bounded context details.
 | 5 | full-stack | **US-070** ✅ | System enforces period-lock immutability via Postgres row trigger | ? ?SP | `See story file` | — | US-008 | — | — | [r1_substrate_us_070.md](sprint-3/r1_substrate_us_070.md) |
 | 6 | full-stack | **US-071** ✅ | System enforces audit-write-failure rollback via same-transaction pattern | ? ?SP | `See story file` | — | US-008 | →4 | — | [r1_substrate_us_071.md](sprint-3/r1_substrate_us_071.md) |
 | 7 | full-stack | **US-072** ✅ | System enforces cross-tenant safety via Postgres RLS plus auth session var | ? ?SP | `See story file` | — | US-008, US-011 | — | — | [r1_substrate_us_072.md](sprint-3/r1_substrate_us_072.md) |
-| 8 | full-stack | **US-073** 🔨 | System captures errors with PII redaction in Sentry | ? ?SP | `See story file` | — | US-005 | — | — | [r1_observability_us_073.md](sprint-3/r1_observability_us_073.md) |
+| 8 | full-stack | **US-073** ✅ | System captures errors with PII redaction in Sentry | ? ?SP | `See story file` | — | US-005 | — | — | [r1_observability_us_073.md](sprint-3/r1_observability_us_073.md) |
 | 9 | full-stack | **US-083** ✅ | Operator opens an adjustment period after a locked monthly close | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_083.md](sprint-3/r1_chg_us_083.md) |
 | 10 | full-stack | **US-057** ✅ | Treasurer searches Historial by member kind and date range | ? ?SP | `See story file` | — | US-056, US-063, US-067 | — | — | [r1_audit_us_057.md](sprint-3/r1_audit_us_057.md) |
 
@@ -146,11 +146,11 @@ See `docs/specs/09_architecture.md` for bounded context details.
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |
 |---|-------|-------|------|------|---------------|-----|------------|--------|----------|------|
 | 1 | full-stack | **US-040** ✅ | Treasurer views the A/R aging primary tab sorted by days-late descending | ? ?SP | `See story file` | — | US-008, US-029, US-036 | →5 | — | [r1_collections_us_040.md](sprint-4/r1_collections_us_040.md) |
-| 2 | full-stack | **US-050** 🔨 | System awards treasurer compensation per cron with idempotency | ? ?SP | `See story file` | — | US-012, US-017, US-047 | — | — | [r1_reporting_us_050.md](sprint-4/r1_reporting_us_050.md) |
+| 2 | full-stack | **US-050** ✅ | System awards treasurer compensation per cron with idempotency | ? ?SP | `See story file` | — | US-012, US-017, US-047 | — | — | [r1_reporting_us_050.md](sprint-4/r1_reporting_us_050.md) |
 | 3 | full-stack | **US-054** ✅ | Treasurer views Liquidez Proyectada single screen with sandbox | ? ?SP | `See story file` | — | US-008, US-064, US-062 | →2 | — | [r1_liquidity_us_054.md](sprint-4/r1_liquidity_us_054.md) |
 | 4 | full-stack | **US-076** ✅ | Treasurer declares loan disbursement source (bank vs cash) at origination | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_076.md](sprint-4/r1_chg_us_076.md) |
 | 5 | full-stack | **US-077** ✅ | PWA visibly shows "guardado, esperando señal" when a write is queued offline | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_077.md](sprint-4/r1_chg_us_077.md) |
-| 6 | full-stack | **US-085** 🔨 | Public statement-verifier endpoint accepts hash + returns "matches / does not match" | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_085.md](sprint-4/r1_chg_us_085.md) |
+| 6 | full-stack | **US-085** ✅ | Public statement-verifier endpoint accepts hash + returns "matches / does not match" | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_085.md](sprint-4/r1_chg_us_085.md) |
 | 7 | full-stack | **US-087** ✅ | Operator runs the design-partner onboarding ceremony with parity-check log | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_087.md](sprint-4/r1_chg_us_087.md) |
 | 8 | full-stack | **US-041** ✅ | Treasurer marks a promise on a late row with a date | ? ?SP | `See story file` | — | US-040, US-064 | →2 | — | [r1_collections_us_041.md](sprint-4/r1_collections_us_041.md) |
 | 9 | full-stack | **US-043** ✅ | System surfaces promise on the promised date as a reminder | ? ?SP | `See story file` | — | US-041 | — | — | [r1_alerts_us_043.md](sprint-4/r1_alerts_us_043.md) |
@@ -253,16 +253,16 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |
 |---|-------|-------|------|------|---------------|-----|------------|--------|----------|------|
-| 1 | full-stack | **US-019** ⬜ | Platform operator views per-org health snapshot on admin home | ? ?SP | `See story file` | — | US-008, US-011, US-017 | →1 | — | [r1_admin_us_019.md](sprint-8/r1_admin_us_019.md) |
-| 2 | full-stack | **US-020** ⬜ | Platform operator starts read-only impersonation with required reason | ? ?SP | `See story file` | — | US-016, US-025, US-004 | →5 | — | [r1_admin_us_020.md](sprint-8/r1_admin_us_020.md) |
-| 3 | full-stack | **US-091** ⬜ | Treasurer sets up and manages the group's accounts | ? ?SP | `See story file` | CHG-001 | — | →2 | — | [r1_chg_us_091.md](sprint-8/r1_chg_us_091.md) |
-| 4 | full-stack | **US-092** ⬜ | Treasurer records a categorized fund movement (fee / supplies / shared expense) | ? ?SP | `See story file` | CHG-001 | — | →1 | — | [r1_chg_us_092.md](sprint-8/r1_chg_us_092.md) |
-| 5 | full-stack | **US-093** ⬜ | Treasurer records an inter-account transfer (bookkeeping) | ? ?SP | `See story file` | CHG-001 | — | — | — | [r1_chg_us_093.md](sprint-8/r1_chg_us_093.md) |
-| 6 | full-stack | **US-094** ⬜ | Treasurer regularizes a deposit that landed in a non-group account *(crown jewel | ? ?SP | `See story file` | CHG-001 | — | — | — | [r1_chg_us_094.md](sprint-8/r1_chg_us_094.md) |
-| 7 | full-stack | **US-095** ⬜ | Period close blocks while unregularized movements exist (reconciliation panel) | ? ?SP | `See story file` | CHG-001 | — | — | — | [r1_chg_us_095.md](sprint-8/r1_chg_us_095.md) |
-| 8 | full-stack | **US-021** ⬜ | Platform operator exports tenant data as ZIP with CSVs + PDFs + manifest | ? ?SP | `See story file` | — | US-008, US-011, US-020 | →1 | — | [r1_admin_us_021.md](sprint-8/r1_admin_us_021.md) |
-| 9 | full-stack | **US-022** ⬜ | Platform operator views audit bitácora across orgs with dense filters | ? ?SP | `See story file` | — | US-008, US-021 | — | — | [r1_admin_us_022.md](sprint-8/r1_admin_us_022.md) |
-| 10 | full-stack | **US-023** ⬜ | Platform operator views substrate drift status + last-check timestamp | ? ?SP | `See story file` | — | US-012, US-020 | — | — | [r1_admin_us_023.md](sprint-8/r1_admin_us_023.md) |
+| 1 | full-stack | **US-019** ✅ | Platform operator views per-org health snapshot on admin home | ? ?SP | `See story file` | — | US-008, US-011, US-017 | →1 | — | [r1_admin_us_019.md](sprint-8/r1_admin_us_019.md) |
+| 2 | full-stack | **US-020** ✅ | Platform operator starts read-only impersonation with required reason | ? ?SP | `See story file` | — | US-016, US-025, US-004 | →5 | — | [r1_admin_us_020.md](sprint-8/r1_admin_us_020.md) |
+| 3 | full-stack | **US-091** ✅ | Treasurer sets up and manages the group's accounts | ? ?SP | `See story file` | CHG-001 | — | →2 | — | [r1_chg_us_091.md](sprint-8/r1_chg_us_091.md) |
+| 4 | full-stack | **US-092** ✅ | Treasurer records a categorized fund movement (fee / supplies / shared expense) | ? ?SP | `See story file` | CHG-001 | — | →1 | — | [r1_chg_us_092.md](sprint-8/r1_chg_us_092.md) |
+| 5 | full-stack | **US-093** ✅ | Treasurer records an inter-account transfer (bookkeeping) | ? ?SP | `See story file` | CHG-001 | — | — | — | [r1_chg_us_093.md](sprint-8/r1_chg_us_093.md) |
+| 6 | full-stack | **US-094** ✅ | Treasurer regularizes a deposit that landed in a non-group account *(crown jewel | ? ?SP | `See story file` | CHG-001 | — | — | — | [r1_chg_us_094.md](sprint-8/r1_chg_us_094.md) |
+| 7 | full-stack | **US-095** ✅ | Period close blocks while unregularized movements exist (reconciliation panel) | ? ?SP | `See story file` | CHG-001 | — | — | — | [r1_chg_us_095.md](sprint-8/r1_chg_us_095.md) |
+| 8 | full-stack | **US-021** ✅ | Platform operator exports tenant data as ZIP with CSVs + PDFs + manifest | ? ?SP | `See story file` | — | US-008, US-011, US-020 | →1 | — | [r1_admin_us_021.md](sprint-8/r1_admin_us_021.md) |
+| 9 | full-stack | **US-022** ✅ | Platform operator views audit bitácora across orgs with dense filters | ? ?SP | `See story file` | — | US-008, US-021 | — | — | [r1_admin_us_022.md](sprint-8/r1_admin_us_022.md) |
+| 10 | full-stack | **US-023** ✅ | Platform operator views substrate drift status + last-check timestamp | ? ?SP | `See story file` | — | US-012, US-020 | — | — | [r1_admin_us_023.md](sprint-8/r1_admin_us_023.md) |
 
 ### References
 

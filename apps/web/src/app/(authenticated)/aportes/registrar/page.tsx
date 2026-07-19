@@ -5,6 +5,7 @@ import { requireTreasurer } from "@/lib/auth/require-session";
 import { todayISO } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
 import { recordContributionAction } from "./actions";
+import { MemberSearchPicker } from "./member-search-picker";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function ScrRecordContributionPage({
     notes?: string;
     targetLoanId?: string;
     targetCycleId?: string;
+    saved?: string;
   }>;
 }) {
   const session = await requireTreasurer();
@@ -48,6 +50,7 @@ export default async function ScrRecordContributionPage({
   const showConfirmation = params?.confirm === "1";
   const clientRequestId = params?.clientRequestId || randomUUID();
   const defaultMemberId = params?.memberId ?? members[0]?.id;
+  const savedMember = params?.saved === "1" ? members.find((member) => member.id === params.memberId) : undefined;
   const defaultPaymentSource = params?.paymentSource ?? "cash_in_meeting";
   const hasGroupAccount = accounts.some((account) => account.isGroupFund);
   const defaultAccountId = params?.accountId ?? accounts.find((account) => account.isGroupFund)?.id ?? accounts[0]?.id;
@@ -62,6 +65,11 @@ export default async function ScrRecordContributionPage({
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
       <h1 className="text-2xl font-bold text-text-primary">{copy.contributions.title}</h1>
+      {savedMember && params?.amount && params.datedOn ? (
+        <p className="rounded-md border border-success-text bg-success-bg p-4 text-text-primary" role="status">
+          Aporte de {savedMember.displayName} registrado — USD {Number(params.amount).toFixed(2)}, {params.datedOn}
+        </p>
+      ) : null}
       <div className="rounded-md border border-warning-text bg-warning-bg p-4 text-text-primary">
         <h2 className="font-semibold">{copy.contributions.allocationTitle}</h2>
         <p className="mt-1 text-sm">{copy.contributions.allocationBody}</p>
@@ -80,13 +88,16 @@ export default async function ScrRecordContributionPage({
         <input type="hidden" name="clientRequestId" value={clientRequestId} />
         {params?.targetLoanId ? <input type="hidden" name="targetLoanId" value={params.targetLoanId} /> : null}
         {params?.targetCycleId ? <input type="hidden" name="targetCycleId" value={params.targetCycleId} /> : null}
-        <FormField controlId="contribution-member" labelKey={copy.common.member}>
-          <Select id="contribution-member" name="memberId" defaultValue={defaultMemberId} required>
-            {members.map((row) => (
-              <option key={row.id} value={row.id}>{row.displayName}</option>
-            ))}
-          </Select>
-        </FormField>
+        <MemberSearchPicker
+          copy={{
+            search: copy.contributions.memberSearch,
+            placeholder: copy.contributions.memberSearchPlaceholder,
+            member: copy.common.member,
+            empty: copy.contributions.memberSearchEmpty,
+          }}
+          defaultMemberId={defaultMemberId}
+          members={members}
+        />
         <FormField controlId="contribution-account" helperTextKey={copy.contributions.accountHelp} labelKey={copy.contributions.account}>
           <Select id="contribution-account" name="accountId" defaultValue={defaultAccountId} required>
             {accounts.map((account) => <option key={account.id} value={account.id}>{accountLabel(account)}</option>)}
@@ -105,8 +116,16 @@ export default async function ScrRecordContributionPage({
             <option value="petty_cash_deposit">{copy.contributions.pettyCashDeposit}</option>
           </Select>
         </FormField>
-        <FormField labelKey={copy.contributions.slip}>
-          <InputText labelKey={copy.contributions.slip} name="slipPhotoId" defaultValue={params?.slipPhotoId ?? ""} />
+        {params?.slipPhotoId ? <input name="slipPhotoId" type="hidden" value={params.slipPhotoId} /> : null}
+        <FormField controlId="contribution-slip" helperTextKey={copy.contributions.slipHelp} labelKey={copy.contributions.slip}>
+          <input
+            accept="image/jpeg,image/png,image/webp"
+            capture="environment"
+            className="min-h-12 w-full rounded-md border border-border bg-surface px-4 py-2 text-text-primary file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-text-on-primary"
+            id="contribution-slip"
+            name="slipPhoto"
+            type="file"
+          />
         </FormField>
         <FormField labelKey={copy.common.notes}>
           <InputText labelKey={copy.common.notes} name="notes" defaultValue={params?.notes ?? ""} />

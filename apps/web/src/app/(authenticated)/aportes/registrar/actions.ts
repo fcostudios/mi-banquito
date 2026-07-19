@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ZodError } from "zod";
@@ -7,6 +8,7 @@ import { memberPaymentFormSchema } from "@mi-banquito/contracts";
 import { createPaymentService } from "@mi-banquito/domain";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import { formDataToObject } from "@/lib/forms/sprint1";
+import { deleteExpenseSlip, uploadContributionSlip } from "@/lib/expense-slip-storage";
 
 function contributionErrorCode(error: unknown): string {
   if (error instanceof ZodError) {
@@ -47,19 +49,33 @@ function confirmationRedirect(input: Record<string, unknown>): string {
 
 export async function recordContributionAction(formData: FormData) {
   const session = await requireTreasurer();
+  let uploadedSlip: Awaited<ReturnType<typeof uploadContributionSlip>> | undefined;
   let receiptId: string;
   let memberId: string;
   try {
     const raw = formDataToObject(formData);
+    const slipValue = formData.get("slipPhoto");
+    let slipPhotoId = typeof raw.slipPhotoId === "string" ? raw.slipPhotoId : "";
+    if (slipValue instanceof File && slipValue.size > 0) {
+      slipPhotoId = randomUUID();
+      uploadedSlip = await uploadContributionSlip({
+        orgId: session.orgId,
+        clientRequestId: String(raw.clientRequestId ?? ""),
+        file: slipValue,
+      });
+      raw.slipPhotoId = slipPhotoId;
+    }
     const parsed = memberPaymentFormSchema.parse(raw);
     const result = await createPaymentService().recordMemberPayment({
       ...parsed,
       orgId: session.orgId,
       actorId: session.actorId,
+      slipPhoto: uploadedSlip ? { id: slipPhotoId, ...uploadedSlip } : undefined,
     });
     receiptId = result.receiptId;
     memberId = parsed.memberId;
   } catch (error) {
+    if (uploadedSlip) await deleteExpenseSlip(uploadedSlip.uri).catch(() => undefined);
     if (error instanceof Error && error.message === "payment_extra_decision_required") {
       redirect(confirmationRedirect(formDataToObject(formData)));
     }

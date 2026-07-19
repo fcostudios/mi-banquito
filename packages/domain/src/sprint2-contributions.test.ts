@@ -596,7 +596,7 @@ describe("Sprint 2 contribution source and partial state", () => {
   });
 
   it("refreshes read models after base-fund quota payments change protected capital", async () => {
-    const fakeDb = new FakeDb([]);
+    const fakeDb = new FakeDb([[{ id: "55555555-5555-4555-8555-555555555555" }]]);
     vi.resetModules();
     vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
     vi.doMock("@mi-banquito/db/tenant", () => ({
