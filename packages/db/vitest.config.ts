@@ -5,6 +5,7 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["scripts/**/*.test.{mjs,ts}", "src/**/*.test.ts"],
+    maxWorkers: 1,
     passWithNoTests: true,
   },
 });
