@@ -405,13 +405,13 @@ Run: `rtk gh variable set NEON_PROJECT_ID --body cool-shape-96550274`
 
 Expected: `rtk gh variable list` shows `NEON_PROJECT_ID`; no secret is printed.
 
-- [ ] **Step 2: Confirm the required GitHub secret is present**
+- [x] **Step 2: Confirm the required GitHub secret is present**
 
 Run: `rtk gh secret list --app actions`
 
 Expected: `NEON_API_KEY` is listed. If absent, report live PR execution as externally blocked without weakening or skipping the CI path.
 
-Observed: `NEON_API_KEY` is absent; the workflow is implemented and structurally verified, but a live trusted-PR run remains externally blocked on this repository secret.
+Observed: `NEON_API_KEY` is present. PR #41 run `29704838300` created and verified an expiring Neon branch, then passed the complete gate in 7m01s.
 
 - [x] **Step 3: Create or reuse a fresh expiring Neon child through the authenticated Neon management connection**
 
@@ -466,7 +466,7 @@ Expected: production has the required view/index, all policies fail closed, and 
 
 Observed: production verification reports 52 tables, 47 forced-RLS fail-closed policies, 11 materialized views, 148 indexes, and an empty child-to-production schema diff. Non-owner probes returned 0 rows for missing, empty, and wrong tenant context and 3 rows for the matching tenant. All seven US-008 materialized views refreshed successfully.
 
-- [ ] **Step 8: Record US-008 evidence and synchronize Nous**
+- [x] **Step 8: Record US-008 evidence and synchronize Nous**
 
 Append JSONL events for all nine acceptance criteria, a `build_pass`, and finally the required plain status event:
 
@@ -477,7 +477,9 @@ Append JSONL events for all nine acceptance criteria, a `build_pass`, and finall
 
 Run `rtk ./infra/scripts/sync-from-nous.sh` and verify the synchronized story state. Do not emit `done` if the production or live trusted-PR evidence remains incomplete.
 
-- [ ] **Step 9: Commit closure evidence**
+Observed: the required plain `done` event was appended after all six PR checks passed. Nous sync propagated one status update and regenerated `SPRINT_PLAN.md` with US-008 marked done.
+
+- [x] **Step 9: Commit closure evidence**
 
 ```bash
 rtk git add .nous-feedback.jsonl
