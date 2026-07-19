@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-19  
 **Story:** US-008  
-**Status:** Awaiting written-spec review
+**Status:** Approved for implementation
 
 ## Goal
 
