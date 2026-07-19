@@ -47,6 +47,33 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Set Neon branch expiration
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: echo "NEON_EXPIRES_AT=$(date -u --date '+24 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+      - name: Create Neon verification branch
+        id: create_neon_branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ci/pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          database: neondb
+          role: neondb_owner
+          expires_at: ${{ env.NEON_EXPIRES_AT }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+      - name: Verify schema on Neon PR branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        working-directory: packages/db
+        env:
+          DATABASE_URL: ${{ steps.create_neon_branch.outputs.db_url }}
+          DB_DRIVER: pg
+          ALLOW_NON_LOCAL_SCHEMA_APPLY: "1"
+        run: |
+          node scripts/apply-local-schema.mjs
+          node scripts/verify-schema.mjs
+          pnpm exec vitest run --maxWorkers=1 src/tenant.test.ts src/sprint3-substrate.test.ts src/interest-gains-schema.test.ts src/fail-closed-rls.test.ts
+          node scripts/apply-local-schema.mjs
+          node scripts/verify-schema.mjs
       - name: Apply full local schema
         run: cd packages/db && node scripts/apply-local-schema.mjs && node scripts/verify-schema.mjs
       - name: Type check

@@ -29,6 +29,7 @@ describe("tenant RLS transaction helper", () => {
           END IF;
         END
         $$;
+        GRANT ${testRole} TO CURRENT_USER;
         GRANT USAGE ON SCHEMA public TO ${testRole};
         GRANT SELECT, INSERT, DELETE ON member TO ${testRole};
       `);

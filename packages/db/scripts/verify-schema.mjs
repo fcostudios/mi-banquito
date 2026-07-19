@@ -73,7 +73,7 @@ export function parseExpectedSchema(sql) {
       .map((match) => match[1])
   );
   const materializedViewNames = uniqueSorted(
-    [...sql.matchAll(/CREATE MATERIALIZED VIEW\s+([a-z_]+)\s+AS/g)].map(
+    [...sql.matchAll(/CREATE MATERIALIZED VIEW\s+(?:IF NOT EXISTS\s+)?([a-z_]+)\s+AS/g)].map(
       (match) => match[1]
     )
   );
@@ -229,6 +229,12 @@ export function evaluateSchemaHealth(actual, expected = EXPECTED_SCHEMA) {
     errors,
   });
   assertExpectedObjects({
+    label: "fail-closed policies on tables",
+    expectedNames: expected.policyTables,
+    actualValue: actual.failClosedPolicyTables ?? [],
+    errors,
+  });
+  assertExpectedObjects({
     label: "triggers on tables",
     expectedNames: expected.triggerTables,
     actualValue: actual.triggerTables ?? actual.triggerCount,
@@ -344,6 +350,15 @@ SELECT
     ARRAY[]::text[]
   ) AS policy_tables,
   COALESCE(
+    (SELECT array_agg(DISTINCT tablename::text ORDER BY tablename::text)
+       FROM pg_policies
+      WHERE schemaname = 'public'
+        AND policyname = tablename || '_tenant_isolation'
+        AND qual ILIKE '%org_id%nullif%app.current_org_id%'
+        AND with_check ILIKE '%org_id%nullif%app.current_org_id%'),
+    ARRAY[]::text[]
+  ) AS fail_closed_policy_tables,
+  COALESCE(
     (SELECT array_agg(DISTINCT event_object_table::text ORDER BY event_object_table::text)
        FROM information_schema.triggers
       WHERE trigger_schema = 'public'),
@@ -442,6 +457,7 @@ function normalizeHealthRow(row = {}) {
     rlsTableNames: parsePgArray(row.rls_table_names),
     forcedRlsTableNames: parsePgArray(row.forced_rls_table_names),
     policyTables: parsePgArray(row.policy_tables),
+    failClosedPolicyTables: parsePgArray(row.fail_closed_policy_tables),
     triggerTables: parsePgArray(row.trigger_tables),
     materializedViewNames: parsePgArray(row.materialized_view_names),
     indexNames: parsePgArray(row.index_names),

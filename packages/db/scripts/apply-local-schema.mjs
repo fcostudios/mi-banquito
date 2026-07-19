@@ -49,10 +49,23 @@ const BASE_FUND_QUOTA_SLIP_KIND_MIGRATION_URL = new URL(
   "../src/migrations/V20260718133600__base_fund_quota_slip_kind.sql",
   import.meta.url
 );
+const US_008_INTEREST_GAINS_MIGRATION_URL = new URL(
+  "../src/migrations/V20260719115010__interest_gains_fiscal_year_view.sql",
+  import.meta.url
+);
+const US_008_FAIL_CLOSED_RLS_MIGRATION_URL = new URL(
+  "../src/migrations/V20260719115020__fail_closed_tenant_policies.sql",
+  import.meta.url
+);
 const SPRINT_1_ADDITIVE_TABLES = new Set([
   "base_fund_quota_config",
   "base_fund_quota_payment",
 ]);
+const US_008_REPAIR_OBJECTS = {
+  "materialized views": new Set(["mv_interest_gains_per_fiscal_year"]),
+  indexes: new Set(["idx_mv_interest_gains_per_fiscal_year_org_year"]),
+  "fail-closed policies on tables": new Set(EXPECTED_POLICY_TABLES),
+};
 
 function assertLocalDatabaseUrl(databaseUrl) {
   const parsed = new URL(databaseUrl);
@@ -102,6 +115,45 @@ function isOnlyMissingSprint1AdditiveSchema(existingHealth) {
   }
 
   return sawSprint1MissingObject;
+}
+
+export function isOnlyMissingUs008Repair(existingHealth) {
+  const errors = existingHealth?.errors ?? [];
+  if (errors.length === 0) {
+    return false;
+  }
+
+  let sawRepairableGap = false;
+  for (const error of errors) {
+    const countError = /^expected \d+ (materialized views|indexes|fail-closed policies on tables), found \d+$/.exec(
+      error,
+    );
+    if (countError) {
+      sawRepairableGap = true;
+      continue;
+    }
+
+    const missingError = /^missing (materialized views|indexes|fail-closed policies on tables): (.+)$/.exec(
+      error,
+    );
+    if (!missingError) {
+      return false;
+    }
+
+    const allowedNames = US_008_REPAIR_OBJECTS[missingError[1]];
+    const missingNames = missingError[2]
+      .split(",")
+      .map((name) => name.trim());
+    if (
+      missingNames.length === 0 ||
+      !missingNames.every((name) => allowedNames.has(name))
+    ) {
+      return false;
+    }
+    sawRepairableGap = true;
+  }
+
+  return sawRepairableGap;
 }
 
 async function currentSchemaHealth(databaseUrl) {
@@ -295,6 +347,29 @@ export async function main() {
     );
   const onlyMissingSprint1AdditiveSchema =
     isOnlyMissingSprint1AdditiveSchema(existingHealth);
+  const onlyMissingUs008Repair = isOnlyMissingUs008Repair(existingHealth);
+
+  if (onlyMissingUs008Repair) {
+    try {
+      await pool.query(
+        readFileSync(US_008_INTEREST_GAINS_MIGRATION_URL, "utf8"),
+      );
+      await pool.query(
+        readFileSync(US_008_FAIL_CLOSED_RLS_MIGRATION_URL, "utf8"),
+      );
+      const repairedHealth = await currentSchemaHealth(databaseUrl);
+      if (!repairedHealth?.ok) {
+        throw new Error(repairedHealth?.errors.join("; ") ?? "health unavailable");
+      }
+      console.log("local US-008 interest view and fail-closed RLS repaired");
+      return 0;
+    } catch (err) {
+      console.error(`✗ local US-008 schema repair failed: ${err.message}`);
+      return 1;
+    } finally {
+      await pool.end();
+    }
+  }
 
   if (onlyMissingUpdatedAtTriggers) {
     try {

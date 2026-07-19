@@ -1,5 +1,5 @@
 <!-- nous-sprint-stamp
-generated_at: 2026-07-19T05:56:25Z
+generated_at: 2026-07-19T21:50:14Z
 current_sprint: sprint-12
 sprints_hash: a81073114fb755ff
 -->
@@ -35,7 +35,7 @@ See `docs/specs/09_architecture.md` for bounded context details.
 | 5 | full-stack | **US-009** 🔨 | Set up Tailwind 4 with design tokens and strings.es-EC.json and Lucide allow-list | ? ?SP | `See story file` | — | US-007 | →3 | — | [r1_foundation_us_009.md](sprint-0/r1_foundation_us_009.md) |
 | 6 | full-stack | **US-005** 🔨 | Provision Vercel Blob store and Sentry project and Better Stack monitor | ? ?SP | `See story file` | — | US-002, US-004 | →6 | — | [r1_foundation_us_005.md](sprint-0/r1_foundation_us_005.md) |
 | 7 | full-stack | **US-007** 🔨 | Set up Next.js 16 App Router with treasurer and admin route groups | ? ?SP | `See story file` | — | US-001, US-005 | →4 | — | [r1_foundation_us_007.md](sprint-0/r1_foundation_us_007.md) |
-| 8 | backend | **US-008** 🔨 | Set up Drizzle initial migration with 29 entity tables RLS triggers materialized views | ? ?SP | `apps/web/src/app/api/` | — | US-003, US-007 | →29 | — | [r1_foundation_us_008.md](sprint-0/r1_foundation_us_008.md) |
+| 8 | backend | **US-008** ✅ | Set up Drizzle initial migration with 29 entity tables RLS triggers materialized views | ? ?SP | `apps/web/src/app/api/` | — | US-003, US-007 | →29 | — | [r1_foundation_us_008.md](sprint-0/r1_foundation_us_008.md) |
 | 9 | full-stack | **US-010** 🔨 | Set up Serwist service worker and PWA manifest installable Android and iOS | ? ?SP | `See story file` | — | US-009, US-064, US-062 | — | — | [r1_foundation_us_010.md](sprint-0/r1_foundation_us_010.md) |
 | 10 | full-stack | **US-011** 🔨 | Set up auth middleware Auth0 session extraction and Postgres RLS session var | ? ?SP | `See story file` | — | US-008, US-064, US-004 | →7 | — | [r1_foundation_us_011.md](sprint-0/r1_foundation_us_011.md) |
 | 11 | backend | **US-013** 🔨 | Set up CI pipeline type-check lint test Drizzle migration check axe a11y | ? ?SP | `apps/web/src/app/api/` | — | US-001, US-064, US-004 | →2 | — | [r1_foundation_us_013.md](sprint-0/r1_foundation_us_013.md) |
@@ -54,6 +54,7 @@ See `docs/specs/09_architecture.md` for bounded context details.
 - Architecture: [docs/specs/09_architecture.md](../specs/09_architecture.md)
 - Design system: [packages/design-system/tokens.json](../../packages/design-system/tokens.json)
 - HTML specs: [docs/specs-html/index.html](../specs-html/index.html)
+
 ---
 
 ## Sprint 1: Sprint 1
@@ -372,3 +373,4 @@ See `docs/specs/09_architecture.md` for bounded context details.
 - Architecture: [docs/specs/09_architecture.md](../specs/09_architecture.md)
 - Design system: [packages/design-system/tokens.json](../../packages/design-system/tokens.json)
 - HTML specs: [docs/specs-html/index.html](../specs-html/index.html)
+
