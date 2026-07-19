@@ -32,6 +32,7 @@ describe("schema verifier", () => {
       rlsTableNames: EXPECTED_RLS_TABLE_NAMES,
       forcedRlsTableNames: EXPECTED_FORCED_RLS_TABLE_NAMES,
       policyTables: EXPECTED_POLICY_TABLES,
+      failClosedPolicyTables: EXPECTED_POLICY_TABLES,
       triggerTables: EXPECTED_TRIGGER_TABLES,
       materializedViewNames: EXPECTED_MATERIALIZED_VIEW_NAMES,
       indexNames: EXPECTED_INDEX_NAMES,
@@ -45,6 +46,30 @@ describe("schema verifier", () => {
 
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
+  });
+
+  it("fails when tenant policies exist but are not fail closed", () => {
+    const result = evaluateSchemaHealth({
+      tableNames: EXPECTED_TABLE_NAMES,
+      rlsTableNames: EXPECTED_RLS_TABLE_NAMES,
+      forcedRlsTableNames: EXPECTED_FORCED_RLS_TABLE_NAMES,
+      policyTables: EXPECTED_POLICY_TABLES,
+      failClosedPolicyTables: EXPECTED_POLICY_TABLES.slice(1),
+      triggerTables: EXPECTED_TRIGGER_TABLES,
+      materializedViewNames: EXPECTED_MATERIALIZED_VIEW_NAMES,
+      indexNames: EXPECTED_INDEX_NAMES,
+      checkConstraintNames: EXPECTED_CHECK_CONSTRAINT_NAMES,
+      uniqueConstraintNames: EXPECTED_UNIQUE_CONSTRAINT_NAMES,
+      foreignKeyConstraintNames: EXPECTED_FOREIGN_KEY_CONSTRAINT_NAMES,
+      functionNames: REQUIRED_FUNCTIONS,
+      updatedAtTables: EXPECTED_UPDATED_AT_TABLES,
+      updatedAtTriggerTables: EXPECTED_UPDATED_AT_TABLES,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain(
+      `missing fail-closed policies on tables: ${EXPECTED_POLICY_TABLES[0]}`,
+    );
   });
 
   it("fails when drizzle push creates tables but no RLS policies or triggers", () => {

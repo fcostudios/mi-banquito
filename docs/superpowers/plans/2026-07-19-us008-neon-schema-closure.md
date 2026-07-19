@@ -31,7 +31,7 @@
 - Modify: `packages/db/scripts/verify-schema.test.mjs`
 - Modify: `packages/db/scripts/verify-schema.mjs`
 
-- [ ] **Step 1: Write the failing verifier tests**
+- [x] **Step 1: Write the failing verifier tests**
 
 Add `failClosedPolicyTables: EXPECTED_POLICY_TABLES` to healthy fixtures and add this stale-policy case:
 
@@ -61,13 +61,13 @@ it("fails when tenant policies exist but are not fail closed", () => {
 });
 ```
 
-- [ ] **Step 2: Run the verifier tests and confirm RED**
+- [x] **Step 2: Run the verifier tests and confirm RED**
 
 Run: `rtk pnpm --filter @mi-banquito/db exec vitest run scripts/verify-schema.test.mjs`
 
 Expected: FAIL because `evaluateSchemaHealth` does not inspect `failClosedPolicyTables`.
 
-- [ ] **Step 3: Implement policy-definition collection and evaluation**
+- [x] **Step 3: Implement policy-definition collection and evaluation**
 
 Extend `HEALTH_SQL` with `fail_closed_policy_tables`, selecting policies whose `qual` and `with_check` both contain `NULLIF`, `app.current_org_id`, and tenant equality. Normalize it as `failClosedPolicyTables`, then add:
 
@@ -88,13 +88,13 @@ AND qual ILIKE '%org_id%nullif%app.current_org_id%'
 AND with_check ILIKE '%org_id%nullif%app.current_org_id%'
 ```
 
-- [ ] **Step 4: Run the verifier tests and confirm GREEN**
+- [x] **Step 4: Run the verifier tests and confirm GREEN**
 
 Run: `rtk pnpm --filter @mi-banquito/db exec vitest run scripts/verify-schema.test.mjs`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the verifier contract**
+- [x] **Step 5: Commit the verifier contract**
 
 ```bash
 rtk git add packages/db/scripts/verify-schema.mjs packages/db/scripts/verify-schema.test.mjs
