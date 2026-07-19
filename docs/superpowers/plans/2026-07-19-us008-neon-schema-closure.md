@@ -399,7 +399,7 @@ rtk git commit -m "ci(db): verify trusted PRs on Neon branches (US-008)"
 **Files:**
 - Modify: `.nous-feedback.jsonl`
 
-- [ ] **Step 1: Configure the non-secret GitHub repository variable**
+- [x] **Step 1: Configure the non-secret GitHub repository variable**
 
 Run: `rtk gh variable set NEON_PROJECT_ID --body cool-shape-96550274`
 
@@ -411,13 +411,15 @@ Run: `rtk gh secret list --app actions`
 
 Expected: `NEON_API_KEY` is listed. If absent, report live PR execution as externally blocked without weakening or skipping the CI path.
 
-- [ ] **Step 3: Create or reuse a fresh expiring Neon child through the authenticated Neon management connection**
+Observed: `NEON_API_KEY` is absent; the workflow is implemented and structurally verified, but a live trusted-PR run remains externally blocked on this repository secret.
+
+- [x] **Step 3: Create or reuse a fresh expiring Neon child through the authenticated Neon management connection**
 
 Use project `cool-shape-96550274`, parent `br-bold-cake-aiq95mz3`, name `verify-us008-20260719`, database `neondb`, role `neondb_owner`, and an expiry no later than 24 hours after creation.
 
 Expected: a child branch ID and masked connection string are returned.
 
-- [ ] **Step 4: Run the migration rehearsal twice on the child**
+- [x] **Step 4: Run the migration rehearsal twice on the child**
 
 With the child URL provided only through `DATABASE_URL`, run:
 
@@ -431,7 +433,7 @@ rtk env DB_DRIVER=pg pnpm --filter @mi-banquito/db exec vitest run src/tenant.te
 
 Expected: both schema passes and all selected tests are green.
 
-- [ ] **Step 5: Compare child and production catalogs**
+- [x] **Step 5: Compare child and production catalogs**
 
 Read-only catalog queries must show that the intended diff is exactly:
 
@@ -441,7 +443,7 @@ Read-only catalog queries must show that the intended diff is exactly:
 
 Expected: no table, column, constraint, trigger, or Sprint 8 object is removed or changed.
 
-- [ ] **Step 6: Run the full repository Definition of Done gate**
+- [x] **Step 6: Run the full repository Definition of Done gate**
 
 Run:
 
@@ -450,17 +452,19 @@ rtk pnpm type-check
 rtk pnpm lint
 rtk pnpm test
 rtk pnpm build
-rtk python3 docs/scripts/nous_api_reconcile.py
+rtk python3 docs/scripts/nous_api_reconcile.py --target . --json
 rtk pnpm audit:sprints0-1
 ```
 
 Expected: all commands exit 0.
 
-- [ ] **Step 7: Apply the rehearsed additive migrations to production**
+- [x] **Step 7: Apply the rehearsed additive migrations to production**
 
 After confirming the child diff and target branch, run the same guarded schema application against the production branch URL, followed only by read-only catalog verification and non-owner adversarial RLS probes.
 
 Expected: production has the required view/index, all policies fail closed, and all existing materialized views refresh.
+
+Observed: production verification reports 52 tables, 47 forced-RLS fail-closed policies, 11 materialized views, 148 indexes, and an empty child-to-production schema diff. Non-owner probes returned 0 rows for missing, empty, and wrong tenant context and 3 rows for the matching tenant. All seven US-008 materialized views refreshed successfully.
 
 - [ ] **Step 8: Record US-008 evidence and synchronize Nous**
 
