@@ -26,6 +26,17 @@ describe("schema verifier", () => {
     expect(parsed.triggerTables).toEqual(["contribution"]);
   });
 
+  it("derives idempotent materialized-view expectations", () => {
+    const parsed = parseExpectedSchema(`
+      CREATE MATERIALIZED VIEW IF NOT EXISTS mv_interest_gains_per_fiscal_year AS
+      SELECT 1 AS fiscal_year;
+    `);
+
+    expect(parsed.materializedViewNames).toEqual([
+      "mv_interest_gains_per_fiscal_year",
+    ]);
+  });
+
   it("passes when tables, RLS, policies, triggers, and updated_at triggers match expectations", () => {
     const result = evaluateSchemaHealth({
       tableNames: EXPECTED_TABLE_NAMES,

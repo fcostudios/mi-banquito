@@ -108,7 +108,7 @@ rtk git commit -m "test(db): verify fail-closed tenant policies (US-008)"
 - Create: `packages/db/src/migrations/V20260719115010__interest_gains_fiscal_year_view.sql`
 - Modify: `packages/db/src/schema.ts`
 
-- [ ] **Step 1: Write the failing Drizzle and migration contract**
+- [x] **Step 1: Write the failing Drizzle and migration contract**
 
 Create a test importing `interestGainsPerFiscalYear` and assert this exact shape:
 
@@ -130,13 +130,13 @@ expect(migration).toContain("CREATE MATERIALIZED VIEW IF NOT EXISTS mv_interest_
 expect(migration).toContain("idx_mv_interest_gains_per_fiscal_year_org_year");
 ```
 
-- [ ] **Step 2: Run the schema contract and confirm RED**
+- [x] **Step 2: Run the schema contract and confirm RED**
 
 Run: `rtk pnpm --filter @mi-banquito/db exec vitest run src/interest-gains-schema.test.ts`
 
 Expected: FAIL because the export and migration do not exist.
 
-- [ ] **Step 3: Add the Drizzle existing-view declaration**
+- [x] **Step 3: Add the Drizzle existing-view declaration**
 
 Add after the other fiscal read models in `schema.ts`:
 
@@ -150,7 +150,7 @@ export const interestGainsPerFiscalYear = pgMaterializedView("mv_interest_gains_
 }).existing();
 ```
 
-- [ ] **Step 4: Add the immutable view migration**
+- [x] **Step 4: Add the immutable view migration**
 
 Use an active-config CTE (`valid_to IS NULL`, latest `valid_from`) and derive the fiscal label as the year in which the fiscal period starts:
 
@@ -187,13 +187,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_interest_gains_per_fiscal_year_org_year
   ON mv_interest_gains_per_fiscal_year(org_id, fiscal_year);
 ```
 
-- [ ] **Step 5: Run the schema contract and confirm GREEN**
+- [x] **Step 5: Run the schema contract and confirm GREEN**
 
 Run: `rtk pnpm --filter @mi-banquito/db exec vitest run src/interest-gains-schema.test.ts`
 
 Expected: the static contract passes; the DB case skips when no `DATABASE_URL` is present.
 
-- [ ] **Step 6: Add the real-Postgres fiscal-boundary test**
+- [x] **Step 6: Add the real-Postgres fiscal-boundary test**
 
 Within one transaction create two organizations, active configs with an April 1 fiscal boundary, one member and loan per org, and accruals on `2026-03-31`, `2026-04-01`, `2026-04-15`, and another tenant. Refresh the view and assert:
 
@@ -205,13 +205,13 @@ expect(rows.rows).toEqual([
 expect(rows.rows.every((row) => row.org_id === orgA)).toBe(true);
 ```
 
-- [ ] **Step 7: Run the real-Postgres test and confirm GREEN**
+- [x] **Step 7: Run the real-Postgres test and confirm GREEN**
 
 Run with the local CI database: `rtk pnpm --filter @mi-banquito/db exec vitest run src/interest-gains-schema.test.ts`
 
 Expected: PASS with exact boundary, sum, currency, and tenant assertions.
 
-- [ ] **Step 8: Commit the view**
+- [x] **Step 8: Commit the view**
 
 ```bash
 rtk git add packages/db/src/schema.ts packages/db/src/interest-gains-schema.test.ts packages/db/src/migrations/V20260719115010__interest_gains_fiscal_year_view.sql

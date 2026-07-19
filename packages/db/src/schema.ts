@@ -754,6 +754,14 @@ export const baseFundPoolPerFiscalYear = pgMaterializedView("mv_base_fund_pool_p
   refreshedAt: timestamp("refreshed_at").notNull(),
 }).existing();
 
+export const interestGainsPerFiscalYear = pgMaterializedView("mv_interest_gains_per_fiscal_year", {
+  orgId: uuid("org_id").notNull(),
+  fiscalYear: integer("fiscal_year").notNull(),
+  interestGains: numeric("interest_gains", { precision: 18, scale: 4 }).notNull(),
+  currencyCode: text("currency_code").notNull(),
+  refreshedAt: timestamp("refreshed_at").notNull(),
+}).existing();
+
 export const availableCapital = pgMaterializedView("mv_available_capital", {
   orgId: uuid("org_id").notNull(),
   poolBalance: numeric("pool_balance", { precision: 18, scale: 4 }).notNull(),

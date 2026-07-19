@@ -73,7 +73,7 @@ export function parseExpectedSchema(sql) {
       .map((match) => match[1])
   );
   const materializedViewNames = uniqueSorted(
-    [...sql.matchAll(/CREATE MATERIALIZED VIEW\s+([a-z_]+)\s+AS/g)].map(
+    [...sql.matchAll(/CREATE MATERIALIZED VIEW\s+(?:IF NOT EXISTS\s+)?([a-z_]+)\s+AS/g)].map(
       (match) => match[1]
     )
   );
