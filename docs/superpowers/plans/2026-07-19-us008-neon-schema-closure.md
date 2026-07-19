@@ -374,7 +374,7 @@ After dependency installation, calculate a 24-hour RFC3339 expiry and create a b
   run: |
     node scripts/apply-local-schema.mjs
     node scripts/verify-schema.mjs
-    pnpm exec vitest run src/tenant.test.ts src/sprint3-substrate.test.ts src/interest-gains-schema.test.ts src/fail-closed-rls.test.ts
+    pnpm exec vitest run --maxWorkers=1 src/tenant.test.ts src/sprint3-substrate.test.ts src/interest-gains-schema.test.ts src/fail-closed-rls.test.ts
     node scripts/apply-local-schema.mjs
     node scripts/verify-schema.mjs
 ```

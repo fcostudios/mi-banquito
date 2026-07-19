@@ -28,5 +28,6 @@ describe("US-008 Neon pull-request schema gate", () => {
     expect(workflow).toContain("src/sprint3-substrate.test.ts");
     expect(workflow).toContain("src/interest-gains-schema.test.ts");
     expect(workflow).toContain("src/fail-closed-rls.test.ts");
+    expect(workflow).toContain("--maxWorkers=1");
   });
 });

@@ -158,7 +158,8 @@ describe("US-008 fiscal-year interest gains", () => {
           [[orgA, orgB]],
         );
 
-        expect(rows.rows).toEqual([
+        expect(rows.rows).toHaveLength(3);
+        expect(rows.rows.filter((row) => row.org_id === orgA)).toEqual([
           {
             org_id: orgA,
             fiscal_year: 2025,
@@ -171,6 +172,8 @@ describe("US-008 fiscal-year interest gains", () => {
             interest_gains: "25.5000",
             currency_code: "USD",
           },
+        ]);
+        expect(rows.rows.filter((row) => row.org_id === orgB)).toEqual([
           {
             org_id: orgB,
             fiscal_year: 2026,
