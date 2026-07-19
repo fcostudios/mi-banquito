@@ -1,5 +1,5 @@
 <!-- nous-sprint-stamp
-generated_at: 2026-07-18T19:48:42Z
+generated_at: 2026-07-19T05:56:25Z
 current_sprint: sprint-12
 sprints_hash: a81073114fb755ff
 -->
@@ -41,7 +41,7 @@ See `docs/specs/09_architecture.md` for bounded context details.
 | 11 | backend | **US-013** 🔨 | Set up CI pipeline type-check lint test Drizzle migration check axe a11y | ? ?SP | `apps/web/src/app/api/` | — | US-001, US-064, US-004 | →2 | — | [r1_foundation_us_013.md](sprint-0/r1_foundation_us_013.md) |
 | 12 | full-stack | **US-014** 🔨 | Set up business-rule test infrastructure golden files property-based | ? ?SP | `See story file` | — | US-001, US-013, US-045 | →2 | — | [r1_foundation_us_014.md](sprint-0/r1_foundation_us_014.md) |
 | 13 | full-stack | **US-006** 🔨 | Configure environment variables for local preview and prod | ? ?SP | `See story file` | — | US-003, US-004, US-005 | — | — | [r1_foundation_us_006.md](sprint-0/r1_foundation_us_006.md) |
-| 14 | full-stack | **US-012** 🔨 | Set up Vercel Cron config for daily interest and treasurer compensation and drift sweep | ? ?SP | `See story file` | — | US-007, US-011, US-013 | →6 | — | [r1_foundation_us_012.md](sprint-0/r1_foundation_us_012.md) |
+| 14 | full-stack | **US-012** ✅ | Set up Vercel Cron config for daily interest and treasurer compensation and drift sweep | ? ?SP | `See story file` | — | US-007, US-011, US-013 | →6 | — | [r1_foundation_us_012.md](sprint-0/r1_foundation_us_012.md) |
 | 15 | full-stack | **US-015** 🔨 | Set up Auth0 magic-link passwordless email flow | ? ?SP | `See story file` | — | US-004, US-007, US-011 | →2 | — | [r1_foundation_us_015.md](sprint-0/r1_foundation_us_015.md) |
 
 ### Parallel Tracks
