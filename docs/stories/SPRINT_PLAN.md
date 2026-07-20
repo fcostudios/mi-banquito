@@ -1,5 +1,5 @@
 <!-- nous-sprint-stamp
-generated_at: 2026-07-19T21:50:14Z
+generated_at: 2026-07-20T00:23:09Z
 current_sprint: sprint-12
 sprints_hash: a81073114fb755ff
 -->
@@ -28,7 +28,7 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |
 |---|-------|-------|------|------|---------------|-----|------------|--------|----------|------|
-| 1 | full-stack | **US-001** 🔨 | Initialize Turborepo monorepo with apps/web and 5 packages | ? ?SP | `See story file` | — | US-047 | →4 | — | [r1_foundation_us_001.md](sprint-0/r1_foundation_us_001.md) |
+| 1 | full-stack | **US-001** ✅ | Initialize Turborepo monorepo with apps/web and 5 packages | ? ?SP | `See story file` | — | US-047 | →4 | — | [r1_foundation_us_001.md](sprint-0/r1_foundation_us_001.md) |
 | 2 | full-stack | **US-002** 🔨 | Provision Vercel project with custom domain and preview deploys | ? ?SP | `See story file` | — | US-001 | →5 | — | [r1_foundation_us_002.md](sprint-0/r1_foundation_us_002.md) |
 | 3 | full-stack | **US-003** 🔨 | Provision Neon project with branching per Vercel preview | ? ?SP | `See story file` | — | US-002 | →4 | — | [r1_foundation_us_003.md](sprint-0/r1_foundation_us_003.md) |
 | 4 | full-stack | **US-004** 🔨 | Provision Auth0 tenant with Organizations and FcoStudios org | ? ?SP | `See story file` | — | US-002, US-047 | →10 | — | [r1_foundation_us_004.md](sprint-0/r1_foundation_us_004.md) |
@@ -38,8 +38,8 @@ See `docs/specs/09_architecture.md` for bounded context details.
 | 8 | backend | **US-008** ✅ | Set up Drizzle initial migration with 29 entity tables RLS triggers materialized views | ? ?SP | `apps/web/src/app/api/` | — | US-003, US-007 | →29 | — | [r1_foundation_us_008.md](sprint-0/r1_foundation_us_008.md) |
 | 9 | full-stack | **US-010** 🔨 | Set up Serwist service worker and PWA manifest installable Android and iOS | ? ?SP | `See story file` | — | US-009, US-064, US-062 | — | — | [r1_foundation_us_010.md](sprint-0/r1_foundation_us_010.md) |
 | 10 | full-stack | **US-011** 🔨 | Set up auth middleware Auth0 session extraction and Postgres RLS session var | ? ?SP | `See story file` | — | US-008, US-064, US-004 | →7 | — | [r1_foundation_us_011.md](sprint-0/r1_foundation_us_011.md) |
-| 11 | backend | **US-013** 🔨 | Set up CI pipeline type-check lint test Drizzle migration check axe a11y | ? ?SP | `apps/web/src/app/api/` | — | US-001, US-064, US-004 | →2 | — | [r1_foundation_us_013.md](sprint-0/r1_foundation_us_013.md) |
-| 12 | full-stack | **US-014** 🔨 | Set up business-rule test infrastructure golden files property-based | ? ?SP | `See story file` | — | US-001, US-013, US-045 | →2 | — | [r1_foundation_us_014.md](sprint-0/r1_foundation_us_014.md) |
+| 11 | backend | **US-013** ✅ | Set up CI pipeline type-check lint test Drizzle migration check axe a11y | ? ?SP | `apps/web/src/app/api/` | — | US-001, US-064, US-004 | →2 | — | [r1_foundation_us_013.md](sprint-0/r1_foundation_us_013.md) |
+| 12 | full-stack | **US-014** ✅ | Set up business-rule test infrastructure golden files property-based | ? ?SP | `See story file` | — | US-001, US-013, US-045 | →2 | — | [r1_foundation_us_014.md](sprint-0/r1_foundation_us_014.md) |
 | 13 | full-stack | **US-006** 🔨 | Configure environment variables for local preview and prod | ? ?SP | `See story file` | — | US-003, US-004, US-005 | — | — | [r1_foundation_us_006.md](sprint-0/r1_foundation_us_006.md) |
 | 14 | full-stack | **US-012** ✅ | Set up Vercel Cron config for daily interest and treasurer compensation and drift sweep | ? ?SP | `See story file` | — | US-007, US-011, US-013 | →6 | — | [r1_foundation_us_012.md](sprint-0/r1_foundation_us_012.md) |
 | 15 | full-stack | **US-015** 🔨 | Set up Auth0 magic-link passwordless email flow | ? ?SP | `See story file` | — | US-004, US-007, US-011 | →2 | — | [r1_foundation_us_015.md](sprint-0/r1_foundation_us_015.md) |
