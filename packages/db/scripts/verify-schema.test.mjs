@@ -37,6 +37,15 @@ describe("schema verifier", () => {
     ]);
   });
 
+  it("derives both guarded and unconditional index expectations", () => {
+    const parsed = parseExpectedSchema(`
+      CREATE INDEX IF NOT EXISTS idx_guarded ON account (org_id);
+      CREATE UNIQUE INDEX uq_unconditional ON member (org_id);
+    `);
+
+    expect(parsed.indexNames).toEqual(["idx_guarded", "uq_unconditional"]);
+  });
+
   it("passes when tables, RLS, policies, triggers, and updated_at triggers match expectations", () => {
     const result = evaluateSchemaHealth({
       tableNames: EXPECTED_TABLE_NAMES,

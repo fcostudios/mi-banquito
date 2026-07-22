@@ -78,7 +78,7 @@ export function parseExpectedSchema(sql) {
     )
   );
   const indexNames = uniqueSorted(
-    [...sql.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX IF NOT EXISTS\s+([a-z_]+)\s+/g)]
+    [...sql.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX(?:\s+IF NOT EXISTS)?\s+([a-z_]+)\s+/g)]
       .map((match) => pgIdentifierName(match[1]))
   );
   const checkConstraintNames = uniqueSorted(
@@ -444,11 +444,15 @@ export async function collectSchemaHealth(databaseUrl, driver) {
   const pg = await import("pg");
   const pool = new pg.default.Pool({ connectionString: databaseUrl });
   try {
-    const { rows } = await pool.query(HEALTH_SQL);
-    return normalizeHealthRow(rows[0]);
+    return await collectSchemaHealthWithClient(pool);
   } finally {
     await pool.end();
   }
+}
+
+export async function collectSchemaHealthWithClient(client) {
+  const { rows } = await client.query(HEALTH_SQL);
+  return normalizeHealthRow(rows[0]);
 }
 
 function normalizeHealthRow(row = {}) {
