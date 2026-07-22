@@ -506,6 +506,11 @@ The 9 bounded contexts from `03b §8` are the data domains. Each context owns it
 | `status` | `text` (enum) | IDX | no | `open / collecting / paid_out / closed / cancelled` — `cancelled` requires a documented disposition (return Transfer to contributors, or a group-voted retention that enters the fund); a collection cannot sit in `collecting` indefinitely with regularized money and no payout (BR-14) | `collecting` | BR-14 |
 | `opened_on` | `date` | IDX | no |  | `2026-05-10` | `[SRC:CJ]` |
 | `paid_out_expense_id` | `uuid` | FK => Expense.id | yes | The solidarity payout (Expense, category=`solidarity_payout`) | … | BR-14 |
+| `surplus_amount` | `decimal(18,4)` |  | yes | Set exactly once at the transition to `closed` or `cancelled`: `Σ(regularized lines) − payout` (payout = 0 for `cancelled`). NULL while `open`/`collecting`/`paid_out` (CHG-011) | `12.5000` | BR-14/CHG-011 |
+| `disposition` | `text` (enum) |  | yes | `returned` / `retained` — REQUIRED (transition rule, not column constraint) when `surplus_amount > 0` at close AND always on `cancelled` with regularized funds; NULL when surplus = 0 (CHG-011: "no silent surplus", mirrors `YearEndShareOutLine.disposition`) | `returned` | BR-14/CHG-011 |
+| `disposition_motive` | `text` |  | yes | Free text; REQUIRED when `disposition = retained` (the group-vote reference) | `"Voto 2026-06: retener para fondo"` | BR-14/CHG-011 |
+| `surplus_transfer_id` | `uuid` | FK => Transfer.id, UNIQUE (`uq_collection_surplus_transfer_once`) | yes | REQUIRED when `disposition = returned` — links the **single aggregate** return `Transfer` (`purpose = collection_surplus_return`) from a group-fund account to ONE active same-org NON-group return-channel account selected by the treasurer; physical distribution to contributors happens off-ledger from that channel; the trigger revalidates direction/amount/purpose (DEC-MB-006, CHG-012) | … | BR-14/CHG-011/CHG-012 |
+| `recognition_fiscal_year` | `int` |  | yes | REQUIRED when `kind = treasurer_recognition`; **INSERT-only** — set at creation, never updatable (wrong year ⇒ cancel + recreate while `open`); NULL for `kind = solidarity`. BR-15 attributes recognition collections by THIS column — never by `opened_on` (CHG-011) | `2026` | BR-15/CHG-011 |
 | `created_at` | `timestamptz` |  | no |  |  | — |
 | `created_by` | `uuid` | FK polymorphic | no | Treasurer (member) | | `[SRC:CJ]` |
 
@@ -523,10 +528,12 @@ The 9 bounded contexts from `03b §8` are the data domains. Each context owns it
 | `collection_id` | `uuid` | FK => ExtraordinaryCollection.id, IDX | no |  |  | `[SRC:CJ]` |
 | `member_id` | `uuid` | FK => Member.id, IDX | no |  |  | `[SRC:CJ]` |
 | `amount` | `decimal(18,4)` |  | no |  | `10.0000` | `[SRC:CJ]` |
-| `account_id` | `uuid` | FK => Account.id | yes | Which account it landed in (pending if non-group) | … | DEC-MB-001 |
+| `account_id` | `uuid` | FK => Account.id | no | Which account it landed in (pending if non-group) — REQUIRED per US-096 AC-2/AC-5 (CHG-011: was nullable; every line must name the receiving account) | … | DEC-MB-001/CHG-011 |
 | `reconciliation_status` | `text` (enum) |  | no | `pending / regularized` | `regularized` | DEC-MB-001 |
 | `dated_on` | `date` | IDX | no |  | `2026-05-12` | `[SRC:CJ]` |
 | `slip_photo_id` | `uuid` | FK => SlipPhoto.id | yes |  |  | `03b §7` |
+| `reverses_id` | `uuid` | FK => ExtraordinaryCollectionLine.id | yes | BR-16 correction: a reversing line points at the line it negates (amount sign inverted in projections); never UPDATE/DELETE (CHG-011 — same pattern as the other append-only ledger entities) | … | BR-16/CHG-011 |
+| `reverse_reason` | `text` |  | yes | REQUIRED when `reverses_id` is set | `"monto digitado mal"` | BR-16/CHG-011 |
 | `created_at` | `timestamptz` |  | no |  |  | — |
 | `created_by` | `uuid` | FK polymorphic | no | Treasurer (member) | | `[SRC:CJ]` |
 
@@ -534,6 +541,38 @@ The 9 bounded contexts from `03b §8` are the data domains. Each context owns it
 > - `Contribution`, `Withdrawal`, `Expense`, `Repayment`, `ExtraordinaryCollectionLine` each gain **`account_id` (FK => Account.id)** + **`reconciliation_status` (`pending`/`regularized`)** — a deposit into a non-group account is `pending` until a `Transfer` regularizes it (DEC-MB-001).
 > - `Expense` gains **`category` (enum: `bank_fee` / `supplies` / `shared_expense` / `solidarity_payout` / `treasurer_comp_payout` / `operating`)** — covers cases #1 (comisión bancaria), #4 (pago por gestión, composes BR-07/08), #5 (insumos), #6 (desayunos/compartidos). `SlipPhoto.attached_to_kind` gains `expense / transfer`.
 > - New write-matrix processes: `P_RecordExpense`→Expense, `P_RecordTransfer`→Transfer, `P_RegularizeDeposit`→Transfer+source.reconciliation_status, `P_ExtraordinaryCollect`→ExtraordinaryCollection(+Line), `P_SolidarityPayout`→Expense(category=solidarity_payout)+collection.status, `P_TreasurerCompPayout`→Expense(category=treasurer_comp_payout) — all also write `AuditLogEntry`.
+
+> **Mutation contract (CHG-011, reconciled to the shipped trigger by CHG-012 — DEC-MB-005/006).**
+> Authoritative implementation: `allow_extraordinary_collection_transition()` in migration
+> `V20260721133500__extraordinary_collection_financial_bindings.sql` (supersedes the CHG-011 draft;
+> the init migration's blanket append-only triggers were replaced per HR-25 by a new migration).
+> - **`open→collecting`:** only `status` may change (jsonb-diff equality on all other columns).
+> - **`collecting→paid_out` is per-`kind`:**
+>   - `kind='solidarity'` REQUIRES a valid **paid** `solidarity_payout` Expense linked via
+>     `paid_out_expense_id` (beneficiary match; `0 < payout ≤ Σ regularized lines`).
+>   - `kind='treasurer_recognition'` REQUIRES `paid_out_expense_id IS NULL`
+>     (`recognition_payout_expense_forbidden`) — **`paid_out` is a zero-payout waypoint**; there is
+>     deliberately NO direct `collecting→closed` edge (DEC-MB-005).
+> - **`paid_out→closed` and `open|collecting→cancelled`:** only `status` + the four surplus columns
+>   (`surplus_amount`, `disposition`, `disposition_motive`, `surplus_transfer_id`) may change;
+>   `surplus_amount = Σ(regularized lines) − payout` (payout 0 with no expense — so a closed
+>   recognition colecta retains its FULL regularized total); terminal edges reject any pending line
+>   (`collection_pending_regularization`); `cancelled` from `collecting` rejects any
+>   `paid_out_expense_id` (`cancelled_collection_payout_forbidden`); `disposition='retained'`
+>   REQUIRES `disposition_motive` (trimmed length ≥ 3 — the group-vote reference);
+>   `disposition='returned'` REQUIRES the single surplus Transfer (see `surplus_transfer_id` row +
+>   DEC-MB-006): trigger-revalidated `purpose='collection_surplus_return'`,
+>   `regularizes_kind='extraordinary_collection'`, group-fund source → active same-org NON-group
+>   return-channel destination, not reversed, `amount = surplus_amount`
+>   (`collection_surplus_return_invalid`); at-most-one enforced by `uq_collection_surplus_transfer_once`.
+> - `recognition_fiscal_year` is **INSERT-only** — never legal in any UPDATE. DELETE always forbidden.
+> - **`extraordinary_collection_line`:** UPDATE permitted ONLY for
+>   `reconciliation_status pending→regularized` with no other column changing
+>   (`allow_extraordinary_collection_line_regularization()`). DELETE forbidden.
+> - Everything else stays append-only + audited (BR-16). Adversarial set: state-skips (`open→paid_out`,
+>   `collecting→closed`), regressions (`closed→collecting`), `purpose` edits post-open,
+>   `regularized→pending` flips, a recognition colecta carrying an expense at `paid_out`, and a
+>   solidarity colecta without one must ALL RAISE.
 
 <!-- ───────────────────────── end CHG-001 ───────────────────────── -->
 

@@ -1,5 +1,6 @@
 // @mi-banquito/ui — design-system component library barrel (IMP-265).
 export * from "./tokens";
+export * from "./money4";
 export * from "./atoms/avatar";
 export * from "./atoms/button-destructive";
 export * from "./atoms/button-ghost";

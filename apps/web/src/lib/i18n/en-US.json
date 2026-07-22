@@ -369,8 +369,8 @@
   "movements": {
     "title": "Registrar movimiento",
     "subtitle": "Salidas del fondo y transferencias entre cuentas del grupo",
-    "helpTitle": "Movimientos del fondo",
-    "helpBody": "Registra un gasto en Salida del fondo o mueve dinero entre dos cuentas del grupo.",
+    "helpTitle": "Para qué sirve esta pantalla",
+    "helpBody": "Registra todo lo que entra o sale del fondo además de aportes y préstamos: comisiones del banco, insumos, desayunos, el pago a la beneficiaria de una colecta, el pago reconocido a la tesorera, y transferencias entre cuentas. Llena \"Salida del fondo\" para un gasto, o \"Movimiento entre cuentas\" para una transferencia o para regularizar un depósito que te llegó a tu cuenta personal. El pago a la tesorera nunca puede superar el monto reconocido por el grupo.",
     "blockedTitle": "No se pueden registrar movimientos",
     "blockedDescription": "Registra o activa al menos una cuenta dentro del fondo del grupo antes de continuar.",
     "accountBalances": "Saldos por cuenta",
@@ -383,6 +383,7 @@
     "regularizationSubtitle": "Pasa al fondo un aporte o pago que entró en una cuenta personal.",
     "pendingDeposits": "Depósitos pendientes de regularizar",
     "noPendingDeposits": "No hay depósitos pendientes de regularizar.",
+    "loadMorePending": "Ver más depósitos pendientes",
     "legacyAccount": "Cuenta histórica sin referencia",
     "legacyCannotRegularize": "Este movimiento histórico permanece legible, pero no tiene una cuenta de origen para regularizar.",
     "regularizationTarget": "Hacia la cuenta del fondo",
@@ -404,6 +405,16 @@
     "transferNeedsTwoAccounts": "Activa una segunda cuenta del fondo para registrar transferencias.",
     "governedTitle": "Pagos con control previo",
     "governedBody": "Los pagos solidarios y a la tesorera deben registrarse desde su proceso aprobado para respetar sus topes y controles.",
+    "compensationCeilingNoteTitle": "Tope del pago a la tesorera",
+    "compensationCeilingNoteBody": "Cuando la categoría es \"Pago a tesorera\", el sistema solo acepta hasta lo disponible del monto reconocido por el grupo este año. \"Ya pagado\" incluye tanto los pagos automáticos del sistema como pagos manuales anteriores — es un solo derecho reconocido, nunca se paga dos veces (BR-15/CHG-011).",
+    "compensationTitle": "Disponible para pago a tesorera",
+    "compensationFiscalYear": "Año fiscal {{year}}",
+    "compensationEntitlement": "Reconocido (hasta este año)",
+    "compensationPaid": "Ya pagado (automático + manual)",
+    "compensationAvailable": "Disponible ahora",
+    "compensationExhausted": "Ya se pagó todo el monto reconocido este año (por el pago automático del sistema o pagos manuales anteriores). No hay disponible.",
+    "compensationOverCeiling": "El monto supera lo disponible. Reconocido {{cumulativeEntitlement}} · ya pagado {{cumulativePaid}} · disponible {{payableNow}}.",
+    "saveCompensation": "Guardar pago a tesorera",
     "accountWithLast4": "{{name}} • {{last4}}",
     "success": "Movimiento registrado — {{category}}, {{currency}} {{amount}}",
     "categories": {
@@ -420,6 +431,8 @@
       "invalid-form": "Revisa los datos del movimiento e intenta nuevamente.",
       "account-unavailable": "Selecciona cuentas activas que pertenezcan al fondo del grupo.",
       "governed-payout-required": "Ese pago debe registrarse desde su proceso aprobado.",
+      "compensation-request-conflict": "Este intento ya se usó con datos distintos. Actualiza la pantalla e inténtalo de nuevo.",
+      "compensation-actor-invalid": "Solo la tesorera activa puede registrar este pago.",
       "invalid-slip": "El comprobante debe ser una imagen JPG, PNG o WebP válida de hasta 5 MB.",
       "slip-upload-unavailable": "No se pudo adjuntar el comprobante. Guarda el movimiento sin archivo o inténtalo desde el cargador validado.",
       "action-failed": "No se pudo registrar el movimiento. Intenta nuevamente."
@@ -479,10 +492,13 @@
   "liquidez": {
     "title": "Liquidez proyectada",
     "description": "Mira si el banquito aguanta nuevos préstamos sin tocar la cuota base.",
+    "physicalCashBalance": "Efectivo físico",
+    "collectionCashBalance": "Efectivo de colectas reservado",
+    "regularizedDistributableBalance": "Fondo regularizado disponible",
     "availableCapital": "Capital disponible",
     "poolBalance": "Dinero total",
-    "baseFundPool": "Cuota base protegida",
-    "baseFundExplanation": "Capital disponible = dinero total menos cuota base protegida.",
+    "baseFundPool": "Compromiso del fondo base",
+    "baseFundExplanation": "El efectivo de colectas está reservado. Los préstamos se simulan solo con el fondo regularizado disponible, descontando el compromiso del fondo base.",
     "summary": "Resumen",
     "sandboxTitle": "Considerar un préstamo",
     "sandboxAmount": "Monto del préstamo de prueba",
@@ -554,7 +570,33 @@
     "openPdf": "Abrir PDF",
     "shareWhatsapp": "Compartir por WhatsApp",
     "generateMemberStatements": "Generar estados de cuenta de {{period}}",
-    "memberStatementsReady": "{{count}} estados por socia listos para compartir."
+    "memberStatementsReady": "{{ready}} de {{active}} estados por socia listos.",
+    "member": "Socia",
+    "viewMember": "Ver detalle de {{member}}",
+    "historicalMember": "Socia archivada",
+    "loading": "Cargando estados de cuenta...",
+    "loadError": "No se pudieron cargar los estados de cuenta.",
+    "retry": "Intentar de nuevo"
+    ,"fundMovementsTitle": "Movimientos del fondo y colectas (transparencia)"
+    ,"movementDate": "Fecha"
+    ,"movementSource": "Fuente"
+    ,"movementConcept": "Concepto"
+    ,"movementCategory": "Categoría"
+    ,"movementAccount": "Cuenta"
+    ,"movementStatus": "Estado"
+    ,"movementAmount": "Monto firmado"
+    ,"movementReversal": "Reversa de"
+    ,"reversalLabel": "Reverso"
+    ,"noAccount": "Sin cuenta asociada"
+    ,"reconciled": "Conciliado"
+    ,"summaryTitle": "Resumen del último cierre ({{period}}) — neto de movimientos"
+    ,"summaryMembers": "Socias con estado"
+    ,"summaryIn": "Aportes del mes"
+    ,"summaryOut": "Préstamos desembolsados"
+    ,"summaryMovements": "Movimientos del fondo"
+    ,"summaryBalance": "Saldo neto del fondo"
+    ,"archivedHash": "Hash archivado"
+    ,"archivedGeneratedAt": "Generado"
   },
   "yearEndShareOut": {
     "description": "Revisa la decisión aprobada, calcula el reparto y aprueba cuando cuadre.",
@@ -564,6 +606,18 @@
     "empty": "Aún no hay un borrador de reparto para {{year}}.",
     "governanceRequiredError": "Antes de generar el reparto, registra y aprueba la decisión de gobernanza del año.",
     "yearEndCloseRequiredError": "Antes de generar el reparto, cierra el período anual correspondiente.",
+    "draftInvalidError": "La solicitud para generar el reparto no es válida. Vuelve a intentarlo.",
+    "regularizedBalanceError": "El reparto aprobado supera el fondo regularizado disponible. Ajusta la decisión de la Asamblea antes de continuar.",
+    "regularizedBalance": "Fondo regularizado disponible",
+    "regularizedBalanceExplanation": "La colecta extraordinaria permanece separada: este techo incluye solo dinero regularizado que sí puede repartirse.",
+    "twoPoolTitle": "Paso 1 — Las dos bolsas del reparto",
+    "loanPoolSummary": "Bolsa préstamos",
+    "savingsPoolSummary": "Bolsa ahorros",
+    "loanRateSummary": "Alícuota préstamos",
+    "savingsRateSummary": "Alícuota ahorros",
+    "participationExplanation": "Tu participación es proporcional al tiempo que tu dinero estuvo en el fondo durante el año, no al saldo acumulado.",
+    "approvalSummaryTitle": "Resumen del reparto a aprobar",
+    "approvalSummary": "Se repartirá el total aprobado por la Asamblea entre las socias: bono por préstamos (sobre el capital cobrado — propios + garantizados) + interés sobre ahorros (saldo ponderado por tiempo). La suma cuadra exactamente con el reparto (con línea de ajuste). Al aprobar, se registran los pagos, se hace el corte del año (snapshot inmutable) y se generan los PDFs. Tienes una ventana de gracia para revertirlo.",
     "genericError": "No se pudo generar el reparto todavía.",
     "reversalWindowClosedError": "La ventana para reversar este reparto ya cerró.",
     "reversalReasonMinError": "Escribe una razón de al menos 10 caracteres para reversar el reparto.",
@@ -590,7 +644,7 @@
     "reverseTitle": "Reverso dentro de ventana",
     "reverseDescription": "Registra el reverso del reparto dentro de las 24 horas. Se crearán retiros negativos y los documentos archivados quedarán superseded sin borrarse.",
     "reverseReason": "Razón de reverso",
-    "reverseSubmit": "Reversar reparto",
+    "reverseSubmit": "Revertir reparto",
     "reason": "Razón",
     "finalAmountForMember": "Monto final {{member}}",
     "reasonForMember": "Razón {{member}}"
@@ -622,6 +676,7 @@
       ,"regularizedRepayment": "Pago regularizado"
       ,"regularizationTransfer": "Transferencia para regularizar"
       ,"legacyAccount": "Cuenta histórica sin referencia"
+      ,"fundMovementsTitle": "Movimientos del fondo y colectas (transparencia)"
     },
     "yearEndMemberTitle": "Estado fin de año",
     "yearEndShareOutTitle": "Reparto fin de año",
@@ -630,7 +685,34 @@
     "hash": "Hash"
   },
   "verifier": {
-    "title": "Verificación de documento"
+    "title": "Verificación de documento",
+    "publicDescription": "Esta página es pública y comprueba que el documento coincide con el registro archivado del grupo.",
+    "authenticTitle": "Documento auténtico",
+    "authenticBody": "El código coincide con un documento firmado por el grupo.",
+    "detailsTitle": "Detalles del registro",
+    "generatedAt": "Generado",
+    "movementsTitle": "Movimientos del fondo y colectas (transparencia)",
+    "movementsDescription": "Todo lo que entró y salió del fondo aparece desde el registro archivado.",
+    "date": "Fecha",
+    "concept": "Concepto",
+    "category": "Categoría",
+    "account": "Cuenta",
+    "status": "Estado",
+    "amount": "Monto",
+    "reversalLabel": "Reverso",
+    "reverses": "Reversa de",
+    "noAccount": "Sin cuenta asociada",
+    "reconciled": "Conciliado",
+    "noMovements": "El documento archivado no contiene movimientos para mostrar."
+    ,"hashLabel": "Código de verificación"
+    ,"invalidHash": "Escribe un código hexadecimal de 64 caracteres."
+    ,"verifyAnother": "Verificar otro código"
+    ,"qrTitle": "Verificación por QR"
+    ,"qrHint": "También puedes escanear el código QR impreso en el PDF para abrir esta verificación."
+    ,"pdfPreviewTitle": "Vista previa del PDF"
+    ,"pdfPreviewSummary": "Grupo: {{group}} · Período: {{period}} · {{movements}} movimientos archivados"
+    ,"unknownPeriod": "Período archivado"
+    ,"openArchivedPdf": "Abrir PDF archivado"
   },
   "offline": {
     "queued": "Guardado. Se sincronizará cuando vuelva la señal",
@@ -777,6 +859,9 @@
       ,"legacyAccount": "Cuenta histórica sin referencia"
       ,"pendingStatus": "Pendiente de regularizar"
       ,"regularizedStatus": "Regularizado"
+      ,"loadingDetail": "Cargando detalle de la socia..."
+      ,"loadDetailError": "No se pudo cargar el detalle de la socia."
+      ,"retry": "Intentar de nuevo"
     },
     "group": {
       "title": "Mi grupo",
@@ -918,6 +1003,95 @@
       "slip": "Comprobante",
       "notes": "Notas",
       "submit": "Registrar pago"
+    }
+  },
+  "collections": {
+    "title": "Colecta solidaria",
+    "subtitle": "Registra cada aporte, regulariza el dinero y cierra la colecta con un destino verificable.",
+    "openTitle": "Abrir una colecta",
+    "purpose": "Motivo de la colecta",
+    "beneficiary": "Beneficiaria",
+    "kind": "Tipo",
+    "solidarity": "Solidaria (calamidad)",
+    "recognition": "Reconocimiento a tesorera",
+    "recognitionYear": "Año fiscal del reconocimiento",
+    "target": "Meta (USD, opcional)",
+    "openedOn": "Fecha de apertura",
+    "openSubmit": "Abrir colecta",
+    "selectTitle": "Colectas",
+    "noCollections": "Aún no hay colectas. Abre la primera cuando el grupo la necesite.",
+    "summaryTitle": "Estado de la colecta",
+    "purposePrefix": "Motivo: {{purpose}}",
+    "beneficiaryPrefix": "Beneficiaria: {{beneficiary}}",
+    "contributors": "{{contributors}} de {{members}} socias han aportado",
+    "collected": "Recaudado: USD {{amount}}",
+    "targetProgress": " de USD {{target}} (meta)",
+    "regularized": "Regularizado: USD {{amount}}",
+    "pending": "Pendiente: USD {{amount}}",
+    "status": {
+      "open": "Abierta",
+      "collecting": "Recibiendo aportes",
+      "paid_out": "Pagada",
+      "closed": "Colecta cerrada",
+      "cancelled": "Colecta cancelada"
+    },
+    "surplusNone": "Sin sobrante",
+    "surplusReturned": "Devuelto: USD {{amount}}",
+    "surplusRetained": "Retenido: USD {{amount}}",
+    "addTitle": "Registrar aporte a la colecta",
+    "member": "Socia",
+    "amount": "Monto (USD)",
+    "account": "¿En qué cuenta entró?",
+    "addSubmit": "Agregar aporte",
+    "linesTitle": "Aportes recibidos",
+    "emptyLines": "Aún no se han registrado aportes.",
+    "lineMember": "Socia",
+    "lineAmount": "Monto",
+    "lineAccount": "Cuenta",
+    "lineStatus": "Estado",
+    "linePending": "Pendiente",
+    "lineRegularized": "Regularizado",
+    "regularize": "Regularizar",
+    "regularizationTarget": "Hacia la cuenta",
+    "regularizationConfirm": "Confirmo que el dinero ya está en la cuenta del grupo",
+    "regularizationSubmit": "Confirmar regularización",
+    "reverse": "Revertir aporte",
+    "reversalReason": "Motivo de la reversión",
+    "payoutTitle": "Registrar pago solidario",
+    "payoutAmount": "Monto a pagar (USD)",
+    "sourceAccount": "Cuenta desde la que se paga",
+    "surplusChoice": "Si sobra dinero",
+    "surplusEmpty": "No habrá sobrante",
+    "surplusReturn": "Devolver por una cuenta de retorno",
+    "surplusRetain": "Retener por decisión del grupo",
+    "returnAccount": "Cuenta de retorno a contribuyentes",
+    "voteReference": "Referencia de la votación",
+    "payoutSubmit": "Registrar pago y cerrar colecta",
+    "payoutBlocked": "Primero debes regularizar todos los aportes pendientes.",
+    "payoutCeiling": "Máximo regularizado disponible: USD {{amount}}",
+    "cancelTitle": "Cancelar colecta",
+    "cancelSubmit": "Cancelar colecta",
+    "cancelHelp": "Si ya hay dinero regularizado, indica cómo se devolverá o conservará.",
+    "recognitionCloseTitle": "Cerrar reconocimiento",
+    "recognitionCloseHelp": "La votación conserva el total regularizado como reconocimiento aprobado.",
+    "recognitionCloseSubmit": "Cerrar reconocimiento",
+    "success": "La operación se registró correctamente.",
+    "loading": "Cargando colectas…",
+    "errorTitle": "No pudimos cargar las colectas",
+    "errorBody": "Inténtalo otra vez. Tus datos registrados no se modificaron.",
+    "retry": "Reintentar",
+    "errors": {
+      "invalid-form": "Revisa los campos e inténtalo de nuevo.",
+      "collection-not-found": "La colecta ya no está disponible para este grupo.",
+      "collection-pending-regularization": "Regulariza todos los aportes antes de continuar.",
+      "collection-payout-above-ceiling": "El pago supera el total regularizado disponible.",
+      "collection-disposition-required": "Indica qué ocurrirá con el dinero sobrante.",
+      "collection-return-account-required": "Selecciona la cuenta de retorno.",
+      "collection-retention-motive-required": "Escribe la referencia de la votación del grupo.",
+      "collection-transition-invalid": "El estado actual de la colecta no permite esa operación.",
+      "collection-reversal-invalid": "Ese aporte no se puede revertir.",
+      "collection-idempotency-conflict": "La solicitud ya se usó con datos distintos. Recarga la página.",
+      "action-failed": "No pudimos registrar la operación. Inténtalo otra vez."
     }
   },
   "nav": {

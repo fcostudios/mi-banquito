@@ -5,26 +5,12 @@ import { redirect } from "next/navigation";
 import { createReportingService } from "@mi-banquito/domain";
 
 import { requireTreasurer } from "@/lib/auth/require-session";
-import messages from "@/lib/i18n/en-US.json";
-import { uploadMonthlyMemberArtifact } from "@/lib/monthly-member-artifact";
+import { deleteMonthlyMemberArtifact, uploadMonthlyMemberArtifact } from "@/lib/monthly-member-artifact";
+import { ROUTE_SCR_STATEMENTS_ARCHIVE } from "@/lib/routes";
+import { executeGenerateMemberStatementsAction } from "./generate-statements";
 
 export async function generateMemberStatementsAction(formData: FormData) {
-  const session = await requireTreasurer();
-  const periodCloseId = String(formData.get("periodCloseId") ?? "");
-  const returnTo = String(formData.get("returnTo") ?? "");
-  await createReportingService().generateMonthlyMemberStatements({
-    orgId: session.orgId,
-    actorId: session.actorId,
-    periodCloseId,
-    memberId: String(formData.get("memberId") ?? "") || undefined,
-    statementCopy: messages.statementPdf.monthlyMember,
-    createArtifact: uploadMonthlyMemberArtifact,
-  });
-  revalidatePath("/estados");
-  if (returnTo.startsWith("/") && !returnTo.startsWith("//")) {
-    revalidatePath(returnTo.split("?")[0] || "/");
-    redirect(returnTo);
-  }
+  await executeGenerateMemberStatementsAction(formData, uploadMonthlyMemberArtifact, deleteMonthlyMemberArtifact);
 }
 
 export async function shareStatementAction(formData: FormData) {
@@ -38,5 +24,5 @@ export async function shareStatementAction(formData: FormData) {
   if (result.whatsappUrl) {
     redirect(result.whatsappUrl);
   }
-  revalidatePath("/estados");
+  revalidatePath(ROUTE_SCR_STATEMENTS_ARCHIVE);
 }

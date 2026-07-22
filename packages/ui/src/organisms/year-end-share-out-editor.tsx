@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { formatUsdMoney4 } from "../money4";
 
 export interface YearEndShareOutEditorProps {
   shareOut: {
@@ -45,7 +46,7 @@ export interface YearEndShareOutEditorProps {
 }
 
 function usd(value: string | null | undefined) {
-  return `USD ${Number(value ?? 0).toFixed(2)}`;
+  return formatUsdMoney4(value, "code");
 }
 
 export function YearEndShareOutEditor(props: YearEndShareOutEditorProps) {

@@ -8,6 +8,9 @@ export { applyHypotheticalLoan, liquidityNarrative, type HypotheticalLoanTerms, 
 const DEFAULT_HYPOTHETICAL_LOAN_TERM_PERIODS = 10;
 
 export type LiquidityProjection = {
+  physicalCashBalance: string;
+  collectionCashBalance: string;
+  regularizedDistributableBalance: string;
   availableCapital: string;
   poolBalance: string;
   baseFundPool: string;
@@ -28,6 +31,9 @@ type LiveLiquidityRow = {
   poolBalance: string;
   baseFundPool: string;
   availableCapital: string;
+  physicalCashBalance: string;
+  collectionCashBalance: string;
+  regularizedDistributableBalance: string;
   loanRateValue: string;
 };
 
@@ -41,8 +47,10 @@ export function createLiquidityService(): LiquidityService {
     async getProjection(orgId) {
       const rows = await withTenantTransaction(orgId, async (tx) => {
         const result = await tx.execute<LiveLiquidityRow>(sql`
-          WITH movement_pool AS (
-            SELECT fund_pool_balance(${orgId}) AS pool_balance
+          WITH movement_pool AS MATERIALIZED (
+            SELECT fund_pool_balance(${orgId}::uuid) AS pool_balance,
+              collection_cash_balance(${orgId}::uuid) AS collection_cash_balance,
+              physical_cash_balance(${orgId}::uuid) AS physical_cash_balance
           ),
           latest_base_fund AS (
             SELECT COALESCE(SUM(amount), 0)::numeric(18, 4) AS base_fund_pool
@@ -82,6 +90,9 @@ export function createLiquidityService(): LiquidityService {
               WHERE collection.month_on <= months.month_on
             ), 0))::numeric(18, 4) AS "projectedBalance",
             pool.pool_balance AS "poolBalance",
+            pool.physical_cash_balance AS "physicalCashBalance",
+            pool.collection_cash_balance AS "collectionCashBalance",
+            pool.pool_balance AS "regularizedDistributableBalance",
             base.base_fund_pool AS "baseFundPool",
             (pool.pool_balance - base.base_fund_pool)::numeric(18, 4) AS "availableCapital",
             COALESCE(config.loan_rate_value, 0)::numeric(8, 4) AS "loanRateValue"
@@ -101,6 +112,9 @@ export function createLiquidityService(): LiquidityService {
       const commitment = String(first?.baseFundPool ?? "0.0000");
 
       return {
+        physicalCashBalance: String(first?.physicalCashBalance ?? "0.0000"),
+        collectionCashBalance: String(first?.collectionCashBalance ?? "0.0000"),
+        regularizedDistributableBalance: String(first?.regularizedDistributableBalance ?? "0.0000"),
         availableCapital: String(first?.availableCapital ?? "0.0000"),
         poolBalance: String(first?.poolBalance ?? "0.0000"),
         baseFundPool: commitment,

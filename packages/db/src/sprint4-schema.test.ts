@@ -145,7 +145,8 @@ describe("Sprint 4 schema substrate", () => {
               SELECT 1
               FROM pg_proc
               WHERE proname = 'fund_pool_balance'
-                AND pg_get_functiondef(oid) ILIKE '%reconciliation_status = ''regularized''%'
+                AND pg_get_functiondef(oid) ILIKE '%COALESCE(original.reconciliation_status, c.reconciliation_status) = ''regularized''%'
+                AND pg_get_functiondef(oid) ILIKE '%COALESCE(original.reconciliation_status, r.reconciliation_status) = ''regularized''%'
                 AND pg_get_functiondef(oid) ILIKE '%is_group_fund%'
                 AND pg_get_functiondef(oid) ILIKE '%loan_disbursement%'
                 AND pg_get_functiondef(oid) ILIKE '%repayment%'

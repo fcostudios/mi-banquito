@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getActiveImpersonationSession, type ActiveImpersonationSession } from "@/lib/impersonation/session";
 import { and, desc, eq } from "drizzle-orm";
 import { auth0 } from "@/lib/auth0";
@@ -54,16 +55,23 @@ function getConfiguredDbOrgIdFromNativeOrg(nativeOrgId: unknown): string | undef
   return undefined;
 }
 
-function getDevelopmentBypassSession(): RequiredSession | undefined {
+async function getDevelopmentBypassSession(): Promise<RequiredSession | undefined> {
   if (process.env.E2E_AUTH_BYPASS !== "1" || process.env.NODE_ENV === "production") {
     return undefined;
   }
 
+  const requiresHeader = process.env.E2E_AUTH_REQUIRE_HEADER === "1";
+  const requestHeaders = requiresHeader ? await headers() : undefined;
+  const requestActorId = requestHeaders?.get("x-e2e-auth-actor-id");
+  if (requiresHeader && !requestActorId) return undefined;
   return {
     userId: "e2e-auth-bypass",
-    actorId: "33333333-3333-4333-8333-333333333333",
+    actorId: requestActorId
+      ?? process.env.E2E_AUTH_ACTOR_ID
+      ?? "33333333-3333-4333-8333-333333333333",
     orgId: process.env.AUTH0_ORGANIZATION_DB_ORG_ID ?? "11111111-1111-4111-8111-111111111111",
-    roles: ["TESORERA"],
+    roles: (requestHeaders?.get("x-e2e-auth-roles") ?? process.env.E2E_AUTH_ROLES)
+      ?.split(",").map((role) => role.trim()).filter(Boolean) ?? ["TESORERA"],
   };
 }
 
@@ -85,8 +93,9 @@ async function getActivePlatformOperator(userId: string) {
 
 export async function requireRole(minRole: AppRole): Promise<RequiredSession> {
   initializeTenantRequestContext();
-  const bypass = getDevelopmentBypassSession();
-  if (bypass && hasMinRole(bypass.roles, minRole)) {
+  const bypass = await getDevelopmentBypassSession();
+  if (bypass) {
+    if (!hasMinRole(bypass.roles, minRole)) redirect(ROUTE_ACCESS_DENIED);
     return bypass;
   }
 
@@ -302,7 +311,7 @@ export async function requireTreasurer(): Promise<RequiredSession> {
 }
 
 export async function getShellSession(): Promise<ShellSession> {
-  const bypass = getDevelopmentBypassSession();
+  const bypass = await getDevelopmentBypassSession();
   if (bypass) {
     return {
       displayName: "Tesorera QA",

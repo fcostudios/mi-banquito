@@ -49,6 +49,7 @@ export type CronRunSummary = {
   compensationConfigsScanned?: number;
   compensationDueConfigs?: number;
   compensationDisbursementsAwarded?: number;
+  compensationDisbursementsAccruedWithoutCash?: number;
   compensationSkippedExistingDisbursements?: number;
   compensationConfigsAdvanced?: number;
   closeOverdueOrgsScanned?: number;
@@ -605,6 +606,7 @@ async function runTreasurerCompensationCron(
     compensationConfigsScanned: 0,
     compensationDueConfigs: 0,
     compensationDisbursementsAwarded: 0,
+    compensationDisbursementsAccruedWithoutCash: 0,
     compensationSkippedExistingDisbursements: 0,
     compensationConfigsAdvanced: 0,
     closeOverdueOrgsScanned: 0,
@@ -635,6 +637,7 @@ async function runTreasurerCompensationCron(
     summary.compensationConfigsScanned = result.configsScanned;
     summary.compensationDueConfigs = result.dueConfigs;
     summary.compensationDisbursementsAwarded = result.disbursementsAwarded;
+    summary.compensationDisbursementsAccruedWithoutCash = result.disbursementsAccruedWithoutCash;
     summary.compensationSkippedExistingDisbursements = result.skippedExistingDisbursements;
     summary.compensationConfigsAdvanced = result.configsAdvanced;
     summary.failures.push(...result.failures);

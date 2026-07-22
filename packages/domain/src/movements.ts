@@ -1,8 +1,20 @@
 import { createHash } from "node:crypto";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
-import { account, alert, auditLogEntry, contribution, expense, member, repayment, slipPhoto, transfer } from "@mi-banquito/db/schema";
-import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
+import {
+  account,
+  alert,
+  auditLogEntry,
+  contribution,
+  expense,
+  extraordinaryCollection,
+  extraordinaryCollectionLine,
+  member,
+  repayment,
+  slipPhoto,
+  transfer,
+} from "@mi-banquito/db/schema";
+import { lockTenantMoneyWrites, withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 
 export const EXPENSE_CATEGORIES = [
   "bank_fee",
@@ -18,10 +30,11 @@ export type ExpenseRow = typeof expense.$inferSelect;
 export type TransferRow = typeof transfer.$inferSelect;
 export type MovementAccountRow = typeof account.$inferSelect;
 export type MovementAccountBalance = MovementAccountRow & { balance: string };
+export type RegularizableKind = "contribution" | "repayment" | "extraordinary_collection";
 export type PendingDeposit = {
   id: string;
   orgId: string;
-  sourceKind: "contribution" | "repayment";
+  sourceKind: RegularizableKind;
   amount: string;
   remaining: string;
   currencyCode: string;
@@ -33,9 +46,32 @@ export type PendingDeposit = {
   notes: string | null;
 };
 
-export type DepositStatus = PendingDeposit & {
+export type DepositStatus = Omit<PendingDeposit, "sourceKind" | "remaining"> & {
+  sourceKind: "contribution" | "repayment";
   reconciliationStatus: "pending" | "regularized";
 };
+
+export type PendingDepositCursor = {
+  datedOn: string;
+  sourceKind: RegularizableKind;
+  id: string;
+};
+
+export type PendingDepositListOptions = {
+  cursor?: PendingDepositCursor | null;
+  /** Defaults to 50 and is capped at 100. */
+  limit?: number;
+};
+
+export type PendingDepositKey = Pick<PendingDepositCursor, "sourceKind" | "id">;
+
+export type PendingDepositPage = {
+  rows: PendingDeposit[];
+  nextCursor: PendingDepositCursor | null;
+  totalCount: number;
+};
+
+type PendingDepositQueryOptions = PendingDepositListOptions & { target?: PendingDepositKey };
 
 type TransferAccount = Pick<MovementAccountRow, "id" | "orgId" | "isGroupFund" | "status">;
 
@@ -70,7 +106,7 @@ export type RecordTransferInput = {
 export type RegularizePendingDepositInput = {
   orgId: string;
   actorId: string;
-  regularizesKind: "contribution" | "repayment";
+  regularizesKind: RegularizableKind;
   regularizesId: string;
   toAccountId: string;
   amount: string;
@@ -91,7 +127,10 @@ export interface MovementService {
   listActiveAccounts(orgId: string): Promise<MovementAccountRow[]>;
   listActiveGroupAccounts(orgId: string): Promise<MovementAccountRow[]>;
   listActiveGroupAccountBalances(orgId: string): Promise<MovementAccountBalance[]>;
-  listPendingDeposits(orgId: string): Promise<PendingDeposit[]>;
+  /** Use the final row's datedOn/sourceKind/id as the cursor for the next page. */
+  listPendingDeposits(orgId: string, options?: PendingDepositListOptions): Promise<PendingDeposit[]>;
+  listPendingDepositsPage(orgId: string, options?: PendingDepositListOptions): Promise<PendingDepositPage>;
+  getPendingDeposit(orgId: string, key: PendingDepositKey): Promise<PendingDeposit | null>;
   listMemberDeposits(orgId: string, memberId: string): Promise<DepositStatus[]>;
   isExpenseSlipUriReferenced(orgId: string, uri: string): Promise<boolean>;
   recordBlobCleanupRequired(input: {
@@ -214,6 +253,29 @@ function assertDateOnly(value: string): string {
   return value;
 }
 
+function assertPendingDepositCursor(cursor: PendingDepositCursor): void {
+  try {
+    assertDateOnly(cursor.datedOn);
+  } catch {
+    throw new Error("pending_deposit_cursor_invalid");
+  }
+  if (
+    !["contribution", "repayment", "extraordinary_collection"].includes(cursor.sourceKind)
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(cursor.id)
+  ) {
+    throw new Error("pending_deposit_cursor_invalid");
+  }
+}
+
+function assertPendingDepositKey(key: PendingDepositKey): void {
+  if (
+    !["contribution", "repayment", "extraordinary_collection"].includes(key.sourceKind)
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key.id)
+  ) {
+    throw new Error("pending_deposit_key_invalid");
+  }
+}
+
 function signedMoneyUnits(value: string): bigint {
   const match = /^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(value);
   if (!match) throw new Error("movement_balance_invalid");
@@ -270,24 +332,44 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
           SELECT account_id AS "accountId", SUM(delta)::numeric(18, 4) AS total
           FROM (
             SELECT account_id, amount AS delta
-            FROM contribution
-            WHERE org_id = ${orgId} AND account_id IS NOT NULL
+            FROM contribution original
+            WHERE org_id = ${orgId} AND account_id IS NOT NULL AND reverses_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM contribution reversal
+                WHERE reversal.org_id = original.org_id AND reversal.reverses_id = original.id
+              )
             UNION ALL
             SELECT account_id, amount AS delta
-            FROM repayment
+            FROM repayment original
             WHERE org_id = ${orgId} AND account_id IS NOT NULL AND reverses_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM repayment reversal
+                WHERE reversal.org_id = original.org_id AND reversal.reverses_id = original.id
+              )
             UNION ALL
             SELECT account_id, -amount AS delta
-            FROM expense
+            FROM expense original
             WHERE org_id = ${orgId} AND account_id IS NOT NULL AND status = 'paid' AND reverses_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM expense reversal
+                WHERE reversal.org_id = original.org_id AND reversal.reverses_id = original.id
+              )
             UNION ALL
             SELECT from_account_id AS account_id, -amount AS delta
-            FROM transfer
+            FROM transfer original
             WHERE org_id = ${orgId} AND reverses_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM transfer reversal
+                WHERE reversal.org_id = original.org_id AND reversal.reverses_id = original.id
+              )
             UNION ALL
             SELECT to_account_id AS account_id, amount AS delta
-            FROM transfer
+            FROM transfer original
             WHERE org_id = ${orgId} AND reverses_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM transfer reversal
+                WHERE reversal.org_id = original.org_id AND reversal.reverses_id = original.id
+              )
           ) movement_delta
           GROUP BY account_id
         `);
@@ -301,72 +383,142 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
       });
     },
 
-    async listPendingDeposits(orgId) {
+    async listPendingDeposits(orgId, options = {}) {
+      return (await this.listPendingDepositsPage(orgId, options)).rows;
+    },
+
+    async listPendingDepositsPage(orgId, options = {}) {
+      const limit = options.limit ?? 50;
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+        throw new Error("pending_deposit_limit_invalid");
+      }
+      if (options.cursor) assertPendingDepositCursor(options.cursor);
+      const queryOptions = options as PendingDepositQueryOptions;
+      if (queryOptions.target) assertPendingDepositKey(queryOptions.target);
       return withTenantTransaction(orgId, async (tx) => {
-        const contributionRows = await tx.select({
-          id: contribution.id,
-          orgId: contribution.orgId,
-          amount: contribution.amount,
-          currencyCode: contribution.currencyCode,
-          datedOn: contribution.datedOn,
-          accountId: contribution.accountId,
-          accountName: account.name,
-          memberId: contribution.memberId,
-          memberName: member.displayName,
-          notes: contribution.notes,
-        }).from(contribution)
-          .innerJoin(member, and(eq(member.orgId, contribution.orgId), eq(member.id, contribution.memberId)))
-          .leftJoin(account, and(eq(account.orgId, contribution.orgId), eq(account.id, contribution.accountId)))
-          .where(and(
-          eq(contribution.orgId, orgId),
-          eq(contribution.reconciliationStatus, "pending"),
-        ));
-        const repaymentRows = await tx.select({
-          id: repayment.id,
-          orgId: repayment.orgId,
-          amount: repayment.amount,
-          currencyCode: repayment.currencyCode,
-          datedOn: repayment.datedOn,
-          accountId: repayment.accountId,
-          accountName: account.name,
-          memberId: repayment.memberId,
-          memberName: member.displayName,
-          notes: repayment.notes,
-        }).from(repayment)
-          .innerJoin(member, and(eq(member.orgId, repayment.orgId), eq(member.id, repayment.memberId)))
-          .leftJoin(account, and(eq(account.orgId, repayment.orgId), eq(account.id, repayment.accountId)))
-          .where(and(
-          eq(repayment.orgId, orgId),
-          eq(repayment.reconciliationStatus, "pending"),
-        ));
-        const rows = [
-          ...contributionRows.map((row) => ({ ...row, sourceKind: "contribution" as const })),
-          ...repaymentRows.map((row) => ({ ...row, sourceKind: "repayment" as const })),
-        ].sort((left, right) => (
-          String(left.datedOn).localeCompare(String(right.datedOn))
-          || left.sourceKind.localeCompare(right.sourceKind)
-          || left.id.localeCompare(right.id)
-        ));
-        const coverageResult = await tx.execute<{ regularizesKind: string; regularizesId: string; total: string }>(sql`
-          SELECT t.regularizes_kind AS "regularizesKind", t.regularizes_id AS "regularizesId",
-                 COALESCE(SUM(t.amount), 0)::numeric(18, 4)::text AS total
-          FROM transfer t
-          WHERE t.org_id = ${orgId}
-            AND t.purpose = 'regularization'
-            AND t.reverses_id IS NULL
-            AND NOT EXISTS (
-              SELECT 1 FROM transfer reversal
-              WHERE reversal.org_id = t.org_id AND reversal.reverses_id = t.id
+        const cursorPredicate = options.cursor ? sql`
+          AND (
+            source.dated_on > ${options.cursor.datedOn}
+            OR (source.dated_on = ${options.cursor.datedOn} AND source.source_kind > ${options.cursor.sourceKind})
+            OR (
+              source.dated_on = ${options.cursor.datedOn}
+              AND source.source_kind = ${options.cursor.sourceKind}
+              AND source.id > ${options.cursor.id}
             )
-          GROUP BY t.regularizes_kind, t.regularizes_id
+          )
+        ` : sql``;
+        const targetPredicate = queryOptions.target ? sql`
+          AND source.source_kind = ${queryOptions.target.sourceKind}
+          AND source.id = ${queryOptions.target.id}
+        ` : sql``;
+        const result = await tx.execute<PendingDeposit & { totalCount: number }>(sql`
+          WITH pending_source AS (
+            SELECT c.id, c.org_id, 'contribution'::text AS source_kind, c.amount,
+                   c.currency_code, c.dated_on, c.account_id, a.name AS account_name,
+                   c.member_id, m.display_name AS member_name, c.notes
+            FROM contribution c
+            JOIN member m ON m.org_id = c.org_id AND m.id = c.member_id
+            LEFT JOIN account a ON a.org_id = c.org_id AND a.id = c.account_id
+            WHERE c.org_id = ${orgId} AND c.reconciliation_status = 'pending'
+              AND c.reverses_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM contribution reversal
+                WHERE reversal.org_id = c.org_id AND reversal.reverses_id = c.id
+              )
+            UNION ALL
+            SELECT r.id, r.org_id, 'repayment'::text AS source_kind, r.amount,
+                   r.currency_code, r.dated_on, r.account_id, a.name AS account_name,
+                   r.member_id, m.display_name AS member_name, r.notes
+            FROM repayment r
+            JOIN member m ON m.org_id = r.org_id AND m.id = r.member_id
+            LEFT JOIN account a ON a.org_id = r.org_id AND a.id = r.account_id
+            WHERE r.org_id = ${orgId} AND r.reconciliation_status = 'pending'
+              AND r.reverses_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM repayment reversal
+                WHERE reversal.org_id = r.org_id AND reversal.reverses_id = r.id
+              )
+            UNION ALL
+            SELECT line.id, line.org_id, 'extraordinary_collection'::text AS source_kind,
+                   line.amount, 'USD'::text AS currency_code, line.dated_on, line.account_id,
+                   a.name AS account_name, line.member_id, m.display_name AS member_name,
+                   header.purpose AS notes
+            FROM extraordinary_collection_line line
+            JOIN extraordinary_collection header
+              ON header.org_id = line.org_id AND header.id = line.collection_id
+              AND header.status IN ('open', 'collecting')
+            JOIN member m ON m.org_id = line.org_id AND m.id = line.member_id
+            JOIN account a ON a.org_id = line.org_id AND a.id = line.account_id
+            WHERE line.org_id = ${orgId} AND line.reconciliation_status = 'pending'
+              AND line.reverses_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM extraordinary_collection_line reversal
+                WHERE reversal.org_id = line.org_id AND reversal.reverses_id = line.id
+              )
+          ), total_source AS (
+            SELECT COUNT(*)::int AS total_count
+            FROM pending_source
+          ), page_source AS (
+            SELECT source.*
+            FROM pending_source source
+            WHERE true ${cursorPredicate} ${targetPredicate}
+            ORDER BY source.dated_on, source.source_kind, source.id
+            LIMIT ${limit + 1}
+          )
+          SELECT source.id,
+                 source.org_id AS "orgId",
+                 source.source_kind AS "sourceKind",
+                 source.amount::numeric(18, 4)::text AS amount,
+                 GREATEST(source.amount - COALESCE((
+                   SELECT SUM(t.amount)
+                   FROM transfer t
+                   WHERE t.org_id = source.org_id
+                     AND t.purpose = 'regularization'
+                     AND t.regularizes_kind = source.source_kind
+                     AND t.regularizes_id = source.id
+                     AND t.amount > 0 AND t.amount <> 'NaN'::numeric
+                     AND t.reverses_id IS NULL
+                     AND NOT EXISTS (
+                       SELECT 1 FROM transfer reversal
+                       WHERE reversal.org_id = t.org_id AND reversal.reverses_id = t.id
+                     )
+                 ), 0), 0)::numeric(18, 4)::text AS remaining,
+                 source.currency_code AS "currencyCode",
+                 source.dated_on::text AS "datedOn",
+                 source.account_id AS "accountId",
+                 source.account_name AS "accountName",
+                 source.member_id AS "memberId",
+                 source.member_name AS "memberName",
+                 source.notes,
+                 total.total_count AS "totalCount"
+          FROM total_source total
+          LEFT JOIN page_source source ON true
+          ORDER BY source.dated_on, source.source_kind, source.id
         `);
-        const coverageRows = Array.isArray(coverageResult) ? coverageResult : coverageResult.rows ?? [];
-        const coverage = new Map(coverageRows.map((row) => [`${row.regularizesKind}:${row.regularizesId}`, row.total]));
-        return rows.map((row) => ({
-          ...row,
-          remaining: remainingMoney(String(row.amount), coverage.get(`${row.sourceKind}:${row.id}`) ?? "0.0000"),
-        })) as PendingDeposit[];
+        const rawRows = Array.isArray(result) ? result : result.rows ?? [];
+        const totalCount = Number(rawRows[0]?.totalCount ?? 0);
+        const pendingRows = rawRows.filter((row) => row.id !== null);
+        const rows = pendingRows.slice(0, limit).map(({ totalCount: _totalCount, ...row }) => row as PendingDeposit);
+        const last = rows.at(-1);
+        return {
+          rows,
+          nextCursor: pendingRows.length > limit && last ? {
+            datedOn: last.datedOn,
+            sourceKind: last.sourceKind,
+            id: last.id,
+          } : null,
+          totalCount,
+        };
       });
+    },
+
+    async getPendingDeposit(orgId, key) {
+      assertPendingDepositKey(key);
+      const page = await this.listPendingDepositsPage(orgId, {
+        limit: 1,
+        target: key,
+      } as PendingDepositQueryOptions);
+      return page.rows[0] ?? null;
     },
 
     async listMemberDeposits(orgId, memberId) {
@@ -717,6 +869,7 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
       const notes = normalizedNotes(input.notes);
 
       return withWritableTenantTransaction(input.orgId, async (tx) => {
+        await lockTenantMoneyWrites(tx, input.orgId);
         const assertEquivalentReplay = (replayed: TransferRow): TransferRow => {
           if (
             replayed.orgId !== input.orgId
@@ -753,13 +906,20 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
           if (typeof snapshot?.coverage !== "string" || typeof snapshot.regularized !== "boolean") {
             throw new Error("regularization_replay_outcome_missing");
           }
-          const [sourceAmount] = input.regularizesKind === "contribution"
+          const sourceAmountRows = input.regularizesKind === "contribution"
             ? await tx.select({ amount: contribution.amount }).from(contribution).where(and(
               eq(contribution.orgId, input.orgId), eq(contribution.id, input.regularizesId),
             )).limit(1)
-            : await tx.select({ amount: repayment.amount }).from(repayment).where(and(
+            : input.regularizesKind === "repayment"
+              ? await tx.select({ amount: repayment.amount }).from(repayment).where(and(
               eq(repayment.orgId, input.orgId), eq(repayment.id, input.regularizesId),
-            )).limit(1);
+              )).limit(1)
+              : await tx.select({ amount: extraordinaryCollectionLine.amount })
+                .from(extraordinaryCollectionLine).where(and(
+                  eq(extraordinaryCollectionLine.orgId, input.orgId),
+                  eq(extraordinaryCollectionLine.id, input.regularizesId),
+                )).limit(1);
+          const sourceAmount = sourceAmountRows[0];
           return {
             transfer: replayed,
             coverage: snapshot.coverage,
@@ -782,8 +942,14 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
             eq(contribution.orgId, input.orgId),
             eq(contribution.id, input.regularizesId),
             isNull(contribution.reversesId),
+            sql`NOT EXISTS (
+              SELECT 1 FROM contribution reversal
+              WHERE reversal.org_id = ${contribution.orgId}
+                AND reversal.reverses_id = ${contribution.id}
+            )`,
           )).for("update").limit(1)
-          : await tx.select({
+          : input.regularizesKind === "repayment"
+            ? await tx.select({
             id: repayment.id,
             orgId: repayment.orgId,
             accountId: repayment.accountId,
@@ -793,7 +959,32 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
             eq(repayment.orgId, input.orgId),
             eq(repayment.id, input.regularizesId),
             isNull(repayment.reversesId),
-          )).for("update").limit(1);
+            sql`NOT EXISTS (
+              SELECT 1 FROM repayment reversal
+              WHERE reversal.org_id = ${repayment.orgId}
+                AND reversal.reverses_id = ${repayment.id}
+            )`,
+            )).for("update").limit(1)
+            : await tx.select({
+              id: extraordinaryCollectionLine.id,
+              orgId: extraordinaryCollectionLine.orgId,
+              accountId: extraordinaryCollectionLine.accountId,
+              amount: extraordinaryCollectionLine.amount,
+              reconciliationStatus: extraordinaryCollectionLine.reconciliationStatus,
+            }).from(extraordinaryCollectionLine).innerJoin(extraordinaryCollection, and(
+              eq(extraordinaryCollection.orgId, extraordinaryCollectionLine.orgId),
+              eq(extraordinaryCollection.id, extraordinaryCollectionLine.collectionId),
+              inArray(extraordinaryCollection.status, ["open", "collecting"]),
+            )).where(and(
+              eq(extraordinaryCollectionLine.orgId, input.orgId),
+              eq(extraordinaryCollectionLine.id, input.regularizesId),
+              isNull(extraordinaryCollectionLine.reversesId),
+              sql`NOT EXISTS (
+                SELECT 1 FROM extraordinary_collection_line reversal
+                WHERE reversal.org_id = ${extraordinaryCollectionLine.orgId}
+                  AND reversal.reverses_id = ${extraordinaryCollectionLine.id}
+              )`,
+            )).for("update").limit(1);
         const source = sourceRows[0];
         if (!source?.accountId) throw new Error("regularization_source_unavailable");
         const replayAfterLock = await replayOutcome();
@@ -808,7 +999,7 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
         )).for("update");
         const from = accounts.find((row) => row.id === source.accountId);
         const to = accounts.find((row) => row.id === input.toAccountId);
-        if (!from || from.isGroupFund) throw new Error("regularization_source_unavailable");
+        if (!from || from.status !== "active" || from.isGroupFund) throw new Error("regularization_source_unavailable");
         if (!to || !to.isGroupFund || to.status !== "active") throw new Error("regularization_target_unavailable");
 
         const [priorCoverageRow] = await tx.select({
@@ -819,6 +1010,7 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
           eq(transfer.regularizesKind, input.regularizesKind),
           eq(transfer.regularizesId, input.regularizesId),
           isNull(transfer.reversesId),
+          sql`${transfer.amount} > 0 AND ${transfer.amount} <> 'NaN'::numeric`,
           sql`NOT EXISTS (
             SELECT 1 FROM transfer reversal
             WHERE reversal.org_id = ${transfer.orgId} AND reversal.reverses_id = ${transfer.id}
@@ -861,6 +1053,7 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
           eq(transfer.regularizesKind, input.regularizesKind),
           eq(transfer.regularizesId, input.regularizesId),
           isNull(transfer.reversesId),
+          sql`${transfer.amount} > 0 AND ${transfer.amount} <> 'NaN'::numeric`,
           sql`NOT EXISTS (
             SELECT 1 FROM transfer reversal
             WHERE reversal.org_id = ${transfer.orgId} AND reversal.reverses_id = ${transfer.id}
@@ -868,7 +1061,7 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
         ));
         const coverage = String(coverageRow?.total ?? "0.0000");
         const remaining = remainingMoney(String(source.amount), coverage);
-        const regularized = shouldMarkRegularized({ sourceAmount: String(source.amount), regularizedAmount: coverage });
+        const regularized = signedMoneyUnits(coverage) === signedMoneyUnits(String(source.amount));
         if (regularized && source.reconciliationStatus === "pending") {
           if (input.regularizesKind === "contribution") {
             await tx.update(contribution).set({ reconciliationStatus: "regularized" }).where(and(
@@ -876,11 +1069,17 @@ export function createMovementService(options: { now?: () => Date } = {}): Movem
               eq(contribution.id, input.regularizesId),
               eq(contribution.reconciliationStatus, "pending"),
             ));
-          } else {
+          } else if (input.regularizesKind === "repayment") {
             await tx.update(repayment).set({ reconciliationStatus: "regularized" }).where(and(
               eq(repayment.orgId, input.orgId),
               eq(repayment.id, input.regularizesId),
               eq(repayment.reconciliationStatus, "pending"),
+            ));
+          } else {
+            await tx.update(extraordinaryCollectionLine).set({ reconciliationStatus: "regularized" }).where(and(
+              eq(extraordinaryCollectionLine.orgId, input.orgId),
+              eq(extraordinaryCollectionLine.id, input.regularizesId),
+              eq(extraordinaryCollectionLine.reconciliationStatus, "pending"),
             ));
           }
         }

@@ -1,16 +1,25 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { auth0 } from "@/lib/auth0";
 import messages from "@/lib/i18n/en-US.json";
 import { ROUTE_LOGIN } from "@/lib/routes";
+import { getShellSession } from "@/lib/auth/require-session";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccessDeniedPage() {
   const session = await auth0.getSession();
+  const requestHasBypassActor = process.env.E2E_AUTH_REQUIRE_HEADER === "1"
+    ? Boolean((await headers()).get("x-e2e-auth-actor-id"))
+    : true;
+  const hasDevelopmentBypass = process.env.E2E_AUTH_BYPASS === "1"
+    && process.env.NODE_ENV !== "production"
+    && requestHasBypassActor;
 
-  if (!session?.user?.sub) {
+  if (!session?.user?.sub && !hasDevelopmentBypass) {
     redirect(ROUTE_LOGIN);
   }
+  if (hasDevelopmentBypass) await getShellSession();
 
   const copy = messages.pages.accessDenied;
 

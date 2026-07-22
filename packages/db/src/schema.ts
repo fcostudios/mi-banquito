@@ -18,6 +18,7 @@ export const entity_version_change_kind_enum = pgEnum("entity_version_change_kin
 export const entity_version_created_by_kind_enum = pgEnum("entity_version_created_by_kind_enum", ["member", "platform_operator", "system"]);
 export const expense_category_enum = pgEnum("expense_category_enum", ["bank_fee", "supplies", "shared_expense", "operating", "solidarity_payout", "treasurer_comp_payout"]);
 export const expense_status_enum = pgEnum("expense_status_enum", ["planned", "paid"]);
+export const extraordinary_collection_disposition_enum = pgEnum("extraordinary_collection_disposition_enum", ["returned", "retained"]);
 export const reconciliation_status_enum = pgEnum("extraordinary_collection_line_reconciliation_status_enum", ["pending", "regularized"]);
 export const extraordinary_collection_line_reconciliation_status_enum = reconciliation_status_enum;
 export const group_config_contribution_cycle_kind_enum = pgEnum("group_config_contribution_cycle_kind_enum", ["monthly", "weekly"]);
@@ -114,7 +115,11 @@ export const auditLogEntry = pgTable("audit_log_entry", {
   reason: text("reason"),
   at: timestamp("at").notNull(),
   createdAt: timestamp("created_at").notNull(),
-});
+}, (table) => [
+  index("idx_audit_collection_terminal_lookup")
+    .on(table.orgId, table.subjectId, table.id)
+    .where(sql`${table.actionKind} = 'collection.command.completed' AND ${table.subjectKind} = 'extraordinary_collection'`),
+]);
 
 export const entityVersion = pgTable("entity_version", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -164,7 +169,12 @@ export const member = pgTable("member", {
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
   updatedAt: timestamp("updated_at"),
   updatedBy: uuid("updated_by"),
-});
+}, (table) => [
+  unique("uq_member_org_id_id").on(table.orgId, table.id),
+  uniqueIndex("uq_member_org_single_active_treasurer")
+    .on(table.orgId)
+    .where(sql`${table.role} = 'tesorera' AND ${table.status} = 'activo'`),
+]);
 
 export const contributionCycle = pgTable("contribution_cycle", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -205,6 +215,7 @@ export const contribution = pgTable("contribution", {
   createdBy: uuid("created_by").notNull(),
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
 }, (table) => [
+  uniqueIndex("uq_contribution_reverses_once").on(table.reversesId).where(sql`${table.reversesId} IS NOT NULL`),
   index("idx_contribution_org_reconciliation").on(table.orgId, table.reconciliationStatus, table.datedOn),
   index("idx_contribution_org_account").on(table.orgId, table.accountId),
   unique("uq_contribution_org_member_receipt_id").on(table.orgId, table.memberId, table.paymentReceiptId, table.id),
@@ -239,7 +250,9 @@ export const withdrawal = pgTable("withdrawal", {
   createdBy: uuid("created_by").notNull(),
   createdByKind: withdrawal_created_by_kind_enum("created_by_kind").notNull(),
   yearEndShareOutLineId: uuid("year_end_share_out_line_id").references((): AnyPgColumn => yearEndShareOutLine.id),
-});
+}, (table) => [
+  uniqueIndex("uq_withdrawal_reverses_once").on(table.reversesId).where(sql`${table.reversesId} IS NOT NULL`),
+]);
 
 export const expense = pgTable("expense", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -264,8 +277,16 @@ export const expense = pgTable("expense", {
   createdBy: uuid("created_by").notNull(),
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
 }, (table) => [
+  uniqueIndex("uq_expense_reverses_once").on(table.reversesId).where(sql`${table.reversesId} IS NOT NULL`),
+  check("ck_expense_amount_finite", sql`${table.amount} <> 'NaN'::numeric`),
   index("idx_expense_org_account_date").on(table.orgId, table.accountId, table.incurredOn),
+  unique("uq_expense_org_id_id").on(table.orgId, table.id),
   unique("uq_expense_org_id_client_request_id").on(table.orgId, table.clientRequestId),
+  foreignKey({
+    name: "fk_expense_beneficiary_org",
+    columns: [table.orgId, table.beneficiaryMemberId],
+    foreignColumns: [member.orgId, member.id],
+  }),
   foreignKey({
     name: "fk_expense_account_id",
     columns: [table.accountId],
@@ -370,6 +391,7 @@ export const account = pgTable("account", {
   createdBy: uuid("created_by").notNull(),
 }, (table) => [
   index("idx_account_org_group_fund").on(table.orgId, table.isGroupFund, table.status),
+  unique("uq_account_org_id_id").on(table.orgId, table.id),
   uniqueIndex("uq_account_org_client_request").on(table.orgId, table.clientRequestId),
 ]);
 
@@ -391,9 +413,16 @@ export const transfer = pgTable("transfer", {
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
 }, (table) => [
+  uniqueIndex("uq_transfer_reverses_once").on(table.reversesId).where(sql`${table.reversesId} IS NOT NULL`),
   check("ck_transfer_distinct_accounts", sql`${table.fromAccountId} <> ${table.toAccountId}`),
+  check("ck_transfer_amount_finite", sql`${table.amount} <> 'NaN'::numeric`),
+  check("ck_transfer_regularization_amount_positive", sql`(${table.purpose} IS DISTINCT FROM 'regularization' OR (${table.amount} <> 'NaN'::numeric AND ${table.amount} > 0)) IS TRUE`),
   index("idx_transfer_org_from_account").on(table.orgId, table.fromAccountId),
   index("idx_transfer_org_to_account").on(table.orgId, table.toAccountId),
+  index("idx_transfer_live_regularization_coverage")
+    .on(table.orgId, table.purpose, table.regularizesKind, table.regularizesId)
+    .where(sql`${table.purpose} = 'regularization' AND ${table.reversesId} IS NULL AND ${table.amount} > 0`),
+  unique("uq_transfer_org_id_id").on(table.orgId, table.id),
   uniqueIndex("uq_transfer_org_client_request")
     .on(table.orgId, table.clientRequestId)
     .where(sql`${table.clientRequestId} IS NOT NULL`),
@@ -409,9 +438,46 @@ export const extraordinaryCollection = pgTable("extraordinary_collection", {
   status: text("status").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
   openedOn: date("opened_on").notNull(),
   paidOutExpenseId: uuid("paid_out_expense_id").references((): AnyPgColumn => expense.id),
+  surplusAmount: numeric("surplus_amount", { precision: 18, scale: 4 }),
+  disposition: extraordinary_collection_disposition_enum("disposition"),
+  dispositionMotive: text("disposition_motive"),
+  surplusTransferId: uuid("surplus_transfer_id").references((): AnyPgColumn => transfer.id),
+  recognitionFiscalYear: integer("recognition_fiscal_year"),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
-});
+}, (table) => [
+  uniqueIndex("uq_collection_paid_out_expense_once")
+    .on(table.paidOutExpenseId).where(sql`${table.paidOutExpenseId} IS NOT NULL`),
+  uniqueIndex("uq_collection_surplus_transfer_once")
+    .on(table.surplusTransferId).where(sql`${table.surplusTransferId} IS NOT NULL`),
+  check("ck_extraordinary_collection_kind", sql`${table.kind} IN ('solidarity', 'treasurer_recognition')`),
+  check("ck_extraordinary_collection_status", sql`${table.status} IN ('open', 'collecting', 'paid_out', 'closed', 'cancelled')`),
+  check("ck_extraordinary_collection_target_nonnegative", sql`${table.targetAmount} IS NULL OR (${table.targetAmount} <> 'NaN'::numeric AND ${table.targetAmount} >= 0)`),
+  check("ck_extraordinary_collection_surplus_finite", sql`${table.surplusAmount} IS NULL OR ${table.surplusAmount} <> 'NaN'::numeric`),
+  check("ck_extraordinary_collection_recognition_year", sql`((${table.kind} = 'treasurer_recognition' AND ${table.recognitionFiscalYear} IS NOT NULL) OR (${table.kind} = 'solidarity' AND ${table.recognitionFiscalYear} IS NULL)) IS TRUE`),
+  check("ck_extraordinary_collection_disposition", sql`((${table.surplusAmount} IS NULL AND ${table.disposition} IS NULL AND ${table.dispositionMotive} IS NULL AND ${table.surplusTransferId} IS NULL) OR (${table.surplusAmount} = 0 AND ${table.disposition} IS NULL AND ${table.dispositionMotive} IS NULL AND ${table.surplusTransferId} IS NULL) OR (${table.surplusAmount} > 0 AND ${table.disposition} = 'returned' AND ${table.dispositionMotive} IS NULL AND ${table.surplusTransferId} IS NOT NULL) OR (${table.surplusAmount} > 0 AND ${table.disposition} = 'retained' AND ${table.dispositionMotive} IS NOT NULL AND length(btrim(${table.dispositionMotive})) >= 3 AND ${table.surplusTransferId} IS NULL)) IS TRUE`),
+  check("ck_extraordinary_collection_status_expense", sql`((${table.kind} = 'treasurer_recognition' AND ${table.paidOutExpenseId} IS NULL) OR (${table.kind} = 'solidarity' AND (( ${table.status} IN ('open', 'collecting', 'cancelled') AND ${table.paidOutExpenseId} IS NULL) OR (${table.status} IN ('paid_out', 'closed') AND ${table.paidOutExpenseId} IS NOT NULL)))) IS TRUE`),
+  index("idx_extraordinary_collection_org_status_opened").on(table.orgId, table.status, table.openedOn),
+  index("idx_extraordinary_collection_org_recognition_year")
+    .on(table.orgId, table.recognitionFiscalYear)
+    .where(sql`${table.kind} = 'treasurer_recognition'`),
+  unique("uq_extraordinary_collection_org_id_id").on(table.orgId, table.id),
+  foreignKey({
+    name: "fk_extraordinary_collection_beneficiary_org",
+    columns: [table.orgId, table.beneficiaryMemberId],
+    foreignColumns: [member.orgId, member.id],
+  }),
+  foreignKey({
+    name: "fk_extraordinary_collection_paid_out_expense_org",
+    columns: [table.orgId, table.paidOutExpenseId],
+    foreignColumns: [expense.orgId, expense.id],
+  }),
+  foreignKey({
+    name: "fk_extraordinary_collection_surplus_transfer_org",
+    columns: [table.orgId, table.surplusTransferId],
+    foreignColumns: [transfer.orgId, transfer.id],
+  }),
+]);
 
 export const extraordinaryCollectionLine = pgTable("extraordinary_collection_line", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -419,13 +485,52 @@ export const extraordinaryCollectionLine = pgTable("extraordinary_collection_lin
   collectionId: uuid("collection_id").references((): AnyPgColumn => extraordinaryCollection.id).notNull(),
   memberId: uuid("member_id").references((): AnyPgColumn => member.id).notNull(),
   amount: numeric("amount", { precision: 18, scale: 4 }).notNull(),
-  accountId: uuid("account_id").references((): AnyPgColumn => account.id),
+  accountId: uuid("account_id").references((): AnyPgColumn => account.id).notNull(),
   reconciliationStatus: extraordinary_collection_line_reconciliation_status_enum("reconciliation_status").notNull(),
   datedOn: date("dated_on").notNull(),
   slipPhotoId: uuid("slip_photo_id").references((): AnyPgColumn => slipPhoto.id),
+  reversesId: uuid("reverses_id").references((): AnyPgColumn => extraordinaryCollectionLine.id),
+  reverseReason: text("reverse_reason"),
   createdAt: timestamp("created_at").notNull(),
   createdBy: uuid("created_by").notNull(),
-});
+}, (table) => [
+  check("ck_extraordinary_collection_line_amount_nonnegative", sql`${table.amount} <> 'NaN'::numeric AND ${table.amount} >= 0`),
+  check("ck_extraordinary_collection_line_zero_regularized", sql`${table.amount} <> 0 OR ${table.reconciliationStatus} = 'regularized'`),
+  check("ck_extraordinary_collection_line_reversal_pair", sql`((${table.reversesId} IS NULL AND ${table.reverseReason} IS NULL) OR (${table.reversesId} IS NOT NULL AND ${table.reverseReason} IS NOT NULL AND length(btrim(${table.reverseReason})) >= 3)) IS TRUE`),
+  index("idx_extraordinary_collection_line_org_collection_date")
+    .on(table.orgId, table.collectionId, table.datedOn),
+  index("idx_collection_line_pending_page")
+    .on(table.orgId, table.reconciliationStatus, table.datedOn, table.id)
+    .where(sql`${table.reconciliationStatus} = 'pending' AND ${table.reversesId} IS NULL`),
+  uniqueIndex("uq_extraordinary_collection_line_reverses")
+    .on(table.reversesId)
+    .where(sql`${table.reversesId} IS NOT NULL`),
+  uniqueIndex("uq_extraordinary_collection_line_org_reverses")
+    .on(table.orgId, table.reversesId)
+    .where(sql`${table.reversesId} IS NOT NULL`),
+  unique("uq_extraordinary_collection_line_reversal_target")
+    .on(table.orgId, table.collectionId, table.memberId, table.accountId, table.reconciliationStatus, table.amount, table.id),
+  foreignKey({
+    name: "fk_extraordinary_collection_line_org_collection",
+    columns: [table.orgId, table.collectionId],
+    foreignColumns: [extraordinaryCollection.orgId, extraordinaryCollection.id],
+  }),
+  foreignKey({
+    name: "fk_extraordinary_collection_line_member_org",
+    columns: [table.orgId, table.memberId],
+    foreignColumns: [member.orgId, member.id],
+  }),
+  foreignKey({
+    name: "fk_extraordinary_collection_line_account_org",
+    columns: [table.orgId, table.accountId],
+    foreignColumns: [account.orgId, account.id],
+  }),
+  foreignKey({
+    name: "fk_extraordinary_collection_line_reversal_binding",
+    columns: [table.orgId, table.collectionId, table.memberId, table.accountId, table.reconciliationStatus, table.amount, table.reversesId],
+    foreignColumns: [table.orgId, table.collectionId, table.memberId, table.accountId, table.reconciliationStatus, table.amount, table.id],
+  }),
+]);
 
 export const nonMemberBorrower = pgTable("non_member_borrower", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -554,6 +659,7 @@ export const repayment = pgTable("repayment", {
   createdBy: uuid("created_by").notNull(),
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
 }, (table) => [
+  uniqueIndex("uq_repayment_reverses_once").on(table.reversesId).where(sql`${table.reversesId} IS NOT NULL`),
   index("idx_repayment_org_reconciliation").on(table.orgId, table.reconciliationStatus, table.datedOn),
   index("idx_repayment_org_account").on(table.orgId, table.accountId),
   unique("uq_repayment_org_member_receipt_id").on(table.orgId, table.memberId, table.paymentReceiptId, table.id),
@@ -974,6 +1080,7 @@ export const statementArchive = pgTable("statement_archive", {
   createdByKind: text("created_by_kind").notNull(),  // TODO[IMP-250]: enum members not cleanly parseable — text fallback
 }, (table) => [
   unique("uq_statement_archive_org_id_id").on(table.orgId, table.id),
+  unique("uq_statement_archive_org_id_kind_member_id_period_label").on(table.orgId, table.kind, table.memberId, table.periodLabel),
 ]);
 
 export const statementArtifactEvent = pgTable("statement_artifact_event", {

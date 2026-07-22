@@ -275,8 +275,12 @@ Duración total estimada del MVP (S0-S8): **18-20 semanas**; con S9 (CHG-001): ~
 | BR-09 | Time-weighted interest on savings for share-out | 2 | US-051, US-053 | S6 |
 | BR-10 | Fiscal year configuration | 2 | US-028, US-051 | S1, S6 |
 | BR-11 | Treasurer-overridable share-out with breakdown by source | 2 | US-052, US-053 | S6 |
+| BR-12 | Multi-account regularization (crown jewel — CHG-001) | [1, 2] | US-091, US-093, US-094, US-095, US-096, US-097, US-099 | S8, S9 |
+| BR-14 | Extraordinary collection lifecycle (CHG-001) | 2 | US-096, US-097, US-098, US-099 | S9 |
+| BR-15 | Treasurer-comp payout requires a recognized amount (CHG-001, amended CHG-011) | 2 | US-098 | S9 |
+| BR-16 | Every movement append-only, audited, transparent (CHG-001) | 1 | US-091..US-099 | S8, S9 |
 
-**Cobertura:** 11/11 reglas con ≥1 historia implementadora. Las reglas BR-05 y BR-06 tienen aristas `enforces` a `entity_Loan`/`entity_Withdrawal`, por lo que el ready-check `118_business_rule_coverage.py` exige que toda historia que toque esas entidades declare la BR correspondiente; el resto se verifica por la vía de aristas `governed_by` (drift `[Business Rule Coverage]`).
+**Cobertura (actualizada por CHG-011):** todas las reglas críticas con ≥1 historia implementadora (BR-12/14/15/16 declaradas en las filas `Business Rules` de las historias del Sprint 9 — antes solo en prosa). Las reglas BR-05 y BR-06 tienen aristas `enforces` a `entity_Loan`/`entity_Withdrawal`, por lo que el ready-check `118_business_rule_coverage.py` exige que toda historia que toque esas entidades declare la BR correspondiente; el resto se verifica por la vía de aristas `governed_by` (drift `[Business Rule Coverage]`).
 
 ## SEC19 — Notas de Validación de Estructura
 

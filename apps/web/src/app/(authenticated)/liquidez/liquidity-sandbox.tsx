@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { InputNumber } from "@mi-banquito/ui";
+import { formatPercent4, formatUsdMoney4, InputNumber } from "@mi-banquito/ui";
 import {
   applyHypotheticalLoan,
   liquidityNarrative,
@@ -19,20 +19,6 @@ type LiquiditySandboxCopy = {
   termUnit: string;
   title: string;
 };
-
-function formatMoney(value: string): string {
-  return new Intl.NumberFormat("es-EC", {
-    style: "currency",
-    currency: "USD",
-  }).format(Number(value));
-}
-
-function formatPercent(value: string | undefined): string {
-  return `${new Intl.NumberFormat("es-EC", {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-  }).format(Number(value ?? 0))}%`;
-}
 
 function projectionPath(series: LiquidityPoint[]): string {
   if (series.length === 0) {
@@ -53,7 +39,7 @@ function ProjectionChart({ series }: { series: LiquidityPoint[] }) {
   const path = projectionPath(series);
 
   return (
-    <div className="rounded-md bg-surface-muted p-3">
+    <div className="rounded-md bg-surface-muted p-3" data-testid="projection_chart">
       <svg className="h-48 w-full text-primary" role="img" viewBox="0 0 100 100" preserveAspectRatio="none">
         <path d={path} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
       </svg>
@@ -78,7 +64,7 @@ export function LiquiditySandbox({
   const narrative = useMemo(() => liquidityNarrative({ series: shifted, commitment }), [commitment, shifted]);
 
   return (
-    <section aria-label={copy.title} className="grid gap-4 rounded-md border border-border bg-surface p-5">
+    <section aria-label={copy.title} className="grid gap-4 rounded-md border border-border bg-surface p-5" data-testid="loan_sandbox">
       <h2 className="text-xl font-semibold text-text-primary">{copy.title}</h2>
       <label className="grid gap-2 text-sm font-medium text-text-primary">
         <span>{copy.amount}</span>
@@ -94,7 +80,7 @@ export function LiquiditySandbox({
         <strong className="text-text-primary">{copy.parameters}</strong>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
           <dt>{copy.rate}</dt>
-          <dd className="font-medium text-text-primary">{formatPercent(terms?.rateValue)}</dd>
+          <dd className="font-medium text-text-primary">{formatPercent4(terms?.rateValue)}</dd>
           <dt>{copy.term}</dt>
           <dd className="font-medium text-text-primary">{termPeriods} {copy.termUnit}</dd>
         </dl>
@@ -106,7 +92,7 @@ export function LiquiditySandbox({
         {shifted.map((row) => (
           <div key={row.monthOn} className="grid grid-cols-[1fr_auto] rounded-md bg-surface-muted p-3 text-sm">
             <span>{row.monthOn}</span>
-            <strong>{formatMoney(row.projectedBalance)}</strong>
+            <strong>{formatUsdMoney4(row.projectedBalance)}</strong>
           </div>
         ))}
       </div>

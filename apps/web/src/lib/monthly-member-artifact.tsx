@@ -1,9 +1,10 @@
 import React from "react";
 import { Document, Page, StyleSheet, Text, View, pdf } from "@react-pdf/renderer";
-import type { MonthlyMemberStatementArtifactInput, MonthlyMemberStatementArtifactResult } from "@mi-banquito/domain";
+import { money, type MonthlyMemberStatementArtifactInput, type MonthlyMemberStatementArtifactResult } from "@mi-banquito/domain";
 
 import messages from "@/lib/i18n/en-US.json";
 import { writePrivateStatementArtifact } from "./statement-artifact";
+import { deletePrivateBlob } from "./vercel-blob-adapter";
 
 const copy = messages.statementPdf;
 
@@ -62,17 +63,50 @@ const styles = StyleSheet.create({
   },
 });
 
-type StatementRow = MonthlyMemberStatementArtifactInput["payload"]["sections"][number]["rows"][number];
+export type MonthlyMemberPdfRow = {
+  sectionId: string;
+  sectionTitle: string;
+  sourceId?: string;
+  label: string;
+  value: string;
+  details: string[];
+};
 
-function statementRowValue(row: StatementRow): string {
-  return "value" in row ? row.value : row.amount;
+export function monthlyMemberPdfRows(input: MonthlyMemberStatementArtifactInput): MonthlyMemberPdfRow[] {
+  const statementRows = input.payload.sections
+    .filter((section) => section.id !== "fund-movements")
+    .flatMap((section) => section.rows.map((row) => ({
+    sectionId: section.id,
+    sectionTitle: section.title,
+    label: row.label,
+    value: "value" in row ? row.value : row.amount,
+    details: "details" in row ? row.details : [],
+  })));
+  const movementSection = input.payload.sections.find((section) => section.id === "fund-movements");
+  return [
+    ...statementRows,
+    ...input.payload.verificationMovements.map((movement) => ({
+      sectionId: "fund-movements",
+      sectionTitle: movementSection?.title ?? copy.monthlyMember.fundMovementsTitle,
+      sourceId: movement.sourceId,
+      label: movement.reversesId ? `Reverso · ${movement.label}` : movement.label,
+      value: money(movement.signedAmount),
+      details: [
+        `${messages.statementArchive.movementDate}: ${movement.datedOn}`,
+        `${messages.statementArchive.movementSource}: ${movement.sourceKind} · ${movement.sourceId}`,
+        `${messages.statementArchive.movementCategory}: ${movement.category}`,
+        `${messages.statementArchive.movementAccount}: ${movement.accountName ?? messages.statementArchive.noAccount}`,
+        `${messages.statementArchive.movementStatus}: ${movement.reconciliationStatus ?? messages.statementArchive.reconciled}`,
+        ...(movement.reversesId
+          ? [`${messages.statementArchive.movementReversal}: ${movement.reversesId}`]
+          : []),
+      ],
+    })),
+  ];
 }
 
-function statementRowDetails(row: StatementRow): string[] {
-  return "details" in row ? row.details : [];
-}
-
-function MonthlyMemberDocument({ input }: { input: MonthlyMemberStatementArtifactInput }) {
+export function MonthlyMemberDocument({ input }: { input: MonthlyMemberStatementArtifactInput }) {
+  const rows = monthlyMemberPdfRows(input);
   return (
     <Document title={`Estado ${input.periodLabel} ${input.memberName}`}>
       <Page size="A4" style={styles.page}>
@@ -82,12 +116,12 @@ function MonthlyMemberDocument({ input }: { input: MonthlyMemberStatementArtifac
         {input.payload.sections.map((section) => (
           <View key={section.id} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
-            {section.rows.map((row) => (
-              <View key={`${row.label}-${statementRowValue(row)}`} style={styles.row}>
+            {rows.filter((row) => row.sectionId === section.id).map((row) => (
+              <View key={`${row.sourceId ?? row.label}-${row.value}`} style={styles.row}>
                 <Text style={styles.label}>{row.label}</Text>
                 <Text style={styles.value}>
-                  {statementRowValue(row)}
-                  {statementRowDetails(row).map((detail) => (
+                  {row.value}
+                  {row.details.map((detail) => (
                     <Text key={detail} style={styles.detail}>{"\n"}{detail}</Text>
                   ))}
                 </Text>
@@ -114,5 +148,11 @@ export async function uploadMonthlyMemberArtifact(input: MonthlyMemberStatementA
   return {
     pdfUri: artifact.pdfUri,
     byteSize: artifact.byteSize,
+    storageUri: artifact.blobUrl,
   };
+}
+
+export async function deleteMonthlyMemberArtifact(artifact: MonthlyMemberStatementArtifactResult): Promise<void> {
+  if (!artifact.storageUri) throw new Error("statement_artifact_storage_uri_missing");
+  await deletePrivateBlob(artifact.storageUri);
 }

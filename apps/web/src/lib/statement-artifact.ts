@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
-import { get, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
+import { readPrivateBlob } from "./vercel-blob-adapter";
 
 export type StatementArtifactInput = {
   orgId: string;
@@ -29,7 +30,7 @@ export async function writePrivateStatementArtifact(input: StatementArtifactInpu
 }
 
 export async function readPrivateStatementArtifact(pathname: string) {
-  return get(pathname, { access: "private" });
+  return readPrivateBlob(pathname);
 }
 
 function pdfText(value: string) {

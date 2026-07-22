@@ -1,9 +1,17 @@
 {
   "dirty": true,
   "dirty_paths": [
-    "Nous/Specs/fcostudios/mi-banquito/extracts/07_screens_catalog.json"
+    "Nous/Specs/fcostudios/mi-banquito/extracts/04_entity_catalog.json",
+    "Nous/Specs/fcostudios/mi-banquito/extracts/07_screens_catalog.json",
+    "Nous/Specs/fcostudios/mi-banquito/v1/04_er_model.md",
+    "Nous/Specs/fcostudios/mi-banquito/v1/07c_navigation_map.json",
+    "Nous/Specs/fcostudios/mi-banquito/v1/09b_business_rules.md",
+    "Nous/Specs/fcostudios/mi-banquito/v1/stories/r2_chg_us_096.md",
+    "Nous/Specs/fcostudios/mi-banquito/v1/stories/r2_chg_us_097.md",
+    "Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-access-denied.json",
+    "Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-adjustment-period.json"
   ],
-  "git_sha": "57d38d2b9b11",
+  "git_sha": "a2386a1218b2",
   "project_id": "fcostudios__mi-banquito",
   "schema_version": 1
 }

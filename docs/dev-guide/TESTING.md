@@ -46,6 +46,18 @@ The **aggregate + projection layers should be the widest part of the suite**, no
 - **Tenant isolation** — every path that touches tenant-scoped data (filtered by `org_id`). → explicit isolation assertions (a query for tenant A must never return tenant B's rows).
 - **Authorization** — role/permission gates on commands/mutations. → integration tests for allowed vs forbidden (expect 403).
 - **Money / tax / financial math** (if present) — amounts, rounding, and idempotency of charge/ledger events. → property-based + a provider contract test.
+- **BR-01 — Declining-balance interest method** — critical business rule; oracle: `property`. (stories: US-033, US-036, US-037)
+- **BR-09 — Time-weighted interest on savings for share-out** — critical business rule; oracle: `property`. (stories: US-051, US-053, US-096, US-099, US-112)
+- **BR-12 — Multi-account regularization (crown jewel)** — critical business rule; oracle: `property`. (stories: US-096, US-097, US-099)
+- **BR-14 — Extraordinary collection lifecycle** — critical business rule; oracle: `behavioral`. (stories: US-096, US-097, US-098, US-099)
+- **BR-15 — Treasurer-compensation payout requires a recognized amount** — critical business rule; oracle: `property`. (stories: US-096, US-098)
+- **BR-16 — Every movement is append-only, audited, and transparent** — critical business rule; oracle: `behavioral`. (stories: US-096, US-097, US-098, US-099)
+- **BR-18 — Year-end cut: immutable balance snapshot + period/method freeze** — critical business rule; oracle: `behavioral`. (stories: US-105)
+- **BR-19 — Distributable surplus** — critical business rule; oracle: `property`. (stories: US-110, US-114)
+- **BR-21 — Two-pool year-end distribution** — critical business rule; oracle: `property`. (stories: US-112)
+- **BR-22 — Exact reconciliation with ajuste line** — critical business rule; oracle: `property`. (stories: US-113, US-115)
+- **BR-24 — Year-end balance sheet integrity (ACTIVOS === PASIVOS)** — critical business rule; oracle: `property`. (stories: US-118)
+- **BR-25 — Active-group resolution & cross-group isolation** — critical business rule; oracle: `behavioral`. (stories: US-125)
 - **Account** — auth-sensitive entity (name heuristic).
 - **InterestAccrual** — money-sensitive entity (name heuristic).
 - **LoanFee** — money-sensitive entity (name heuristic).

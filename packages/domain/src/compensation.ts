@@ -12,8 +12,13 @@ import {
   treasurerCompensationDisbursement,
   withdrawal,
 } from "@mi-banquito/db/schema";
-import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
+import { lockTenantMoneyWrites, withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import type { DateOnlyString } from "./collections";
+import { formatMoney4Units, parseMoney4Units } from "./money4";
+import {
+  computeTreasurerCompensationBreakdownInTransaction,
+  fiscalYearForCompensationPeriod,
+} from "./treasurer-compensation";
 
 export type CompensationPeriod = "monthly" | "yearly";
 
@@ -32,6 +37,7 @@ export type AwardDueTreasurerCompensationResult = {
   configsScanned: number;
   dueConfigs: number;
   disbursementsAwarded: number;
+  disbursementsAccruedWithoutCash: number;
   skippedExistingDisbursements: number;
   configsAdvanced: number;
   failures: Array<{ orgId: string; message: string }>;
@@ -44,6 +50,8 @@ export interface CompensationService {
 
 export type CompensationServiceOptions = {
   now?: () => Date;
+  beforeMoneyLock?: (orgId: string) => void | Promise<void>;
+  afterMoneyLock?: (orgId: string) => void | Promise<void>;
 };
 
 type GroupConfigRow = typeof groupConfig.$inferSelect;
@@ -115,11 +123,12 @@ function amountString(value: string | number | undefined): string | null {
   if (value === undefined || value === null) {
     return null;
   }
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount < 0) {
+  try {
+    const units = parseMoney4Units(String(value));
+    return units < BigInt(0) ? null : formatMoney4Units(units);
+  } catch {
     return null;
   }
-  return amount.toFixed(4);
 }
 
 function configObject(value: unknown): Record<string, unknown> {
@@ -254,7 +263,7 @@ async function awardForConfig(
   compensation: TreasurerCompensationConfig,
   todayIso: DateOnlyString,
   now: Date,
-): Promise<"awarded" | "existing"> {
+): Promise<"cash_awarded" | "accrued_without_cash" | "existing"> {
   const period = compensation.period as CompensationPeriod;
   const dueOn = compensationNextDueOn(compensation);
   const amount = amountString(compensation.amount);
@@ -264,17 +273,17 @@ async function awardForConfig(
 
   const currencyCode = compensation.currency ?? compensation.currencyCode ?? row.currencyCode;
   const periodLabel = periodLabelForCompensation(dueOn, period);
-  const [treasurer] = await tx.select().from(member)
-    .where(and(
-      eq(member.orgId, row.orgId),
-      eq(member.role, "tesorera"),
-      eq(member.status, "activo"),
-    ))
-    .orderBy(member.createdAt);
-
-  if (!treasurer) {
+  const orgMembers = await tx.select().from(member)
+    .where(eq(member.orgId, row.orgId))
+    .orderBy(member.createdAt)
+    .for("update");
+  const activeTreasurers = orgMembers.filter((candidate) =>
+    candidate.role === "tesorera" && candidate.status === "activo");
+  if (activeTreasurers.length === 0) {
     throw new Error("active_treasurer_not_found");
   }
+  if (activeTreasurers.length > 1) throw new Error("active_treasurer_ambiguous");
+  const treasurer = activeTreasurers[0]!;
 
   const disbursementId = randomUUID();
   const [disbursement] = await tx.insert(treasurerCompensationDisbursement).values({
@@ -291,81 +300,152 @@ async function awardForConfig(
   }).onConflictDoNothing().returning();
 
   const nextDueOn = nextCompensationDueOn(dueOn, period);
+  let cashAwarded = false;
 
   if (disbursement) {
-    const withdrawalId = randomUUID();
-    await tx.insert(withdrawal).values({
-      id: withdrawalId,
-      orgId: row.orgId,
-      memberId: treasurer.id,
-      amount,
-      currencyCode,
-      datedOn: todayIso,
-      recordedAt: now,
-      kind: "treasurer_compensation_disbursement",
-      shareOutId: null,
-      notes: `Compensación de tesorera de ${periodLabel}`,
-      reversesId: null,
-      reverseReason: null,
-      adjustmentCycleId: null,
-      clientRequestId: null,
-      createdAt: now,
-      createdBy: SYSTEM_ACTOR_ID,
-      createdByKind: "system",
-      yearEndShareOutLineId: null,
-    }).returning();
-    await tx.update(treasurerCompensationDisbursement)
-      .set({ withdrawalId })
-      .where(and(
-        eq(treasurerCompensationDisbursement.orgId, row.orgId),
-        eq(treasurerCompensationDisbursement.id, disbursementId),
-      ));
+    const fiscalYear = fiscalYearForCompensationPeriod({
+      periodLabel,
+      kindAtDisbursement: compensation,
+    }, {
+      startMonth: row.fiscalYearStartMonth,
+      startDay: row.fiscalYearStartDay,
+    });
+    const { breakdown } = await computeTreasurerCompensationBreakdownInTransaction(
+      tx,
+      { orgId: row.orgId, fiscalYear },
+      {
+        boundary: { startMonth: row.fiscalYearStartMonth, startDay: row.fiscalYearStartDay },
+        currencyCode,
+      },
+    );
+    const scheduledUnits = parseMoney4Units(amount);
+    const payableUnits = parseMoney4Units(breakdown.payableNow);
+    const payoutUnits = scheduledUnits < payableUnits ? scheduledUnits : payableUnits;
+    if (payoutUnits > BigInt(0)) {
+      cashAwarded = true;
+      const payoutAmount = formatMoney4Units(payoutUnits);
+      const withdrawalId = randomUUID();
+      await tx.insert(withdrawal).values({
+        id: withdrawalId,
+        orgId: row.orgId,
+        memberId: treasurer.id,
+        amount: payoutAmount,
+        currencyCode,
+        datedOn: todayIso,
+        recordedAt: now,
+        kind: "treasurer_compensation_disbursement",
+        shareOutId: null,
+        notes: `Compensación de tesorera de ${periodLabel}`,
+        reversesId: null,
+        reverseReason: null,
+        adjustmentCycleId: null,
+        clientRequestId: null,
+        createdAt: now,
+        createdBy: SYSTEM_ACTOR_ID,
+        createdByKind: "system",
+        yearEndShareOutLineId: null,
+      }).returning();
+      await tx.update(treasurerCompensationDisbursement)
+        .set({ withdrawalId })
+        .where(and(
+          eq(treasurerCompensationDisbursement.orgId, row.orgId),
+          eq(treasurerCompensationDisbursement.id, disbursementId),
+        ));
 
-    const message = `Compensación de tesorera de ${periodLabel} acreditada — ${currencyCode} ${amount}`;
-    await tx.insert(alert).values({
-      id: randomUUID(),
-      orgId: row.orgId,
-      alertKind: "treasurer_compensation_disbursed",
-      severity: "low",
-      audience: "treasurer",
-      subjectKind: "treasurer_compensation_disbursement",
-      subjectId: disbursementId,
-      payload: {
-        disbursementId,
-        withdrawalId,
-        memberId: treasurer.id,
-        periodLabel,
-        amount,
-        currencyCode,
-        message,
-      },
-      dedupWindowEnd: new Date(now.getTime() + 86_400_000),
-      dismissedAt: null,
-      dismissedBy: null,
-      snoozedUntil: null,
-      createdAt: now,
-    });
-    await tx.insert(auditLogEntry).values({
-      orgId: row.orgId,
-      actorKind: "system",
-      actorId: SYSTEM_ACTOR_ID,
-      actionKind: "treasurer_compensation.disbursed",
-      subjectKind: "treasurer_compensation_disbursement",
-      subjectId: disbursementId,
-      payloadSnapshot: {
-        disbursementId,
-        withdrawalId,
-        memberId: treasurer.id,
-        periodLabel,
-        amount,
-        currencyCode,
-        dueOn,
-        nextDueOn,
-      },
-      reason: null,
-      at: now,
-      createdAt: now,
-    });
+      const message = `Compensación de tesorera de ${periodLabel} acreditada — ${currencyCode} ${payoutAmount}`;
+      await tx.insert(alert).values({
+        id: randomUUID(),
+        orgId: row.orgId,
+        alertKind: "treasurer_compensation_disbursed",
+        severity: "low",
+        audience: "treasurer",
+        subjectKind: "treasurer_compensation_disbursement",
+        subjectId: disbursementId,
+        payload: {
+          disbursementId,
+          withdrawalId,
+          memberId: treasurer.id,
+          periodLabel,
+          amount: payoutAmount,
+          currencyCode,
+          message,
+        },
+        dedupWindowEnd: new Date(now.getTime() + 86_400_000),
+        dismissedAt: null,
+        dismissedBy: null,
+        snoozedUntil: null,
+        createdAt: now,
+      });
+      await tx.insert(auditLogEntry).values({
+        orgId: row.orgId,
+        actorKind: "system",
+        actorId: SYSTEM_ACTOR_ID,
+        actionKind: "treasurer_compensation.disbursed",
+        subjectKind: "treasurer_compensation_disbursement",
+        subjectId: disbursementId,
+        payloadSnapshot: {
+          disbursementId,
+          withdrawalId,
+          memberId: treasurer.id,
+          periodLabel,
+          amount: payoutAmount,
+          currencyCode,
+          dueOn,
+          nextDueOn,
+        },
+        reason: null,
+        at: now,
+        createdAt: now,
+      });
+    } else {
+      const message = `Compensación de tesorera de ${periodLabel} reconocida — no se acreditó otro pago porque el derecho ya estaba cubierto`;
+      await tx.insert(alert).values({
+        id: randomUUID(),
+        orgId: row.orgId,
+        alertKind: "treasurer_compensation_cash_suppressed",
+        severity: "low",
+        audience: "treasurer",
+        subjectKind: "treasurer_compensation_disbursement",
+        subjectId: disbursementId,
+        payload: {
+          disbursementId,
+          memberId: treasurer.id,
+          periodLabel,
+          scheduledAmount: amount,
+          cashPaid: "0.0000",
+          currencyCode,
+          message,
+          breakdown,
+        },
+        dedupWindowEnd: new Date(now.getTime() + 86_400_000),
+        dismissedAt: null,
+        dismissedBy: null,
+        snoozedUntil: null,
+        createdAt: now,
+      });
+      await tx.insert(auditLogEntry).values({
+        orgId: row.orgId,
+        actorKind: "system",
+        actorId: SYSTEM_ACTOR_ID,
+        actionKind: "treasurer_compensation.cash_suppressed",
+        subjectKind: "treasurer_compensation_disbursement",
+        subjectId: disbursementId,
+        payloadSnapshot: {
+          disbursementId,
+          memberId: treasurer.id,
+          periodLabel,
+          scheduledAmount: amount,
+          cashPaid: "0.0000",
+          currencyCode,
+          dueOn,
+          nextDueOn,
+          breakdown,
+        },
+        reason: "shared_entitlement_already_paid",
+        at: now,
+        createdAt: now,
+      });
+    }
   }
 
   await advanceGroupConfig(tx, row, nextDueOn, now);
@@ -374,7 +454,7 @@ async function awardForConfig(
     return "existing";
   }
 
-  return "awarded";
+  return cashAwarded ? "cash_awarded" : "accrued_without_cash";
 }
 
 export function createCompensationService(options: CompensationServiceOptions = {}): CompensationService {
@@ -389,6 +469,7 @@ export function createCompensationService(options: CompensationServiceOptions = 
         configsScanned: 0,
         dueConfigs: 0,
         disbursementsAwarded: 0,
+        disbursementsAccruedWithoutCash: 0,
         skippedExistingDisbursements: 0,
         configsAdvanced: 0,
         failures: [],
@@ -398,11 +479,15 @@ export function createCompensationService(options: CompensationServiceOptions = 
         result.orgsProcessed += 1;
         try {
           const awardResult = await withWritableTenantTransaction(orgId, async (tx) => {
+            await options.beforeMoneyLock?.(orgId);
+            await lockTenantMoneyWrites(tx, orgId);
+            await options.afterMoneyLock?.(orgId);
             const configs = await tx.select().from(groupConfig)
               .where(and(eq(groupConfig.orgId, orgId), isNull(groupConfig.validTo)));
             let configsScanned = 0;
             let dueConfigs = 0;
             let disbursementsAwarded = 0;
+            let disbursementsAccruedWithoutCash = 0;
             let skippedExistingDisbursements = 0;
             let configsAdvanced = 0;
 
@@ -418,6 +503,8 @@ export function createCompensationService(options: CompensationServiceOptions = 
               configsAdvanced += 1;
               if (awarded === "existing") {
                 skippedExistingDisbursements += 1;
+              } else if (awarded === "accrued_without_cash") {
+                disbursementsAccruedWithoutCash += 1;
               } else {
                 disbursementsAwarded += 1;
               }
@@ -427,6 +514,7 @@ export function createCompensationService(options: CompensationServiceOptions = 
               configsScanned,
               dueConfigs,
               disbursementsAwarded,
+              disbursementsAccruedWithoutCash,
               skippedExistingDisbursements,
               configsAdvanced,
             };
@@ -434,6 +522,7 @@ export function createCompensationService(options: CompensationServiceOptions = 
           result.configsScanned += awardResult.configsScanned;
           result.dueConfigs += awardResult.dueConfigs;
           result.disbursementsAwarded += awardResult.disbursementsAwarded;
+          result.disbursementsAccruedWithoutCash += awardResult.disbursementsAccruedWithoutCash;
           result.skippedExistingDisbursements += awardResult.skippedExistingDisbursements;
           result.configsAdvanced += awardResult.configsAdvanced;
         } catch (error) {

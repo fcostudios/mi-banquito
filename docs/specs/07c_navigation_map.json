@@ -283,10 +283,10 @@
         },
         {
           "id": "admin-home",
-          "label": "Panel admin",
-          "label_en": "Admin panel",
+          "label": "Inicio",
+          "label_en": "Home",
           "labelKey": "admin.home",
-          "icon": "Settings",
+          "icon": "Home",
           "route": "/admin",
           "screen": "SCR-admin-home",
           "roles": [
@@ -299,8 +299,8 @@
           "label": "Nueva organización",
           "label_en": "New organization",
           "labelKey": "admin.orgsNew",
-          "icon": "Users",
-          "route": "/admin/orgs/nueva",
+          "icon": "PlusCircle",
+          "route": "/admin/orgs/new",
           "screen": "SCR-admin-orgs-new",
           "roles": [
             "platform_operator"
@@ -819,6 +819,38 @@
       ],
       "release": "R1",
       "auth_required": true
+    },
+    {
+      "route": "/acceso-denegado",
+      "screen_id": "SCR-access-denied",
+      "roles": [
+        "tesorera",
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true
+    },
+    {
+      "route": "/admin/orgs/[id]/period-close/[periodCloseId]/adjust",
+      "screen_id": "SCR-adjustment-period",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true,
+      "dynamic_params": [
+        "id",
+        "periodCloseId"
+      ]
+    },
+    {
+      "route": "/admin/orgs/new",
+      "screen_id": "SCR-admin-orgs-new",
+      "roles": [
+        "platform_operator"
+      ],
+      "release": "R1",
+      "auth_required": true
     }
   ],
   "dynamic_route_params": {
@@ -833,6 +865,12 @@
       "column": "canonical_payload_hash",
       "description": "SHA-256 over canonical JSON of the statement payload — public route US-085",
       "semantic_name": "integrity_hash"
+    },
+    "periodCloseId": {
+      "entity": "PeriodClose",
+      "column": "id",
+      "description": "Primary key of the closed period being reopened for a 7-day adjustment window (CHG-012)",
+      "fk_to_table_resolved_at_runtime_per_route": false
     }
   },
   "navigation_graph": {
@@ -980,6 +1018,14 @@
       {
         "id": "SCR-group-picker",
         "label": "Mis grupos"
+      },
+      {
+        "id": "SCR-access-denied",
+        "label": "Acceso denegado"
+      },
+      {
+        "id": "SCR-adjustment-period",
+        "label": "Abrir período de ajuste"
       }
     ],
     "edges": [
@@ -1264,6 +1310,12 @@
         "to": "SCR-group-picker",
         "label": "Cambiar grupo",
         "kind": "link"
+      },
+      {
+        "from": "SCR-admin-org-detail",
+        "to": "SCR-adjustment-period",
+        "label": "Abrir período de ajuste",
+        "kind": "tile_navigate"
       }
     ]
   },
@@ -1310,7 +1362,8 @@
         "SCR-record-movement",
         "SCR-solidarity-collection",
         "SCR-balance-banquito",
-        "SCR-group-picker"
+        "SCR-group-picker",
+        "SCR-access-denied"
       ]
     },
     "platform_operator": {
@@ -1332,7 +1385,9 @@
         "SCR-admin-audit",
         "SCR-admin-drift",
         "SCR-admin-cron-runs",
-        "SCR-admin-pilot-log"
+        "SCR-admin-pilot-log",
+        "SCR-adjustment-period",
+        "SCR-access-denied"
       ]
     },
     "public": {
@@ -1480,11 +1535,12 @@
     ],
     "/verify/[hash]": [
       "Verificar documento"
-    ]
+    ],
+    "/admin/orgs/[id]/period-close/[periodCloseId]/adjust": "Admin → Organizaciones → {org.name} → Cierres → {periodClose.period_label} → Abrir período de ajuste"
   },
-  "screen_count": 36,
-  "route_count": 36,
-  "edge_count": 47,
+  "screen_count": 38,
+  "route_count": 39,
+  "edge_count": 48,
   "user_flow_count": 16,
   "validation_status": {
     "every_screen_in_navigation_graph_nodes": true,

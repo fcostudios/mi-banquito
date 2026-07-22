@@ -101,7 +101,6 @@
 | sprint-6 | [r1_alerts_us_063.md](sprint-6/r1_alerts_us_063.md) | R1-ALERTS-US-063 |
 | sprint-6 | [r1_artifact_us_059.md](sprint-6/r1_artifact_us_059.md) | R1-ARTIFACT-US-059 |
 | sprint-6 | [r1_ledger_us_058.md](sprint-6/r1_ledger_us_058.md) | R1-LEDGER-US-058 |
-| sprint-6 | [r1_reporting_us_048.md](sprint-6/r1_reporting_us_048.md) | R1-REPORTING-US-048 |
 | sprint-6 | [r1_reporting_us_049.md](sprint-6/r1_reporting_us_049.md) | R1-REPORTING-US-049 |
 | sprint-6 | [r1_reporting_us_051.md](sprint-6/r1_reporting_us_051.md) | R1-REPORTING-US-051 |
 | sprint-6 | [r1_reporting_us_052.md](sprint-6/r1_reporting_us_052.md) | R1-REPORTING-US-052 |
@@ -126,6 +125,7 @@
 | sprint-8 | [r1_chg_us_093.md](sprint-8/r1_chg_us_093.md) | R1-CHG-US-093 |
 | sprint-8 | [r1_chg_us_094.md](sprint-8/r1_chg_us_094.md) | R1-CHG-US-094 |
 | sprint-8 | [r1_chg_us_095.md](sprint-8/r1_chg_us_095.md) | R1-CHG-US-095 |
+| sprint-9 | [r1_reporting_us_048.md](sprint-9/r1_reporting_us_048.md) | R1-REPORTING-US-048 |
 | sprint-9 | [r2_chg_us_096.md](sprint-9/r2_chg_us_096.md) | R2-CHG-US-096 |
 | sprint-9 | [r2_chg_us_097.md](sprint-9/r2_chg_us_097.md) | R2-CHG-US-097 |
 | sprint-9 | [r2_chg_us_098.md](sprint-9/r2_chg_us_098.md) | R2-CHG-US-098 |

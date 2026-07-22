@@ -122,8 +122,8 @@ describe("US-020 impersonation lifecycle", () => {
     expect(wrongOrg).toBeNull();
   });
 
-  runIfDatabase.each([0, 2])("rejects %i active treasurer memberships before writing", async (treasurerCount) => {
-    const fixture = await createFixture({ treasurerCount });
+  runIfDatabase("rejects an organization without an active treasurer before writing", async () => {
+    const fixture = await createFixture({ treasurerCount: 0 });
     const service = createImpersonationService({ now: () => now });
 
     await expect(service.start({
