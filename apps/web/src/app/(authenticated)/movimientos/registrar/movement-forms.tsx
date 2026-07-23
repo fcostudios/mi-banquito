@@ -386,7 +386,7 @@ export function MovementForms({
             data-testid="treasurer_comp_ceiling"
           >
             <div className="border-b border-primary bg-info-bg px-4 py-4 sm:px-5">
-              <p className="text-sm font-semibold text-primary">{copy.compensationFiscalYear.replace("{{year}}", String(fiscalYear))}</p>
+              <p className="text-sm font-semibold text-text-primary">{copy.compensationFiscalYear.replace("{{year}}", String(fiscalYear))}</p>
               <h2 className="mt-1 text-xl font-bold text-text-primary">{copy.compensationTitle}</h2>
             </div>
             <div className="grid grid-cols-1 border-b border-border sm:grid-cols-3">
