@@ -374,7 +374,11 @@ test("collect, regularize, pay, compensate, archive, and publicly verify", async
   });
 
   await expect(page.getByRole("link", { name: "María Quishpe" })).toBeVisible();
-  await page.getByRole("link", { name: "María Quishpe" }).click();
+  await Promise.all([
+    page.waitForURL(new RegExp(`/socias/${MARIA_ID}$`), { timeout: 30_000 }),
+    page.getByRole("link", { name: "María Quishpe" }).click(),
+  ]);
+  await expect(page.getByTestId("member_statement_preview")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Calamidad doméstica E2E")).toBeVisible();
   const memberRows = page.getByTestId("movements_transparency").locator("tbody tr");
   await expect(memberRows).toHaveCount(5);
