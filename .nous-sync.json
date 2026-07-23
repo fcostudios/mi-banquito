@@ -1,5 +1,5 @@
 {
-  "synced_at": "2026-07-19T05:56:25.233488+00:00",
+  "synced_at": "2026-07-22T10:12:42.042799+00:00",
   "project_id": "fcostudios__mi-banquito",
   "files": {
     "docs/stories/sprint-1/r1_admin_us_016.md": {
@@ -442,10 +442,6 @@
       "hash": "ea3ff5e700242560",
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reporting_us_047.md"
     },
-    "docs/stories/sprint-6/r1_reporting_us_048.md": {
-      "hash": "df27303a88ae366d",
-      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reporting_us_048.md"
-    },
     "docs/stories/sprint-6/r1_reporting_us_049.md": {
       "hash": "b61dda7729d748e7",
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reporting_us_049.md"
@@ -483,19 +479,19 @@
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_substrate_us_072.md"
     },
     "docs/stories/sprint-9/r2_chg_us_096.md": {
-      "hash": "947eabf38d816c80",
+      "hash": "a02f526f7ed92684",
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r2_chg_us_096.md"
     },
     "docs/stories/sprint-9/r2_chg_us_097.md": {
-      "hash": "330710d09c95a21e",
+      "hash": "3186d5f56f78aa59",
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r2_chg_us_097.md"
     },
     "docs/stories/sprint-9/r2_chg_us_098.md": {
-      "hash": "8913a1b2f376e65a",
+      "hash": "0758527fe257eefe",
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r2_chg_us_098.md"
     },
     "docs/stories/sprint-9/r2_chg_us_099.md": {
-      "hash": "575128509fd1dfdb",
+      "hash": "7269a1e0e1d964e7",
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r2_chg_us_099.md"
     },
     "docs/stories/sprint-12/r3_misc_us_117.md": {
@@ -515,7 +511,7 @@
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/03_cx_journeys.md"
     },
     "docs/specs/04_er_model.md": {
-      "hash": "57f5f56e9f922f33",
+      "hash": "6aed57f76a45e64c",
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/04_er_model.md"
     },
     "docs/specs/05_brand.md": {
@@ -535,11 +531,11 @@
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/07b_features_backlog.md"
     },
     "docs/specs/07c_navigation_map.json": {
-      "hash": "4a41705160cc795e",
+      "hash": "b1eb936badab70f5",
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/07c_navigation_map.json"
     },
     "docs/specs/08_scope.md": {
-      "hash": "f196717b65e88eb9",
+      "hash": "de6de3d42f4d8ccc",
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/08_scope.md"
     },
     "docs/specs/09_architecture.md": {
@@ -547,7 +543,7 @@
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/09_architecture.md"
     },
     "docs/specs/10_plan.md": {
-      "hash": "6a8c813dc20ca023",
+      "hash": "19c38140836da75c",
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/10_plan.md"
     },
     "docs/dashboard.html": {
@@ -675,7 +671,7 @@
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-record-contribution.json"
     },
     "docs/screens/SCR-record-movement.json": {
-      "hash": "8c25df998208e207",
+      "hash": "cc918c882ca9947e",
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-record-movement.json"
     },
     "docs/screens/SCR-record-repayment.json": {
@@ -847,11 +843,11 @@
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/journey_player.html"
     },
     "docs/stories/SPRINT_PLAN.md": {
-      "hash": "8e1c6cbe48e70d75",
+      "hash": "fae12baaa9f533b0",
       "source": "generated"
     },
     "docs/stories/CHANGES.md": {
-      "hash": "081e4125f5e55ce1",
+      "hash": "69a9f2f00bf1f088",
       "source": "generated"
     },
     "docs/stories/ASSIGNMENTS.md": {
@@ -859,28 +855,44 @@
       "source": "generated"
     },
     "testing/critical-paths.md": {
-      "hash": "62760de2f75268ad",
+      "hash": "9ecf159c0cd8dae7",
       "source": "generated"
     },
     ".nous-project.json": {
-      "hash": "2ccbc1cba507c018",
+      "hash": "7abd2d756c760556",
       "source": "generated"
     },
     "docs/stories/INDEX.md": {
-      "hash": "e8b8e975cee04adb",
+      "hash": "441c836b51892e99",
       "source": "generated"
     },
     "infra/scripts/allowed_lucide_icons.json": {
-      "hash": "88b4e3d029bccd86",
+      "hash": "22b70a44a0b99f10",
       "source": "/Users/fcolomas/Projects/nous/Nous/dev_package_staging/infra/scripts/allowed_lucide_icons.json"
     },
     "infra/scripts/regenerate-sidebar.py": {
-      "hash": "45138d83a457dd4b",
+      "hash": "89571eec73b94992",
       "source": "/Users/fcolomas/Projects/nous/Nous/dev_package_staging/infra/scripts/regenerate-sidebar.py"
     },
     "apps/web/src/components/shell/nav-items.gen.ts": {
       "hash": "c0b576869945249e",
       "source": "/Users/fcolomas/Projects/nous/Nous/dev_package_staging/apps/web/src/components/shell/nav-items.gen.ts"
+    },
+    "docs/stories/sprint-9/r1_reporting_us_048.md": {
+      "hash": "9fd79619c5fd4b03",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/stories/r1_reporting_us_048.md"
+    },
+    "docs/screens/SCR-access-denied.json": {
+      "hash": "aacfe16e9014eff6",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-access-denied.json"
+    },
+    "docs/screens/SCR-adjustment-period.json": {
+      "hash": "7c9b1707b5839f41",
+      "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/toon/SCR-adjustment-period.json"
+    },
+    "infra/scripts/lucide_valid_exports.json": {
+      "hash": "7d01fdad0b6ea7ae",
+      "source": "/Users/fcolomas/Projects/nous/Nous/dev_package_staging/infra/scripts/lucide_valid_exports.json"
     }
   }
 }

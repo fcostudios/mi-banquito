@@ -41,6 +41,7 @@ export type VisibleAlert = {
   audience: string;
   title: string;
   body: string;
+  payload: Record<string, unknown>;
   createdAt: Date;
   whatsAppText: string;
 };
@@ -237,6 +238,7 @@ function alertBody(row: typeof alert.$inferSelect): string {
 }
 
 function visibleAlert(row: typeof alert.$inferSelect): VisibleAlert {
+  const payload = payloadObject(row.payload);
   const title = alertTitle(row);
   const body = alertBody(row);
   return {
@@ -246,6 +248,7 @@ function visibleAlert(row: typeof alert.$inferSelect): VisibleAlert {
     audience: row.audience,
     title,
     body,
+    payload,
     createdAt: dateValue(row.createdAt),
     whatsAppText: whatsAppAlertText({ title, body }),
   };

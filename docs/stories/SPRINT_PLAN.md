@@ -1,7 +1,7 @@
 <!-- nous-sprint-stamp
-generated_at: 2026-07-20T00:23:09Z
+generated_at: 2026-07-22T10:12:41Z
 current_sprint: sprint-12
-sprints_hash: a81073114fb755ff
+sprints_hash: 01307b9fa1236044
 -->
 # Mi Banquito — Sprint Execution Plan
 
@@ -72,7 +72,7 @@ See `docs/specs/09_architecture.md` for bounded context details.
 | 5 | full-stack | **US-031** ✅ | Treasurer views live compliance state per member with green amber red encoding | ? ?SP | `See story file` | — | US-008, US-029, US-040 | →3 | — | [r1_ledger_us_031.md](sprint-1/r1_ledger_us_031.md) |
 | 6 | full-stack | **US-027** ✅ | Treasurer changes a member status to en pausa or baja with refund A/P entry | ? ?SP | `See story file` | — | US-026, US-025 | — | — | [r1_ledger_us_027.md](sprint-1/r1_ledger_us_027.md) |
 | 7 | full-stack | **US-028** ✅ | Treasurer views and edits group rules read-only first then edits with HR-1 versioning | ? ?SP | `See story file` | — | US-025, US-020, US-026 | →3 | — | [r1_config_us_028.md](sprint-1/r1_config_us_028.md) |
-| 8 | full-stack | **US-029** ✅ | Treasurer records a contribution with slip photo and optional notes | ? ?SP | `See story file` | — | US-008, US-009, US-026 | →6 | — | [r1_ledger_us_029.md](sprint-1/r1_ledger_us_029.md) |
+| 8 | full-stack | **US-029** ✅ | Treasurer records a contribution with slip photo and optional notes | ? ?SP | `See story file` | — | US-008, US-009, US-026 | →7 | — | [r1_ledger_us_029.md](sprint-1/r1_ledger_us_029.md) |
 | 9 | full-stack | **US-030** ✅ | Treasurer reverses a prior contribution with required reason | ? ?SP | `See story file` | — | US-029, US-002, US-028 | — | — | [r1_ledger_us_030.md](sprint-1/r1_ledger_us_030.md) |
 | 10 | full-stack | **US-032** ✅ | Treasurer records the annual base fund quota payment for a member | ? ?SP | `See story file` | — | US-008, US-017, US-026 | — | — | [r1_ledger_us_032.md](sprint-1/r1_ledger_us_032.md) |
 
@@ -98,7 +98,7 @@ See `docs/specs/09_architecture.md` for bounded context details.
 | 4 | full-stack | **US-075** ✅ | System supports a "partial aporte" state and treasurer records partial payments | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_075.md](sprint-2/r1_chg_us_075.md) |
 | 5 | full-stack | **US-081** ✅ | Operator views cron run history and triggers manual replay | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_081.md](sprint-2/r1_chg_us_081.md) |
 | 6 | full-stack | **US-034** ✅ | Treasurer originates a non-member loan with required guarantor picker | ? ?SP | `See story file` | — | US-008, US-017, US-033 | →2 | — | [r1_loans_us_034.md](sprint-2/r1_loans_us_034.md) |
-| 7 | full-stack | **US-036** ✅ | Treasurer records a loan repayment with auto split interest first | ? ?SP | `See story file` | — | US-008, US-014, US-033 | →4 | — | [r1_loans_us_036.md](sprint-2/r1_loans_us_036.md) |
+| 7 | full-stack | **US-036** ✅ | Treasurer records a loan repayment with auto split interest first | ? ?SP | `See story file` | — | US-008, US-014, US-033 | →5 | — | [r1_loans_us_036.md](sprint-2/r1_loans_us_036.md) |
 | 8 | full-stack | **US-035** ✅ | Treasurer optionally designates a referrer member on origination | ? ?SP | `See story file` | — | US-017, US-034, US-025 | →1 | — | [r1_loans_us_035.md](sprint-2/r1_loans_us_035.md) |
 | 9 | full-stack | **US-037** ✅ | Treasurer views loan detail with schedule fees repayments accruals referrer guarantor | ? ?SP | `See story file` | — | US-033, US-036, US-004 | — | — | [r1_loans_us_037.md](sprint-2/r1_loans_us_037.md) |
 | 10 | full-stack | **US-039** ✅ | System fires referral commission credit on Loan status pagado | ? ?SP | `See story file` | — | US-035, US-036, US-003 | — | — | [r1_loans_us_039.md](sprint-2/r1_loans_us_039.md) |
@@ -146,7 +146,7 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |
 |---|-------|-------|------|------|---------------|-----|------------|--------|----------|------|
-| 1 | full-stack | **US-040** ✅ | Treasurer views the A/R aging primary tab sorted by days-late descending | ? ?SP | `See story file` | — | US-008, US-029, US-036 | →5 | — | [r1_collections_us_040.md](sprint-4/r1_collections_us_040.md) |
+| 1 | full-stack | **US-040** ✅ | Treasurer views the A/R aging primary tab sorted by days-late descending | ? ?SP | `See story file` | — | US-008, US-029, US-036 | →6 | — | [r1_collections_us_040.md](sprint-4/r1_collections_us_040.md) |
 | 2 | full-stack | **US-050** ✅ | System awards treasurer compensation per cron with idempotency | ? ?SP | `See story file` | — | US-012, US-017, US-047 | — | — | [r1_reporting_us_050.md](sprint-4/r1_reporting_us_050.md) |
 | 3 | full-stack | **US-054** ✅ | Treasurer views Liquidez Proyectada single screen with sandbox | ? ?SP | `See story file` | — | US-008, US-064, US-062 | →2 | — | [r1_liquidity_us_054.md](sprint-4/r1_liquidity_us_054.md) |
 | 4 | full-stack | **US-076** ✅ | Treasurer declares loan disbursement source (bank vs cash) at origination | ? ?SP | `See story file` | — | — | — | — | [r1_chg_us_076.md](sprint-4/r1_chg_us_076.md) |
@@ -194,22 +194,21 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 ## Sprint 6: Sprint 6
 
-**Stories:** 10 | **Points:** 0 SP
+**Stories:** 9 | **Points:** 0 SP
 
 ### Execution Order
 
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |
 |---|-------|-------|------|------|---------------|-----|------------|--------|----------|------|
-| 1 | full-stack | **US-051** ⬜ | Treasurer opens year-end share-out wizard with time-weighted breakdown by source | ? ?SP | `See story file` | — | US-008, US-046, US-100 | →3 | — | [r1_reporting_us_051.md](sprint-6/r1_reporting_us_051.md) |
-| 2 | full-stack | **US-058** ⬜ | Treasurer views balance for any member via partial-name search on home | ? ?SP | `See story file` | — | US-026, US-031, US-056 | — | — | [r1_ledger_us_058.md](sprint-6/r1_ledger_us_058.md) |
-| 3 | full-stack | **US-061** ⬜ | System emits A1 conciliacion pendiente alert | ? ?SP | `See story file` | — | US-008, US-012 | — | — | [r1_alerts_us_061.md](sprint-6/r1_alerts_us_061.md) |
-| 4 | full-stack | **US-062** ⬜ | System emits A2 prestamo proximo a vencer alert | ? ?SP | `See story file` | — | US-008, US-040 | →7 | — | [r1_alerts_us_062.md](sprint-6/r1_alerts_us_062.md) |
-| 5 | full-stack | **US-049** ⬜ | Treasurer shares a statement via WhatsApp share intent | ? ?SP | `See story file` | — | US-048, US-047 | →1 | — | [r1_reporting_us_049.md](sprint-6/r1_reporting_us_049.md) |
-| 6 | full-stack | **US-059** ⬜ | Member receives statement via WhatsApp from treasurer | ? ?SP | `See story file` | — | US-049 | →2 | — | [r1_artifact_us_059.md](sprint-6/r1_artifact_us_059.md) |
-| 7 | full-stack | **US-063** ⬜ | System emits A3 aporte atrasado alert | ? ?SP | `See story file` | — | US-062, US-008, US-031 | →4 | — | [r1_alerts_us_063.md](sprint-6/r1_alerts_us_063.md) |
-| 8 | full-stack | **US-048** ⬜ | Treasurer generates per-member statements as a batch and individually | ? ?SP | `See story file` | — | US-046, US-047, US-062 | →2 | — | [r1_reporting_us_048.md](sprint-6/r1_reporting_us_048.md) |
-| 9 | full-stack | **US-052** ⬜ | Treasurer overrides a per-member share with required reason and audit | ? ?SP | `See story file` | — | US-051, US-113, US-048 | →1 | — | [r1_reporting_us_052.md](sprint-6/r1_reporting_us_052.md) |
-| 10 | full-stack | **US-053** ⬜ | Treasurer approves year-end share-out which writes payouts and PDFs | ? ?SP | `See story file` | — | US-051, US-052, US-105 | →2 | — | [r1_reporting_us_053.md](sprint-6/r1_reporting_us_053.md) |
+| 1 | full-stack | **US-049** ⬜ | Treasurer shares a statement via WhatsApp share intent | ? ?SP | `See story file` | — | US-048, US-047 | →1 | — | [r1_reporting_us_049.md](sprint-6/r1_reporting_us_049.md) |
+| 2 | full-stack | **US-051** ⬜ | Treasurer opens year-end share-out wizard with time-weighted breakdown by source | ? ?SP | `See story file` | — | US-008, US-046, US-100 | →3 | — | [r1_reporting_us_051.md](sprint-6/r1_reporting_us_051.md) |
+| 3 | full-stack | **US-058** ⬜ | Treasurer views balance for any member via partial-name search on home | ? ?SP | `See story file` | — | US-026, US-031, US-056 | — | — | [r1_ledger_us_058.md](sprint-6/r1_ledger_us_058.md) |
+| 4 | full-stack | **US-061** ⬜ | System emits A1 conciliacion pendiente alert | ? ?SP | `See story file` | — | US-008, US-012 | — | — | [r1_alerts_us_061.md](sprint-6/r1_alerts_us_061.md) |
+| 5 | full-stack | **US-062** ⬜ | System emits A2 prestamo proximo a vencer alert | ? ?SP | `See story file` | — | US-008, US-040 | →7 | — | [r1_alerts_us_062.md](sprint-6/r1_alerts_us_062.md) |
+| 6 | full-stack | **US-052** ⬜ | Treasurer overrides a per-member share with required reason and audit | ? ?SP | `See story file` | — | US-051, US-113, US-048 | →1 | — | [r1_reporting_us_052.md](sprint-6/r1_reporting_us_052.md) |
+| 7 | full-stack | **US-059** ⬜ | Member receives statement via WhatsApp from treasurer | ? ?SP | `See story file` | — | US-049 | →2 | — | [r1_artifact_us_059.md](sprint-6/r1_artifact_us_059.md) |
+| 8 | full-stack | **US-063** ⬜ | System emits A3 aporte atrasado alert | ? ?SP | `See story file` | — | US-062, US-008, US-031 | →4 | — | [r1_alerts_us_063.md](sprint-6/r1_alerts_us_063.md) |
+| 9 | full-stack | **US-053** ⬜ | Treasurer approves year-end share-out which writes payouts and PDFs | ? ?SP | `See story file` | — | US-051, US-052, US-105 | →2 | — | [r1_reporting_us_053.md](sprint-6/r1_reporting_us_053.md) |
 
 ### References
 
@@ -275,16 +274,17 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 ## Sprint 9: Sprint 9
 
-**Stories:** 4 | **Points:** 0 SP
+**Stories:** 5 | **Points:** 0 SP
 
 ### Execution Order
 
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |
 |---|-------|-------|------|------|---------------|-----|------------|--------|----------|------|
-| 1 | full-stack | **US-096** ⬜ | Treasurer starts an extraordinary / solidarity collection | ? ?SP | `See story file` | CHG-001 | — | — | — | [r2_chg_us_096.md](sprint-9/r2_chg_us_096.md) |
-| 2 | full-stack | **US-097** ⬜ | Treasurer records a solidarity payout and closes the collection | ? ?SP | `See story file` | CHG-001 | — | — | — | [r2_chg_us_097.md](sprint-9/r2_chg_us_097.md) |
-| 3 | full-stack | **US-098** ⬜ | Treasurer records a treasurer-compensation payout gated by a recognized amount | ? ?SP | `See story file` | CHG-001 | — | — | — | [r2_chg_us_098.md](sprint-9/r2_chg_us_098.md) |
-| 4 | full-stack | **US-099** ⬜ | Statements, cash-flow, and public-verify reflect all movements net + collections | ? ?SP | `See story file` | CHG-001 | — | — | — | [r2_chg_us_099.md](sprint-9/r2_chg_us_099.md) |
+| 1 | full-stack | **US-048** 🔨 | Treasurer generates per-member statements as a batch and individually | ? ?SP | `See story file` | — | US-046, US-047, US-062 | →3 | — | [r1_reporting_us_048.md](sprint-9/r1_reporting_us_048.md) |
+| 2 | full-stack | **US-096** 🔨 | Treasurer starts an extraordinary / solidarity collection | ? ?SP | `See story file` | CHG-012 | — | →2 | — | [r2_chg_us_096.md](sprint-9/r2_chg_us_096.md) |
+| 3 | full-stack | **US-097** 🔨 | Treasurer records a solidarity payout and closes the collection | ? ?SP | `See story file` | CHG-012 | US-096 | →1 | — | [r2_chg_us_097.md](sprint-9/r2_chg_us_097.md) |
+| 4 | full-stack | **US-098** 🔨 | Treasurer records a treasurer-compensation payout gated by a recognized amount | ? ?SP | `See story file` | CHG-011 | US-096 | — | — | [r2_chg_us_098.md](sprint-9/r2_chg_us_098.md) |
+| 5 | full-stack | **US-099** 🔨 | Statements, cash-flow, and public-verify reflect all movements net + collections | ? ?SP | `See story file` | CHG-011 | US-048, US-097 | — | — | [r2_chg_us_099.md](sprint-9/r2_chg_us_099.md) |
 
 ### References
 
@@ -296,24 +296,25 @@ See `docs/specs/09_architecture.md` for bounded context details.
 
 ## Sprint 10: Sprint 10
 
-**Stories:** 7 | **Points:** 0 SP
+**Stories:** 8 | **Points:** 0 SP
 
 ### Execution Order
 
 | # | Track | Story | Name | Size | Where to Code | CHG | Blocked By | Blocks | Assignee | File |
 |---|-------|-------|------|------|---------------|-----|------------|--------|----------|------|
-| 1 | full-stack | **US-100** ⬜ | BR config substrate + resolution contract (CHG-002; precedes the config-driven rules) | ? ?SP | `See story file` | — | US-008 | →4 | — | [r1_chg_us_100.md](sprint-10/r1_chg_us_100.md) |
+| 1 | full-stack | **US-100** ⬜ | BR config substrate + resolution contract (CHG-002; precedes the config-driven rules) | ? ?SP | `See story file` | — | US-008 | →5 | — | [r1_chg_us_100.md](sprint-10/r1_chg_us_100.md) |
 | 2 | backend | **US-101** ⬜ | Formalize `LoanFee` + `GroupConfig.config.mora` (migration, CHG-002) | ? ?SP | `apps/web/src/app/api/` | — | US-008, US-100 | →5 | — | [r1_chg_us_101.md](sprint-10/r1_chg_us_101.md) |
 | 3 | full-stack | **US-102** ⬜ | System accrues a mora fee on overdue installments (BR-17, flat_per_day) | ? ?SP | `See story file` | — | US-038, US-101 | →2 | — | [r1_misc_us_102.md](sprint-10/r1_misc_us_102.md) |
 | 4 | full-stack | **US-103** ⬜ | Mora fee shown in loan detail, repayment split, and A/R aging | ? ?SP | `See story file` | — | US-102 | — | — | [r1_misc_us_103.md](sprint-10/r1_misc_us_103.md) |
 | 5 | full-stack | **US-105** ⬜ | System writes the immutable year-end balance snapshot at close (CHG-003) | ? ?SP | `See story file` | — | US-046, US-101 | →9 | — | [r1_chg_us_105.md](sprint-10/r1_chg_us_105.md) |
 | 6 | full-stack | **US-108** ⬜ | Period/method-freeze guard at year-end (BR-09 / BR-18) | ? ?SP | `See story file` | — | US-046, US-100 | — | — | [r1_misc_us_108.md](sprint-10/r1_misc_us_108.md) |
-| 7 | full-stack | **US-104** ⬜ | Treasurer configures + waives mora (group-config + condonación, O5) | ? ?SP | `See story file` | — | US-101, US-102 | — | — | [r1_misc_us_104.md](sprint-10/r1_misc_us_104.md) |
+| 7 | full-stack | **US-126** ✅ | Treasurer records one member payment with BR-26 allocation waterfall | ? ?SP | `See story file` | — | US-029, US-036, US-040 | — | — | [r1_chg_us_126.md](sprint-10/r1_chg_us_126.md) |
+| 8 | full-stack | **US-104** ⬜ | Treasurer configures + waives mora (group-config + condonación, O5) | ? ?SP | `See story file` | — | US-101, US-102 | — | — | [r1_misc_us_104.md](sprint-10/r1_misc_us_104.md) |
 
 ### Parallel Tracks
 
 **Backend (1 stories):** US-101
-**Full-stack (6 stories):** US-100 → US-102 → US-103 → US-105 → US-108 → US-104
+**Full-stack (7 stories):** US-100 → US-102 → US-103 → US-105 → US-108 → US-126 → US-104
 
 ### References
 

@@ -1,0 +1,45 @@
+{
+ "description": "Terminal access-denied landing: Auth0 session exists but membership, group, or required roles are missing. Redirect target of requireRole/requireTreasurer/requirePlatformOperator (ROUTE_ACCESS_DENIED). Only exit is logout. Added by CHG-012 (page shipped in US-031).",
+ "id": "SCR-access-denied",
+ "route": "/acceso-denegado",
+ "title": "Tu usuario no está listo para entrar",
+ "roles": [
+  "tesorera",
+  "platform_operator"
+ ],
+ "meta": {
+  "change_id": "CHG-012",
+  "owner": "fcostudios__mi-banquito",
+  "release": "R1",
+  "stories": [
+   "US-031"
+  ]
+ },
+ "layout": {
+  "sections": [
+   {
+    "id": "denied_message",
+    "type": "info-banner",
+    "kind": "warning",
+    "icon": "shield-alert",
+    "title": "Tu usuario no está listo para entrar",
+    "content": "La sesión de Auth0 existe, pero falta la membresía, el grupo o los roles requeridos por Mi Banquito. Pide a la operadora de plataforma que complete tu acceso."
+   },
+   {
+    "id": "logout_action",
+    "type": "action-row",
+    "actions": [
+     {
+      "id": "logout",
+      "label": "Cerrar sesión",
+      "href": "/auth/logout",
+      "kind": "secondary"
+     }
+    ]
+   }
+  ]
+ },
+ "states": {
+  "unauthenticated": "no Auth0 session → redirect to login (never renders)"
+ }
+}

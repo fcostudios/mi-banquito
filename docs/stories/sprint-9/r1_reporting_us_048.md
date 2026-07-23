@@ -1,6 +1,6 @@
 # US-048: Treasurer generates per-member statements as a batch and individually
 
-> **Sprint 6** | **P1** | **3 SP** | **R1** | FEAT-048
+> **Sprint 9** | **P1** | **3 SP** | **R1** | FEAT-048
 
 ## User Story
 
@@ -12,7 +12,7 @@ As a treasurer, I want to produce per-member statements after the monthly close 
 |-------|-------|
 | Story ID | US-048 |
 | Feature | FEAT-048 — Treasurer generates per-member statements as a batch and individually |
-| Sprint | Sprint 6 |
+| Sprint | Sprint 9 |
 | Priority | P1 |
 | Size | 3 SP |
 | Release | R1 |

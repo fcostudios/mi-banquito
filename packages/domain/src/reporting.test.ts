@@ -1,17 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildStatementShareUrl,
   canonicalJson,
   monthlyMemberStatementContributions,
   monthlyMemberStatementPayload,
   monthlyMemberStatementReceivedPayments,
+  sha256Hex,
+  money,
+} from "./member-statements";
+import {
+  buildStatementShareUrl,
   publicStatementPdfUrl,
   publicVerifyUrl,
-  sha256Hex,
+  statementArchiveSummaryFromTransparency,
   verifierResultText,
   verifyResultFromArchivedPayload,
-  money,
 } from "./reporting";
 
 const statementCopy = {
@@ -39,6 +42,7 @@ const statementCopy = {
   regularizedRepayment: "Pago regularizado",
   regularizationTransfer: "Transferencia para regularizar",
   legacyAccount: "Cuenta histórica sin referencia",
+  fundMovementsTitle: "Movimientos del fondo y colectas",
 };
 
 describe("public statement verification", () => {
@@ -135,6 +139,60 @@ describe("public statement verification", () => {
   });
 
   it("keeps the pending source and regularizing transfer as separate transparent statement rows", () => {
+    const verificationMovements = [
+      {
+        sourceKind: "contribution" as const,
+        sourceId: "c1",
+        datedOn: "2026-06-10",
+        memberId: "m1",
+        collectionId: null,
+        category: "regular_contribution",
+        label: "Contribution",
+        signedAmount: "50.0000",
+        reconciliationStatus: "pending" as const,
+        reversesId: null,
+        accountName: "Cuenta personal",
+      },
+      {
+        sourceKind: "transfer" as const,
+        sourceId: "t1",
+        datedOn: "2026-06-11",
+        memberId: null,
+        collectionId: null,
+        category: "regularization",
+        label: "Regularization",
+        signedAmount: "50.0000",
+        reconciliationStatus: null,
+        reversesId: null,
+        accountName: "Cuenta personal → Banco del grupo",
+      },
+      {
+        sourceKind: "expense" as const,
+        sourceId: "e-original",
+        datedOn: "2026-06-12",
+        memberId: null,
+        collectionId: null,
+        category: "bank_fee",
+        label: "Comisión de cuenta",
+        signedAmount: "-3.5000",
+        reconciliationStatus: null,
+        reversesId: null,
+        accountName: "Banco del grupo",
+      },
+      {
+        sourceKind: "expense" as const,
+        sourceId: "e-reversal",
+        datedOn: "2026-06-13",
+        memberId: null,
+        collectionId: null,
+        category: "bank_fee",
+        label: "Reverso: Comisión de cuenta",
+        signedAmount: "3.5000",
+        reconciliationStatus: null,
+        reversesId: "e-original",
+        accountName: "Banco del grupo",
+      },
+    ];
     const payload = monthlyMemberStatementPayload({
       orgName: "Mi Banquito",
       periodLabel: "2026-06",
@@ -143,20 +201,20 @@ describe("public statement verification", () => {
       closingBalance: "50.0000",
       contributions: [],
       withdrawals: [],
-      reconciliationMovements: [
-        { id: "c1", kind: "contribution", status: "pending", amount: "50.0000", datedOn: "2026-06-10", accountName: "Cuenta personal" },
-        { id: "t1", kind: "regularization_transfer", status: "regularized", amount: "50.0000", datedOn: "2026-06-11", accountName: "Banco del grupo" },
-      ],
+      verificationMovements,
       treasurerName: "Pancho",
       bankLast4: "1234",
       copy: statementCopy,
     });
 
-    const section = payload.sections.find((row) => row.id === "member-reconciliation");
+    const section = payload.sections.find((row) => row.id === "fund-movements");
     expect(section?.rows).toEqual([
-      expect.objectContaining({ label: "Aporte pendiente · Cuenta personal", value: "USD 50.00" }),
-      expect.objectContaining({ label: "Transferencia para regularizar · Banco del grupo", value: "USD 50.00" }),
+      expect.objectContaining({ sourceId: "c1", category: "regular_contribution", accountName: "Cuenta personal", status: "pending", value: "USD 50.00", reversesId: null }),
+      expect.objectContaining({ sourceId: "t1", category: "regularization", accountName: "Cuenta personal → Banco del grupo", status: null, value: "USD 50.00", reversesId: null }),
+      expect.objectContaining({ sourceId: "e-original", value: "USD -3.50", reversesId: null }),
+      expect.objectContaining({ sourceId: "e-reversal", value: "USD 3.50", reversesId: "e-original" }),
     ]);
+    expect(payload.verificationMovements).toEqual(verificationMovements);
   });
 
   it("keeps grouped BR-26 contribution child rows as statement rows without receipt duplication", () => {
@@ -308,5 +366,33 @@ describe("public statement verification", () => {
       movements: [],
     })).toBe("Este documento coincide con el registro del grupo Mi Banquito al 2026-07-04.");
     expect(verifierResultText({ matched: false })).toBe("No se encontró un documento con este código.");
+  });
+
+  it("derives every archive metric from one deterministic transparency projection", () => {
+    const rows = [
+      { sourceKind: "expense", sourceId: "e1", datedOn: "2026-07-04", memberId: null, collectionId: null, category: "bank_fee", label: "Fee", signedAmount: "-3.5000", reconciliationStatus: null, reversesId: null, accountName: "Bank" },
+      { sourceKind: "loan_disbursement", sourceId: "d1", datedOn: "2026-07-03", memberId: "m2", collectionId: null, category: "bank", label: "Loan", signedAmount: "-40.0000", reconciliationStatus: null, reversesId: null, accountName: null },
+      { sourceKind: "contribution", sourceId: "c1", datedOn: "2026-07-01", memberId: "m1", collectionId: null, category: "regular", label: "Contribution", signedAmount: "50.0000", reconciliationStatus: "regularized", reversesId: null, accountName: "Bank" },
+      { sourceKind: "collection_line", sourceId: "cl1", datedOn: "2026-07-05", memberId: "m1", collectionId: "collection", category: "solidarity", label: "Collection", signedAmount: "10.0000", reconciliationStatus: "regularized", reversesId: null, accountName: "Bank" },
+      { sourceKind: "collection_line", sourceId: "cl2", datedOn: "2026-07-06", memberId: "m1", collectionId: "collection", category: "solidarity", label: "Collection reversal", signedAmount: "-10.0000", reconciliationStatus: "regularized", reversesId: "cl1", accountName: "Bank" },
+    ] as const;
+    const projection = {
+      rows: [...rows],
+      netFundBalance: "106.5000",
+      physicalCashBalance: "106.5000",
+      collectionCashBalance: "0.0000",
+      regularizedDistributableBalance: "106.5000",
+    };
+
+    const expected = {
+      periodLabel: "2026-07",
+      members: 2,
+      in: "50.0000",
+      out: "40.0000",
+      movements: "-3.5000",
+      saldo: "106.5000",
+    };
+    expect(statementArchiveSummaryFromTransparency("2026-07", projection)).toEqual(expected);
+    expect(statementArchiveSummaryFromTransparency("2026-07", { ...projection, rows: [...rows].reverse() })).toEqual(expected);
   });
 });

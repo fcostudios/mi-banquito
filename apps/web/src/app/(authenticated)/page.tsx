@@ -28,10 +28,10 @@ function stateLabel(state: string) {
 export default async function ScrTreasurerHomePage() {
   const session = await requireTreasurer();
   const ledger = createLedgerService();
-  const [rows, memberSearchRows, pendingDeposits] = await Promise.all([
+  const [rows, memberSearchRows, pendingPage] = await Promise.all([
     ledger.listComplianceRows(session.orgId),
     ledger.searchMembersWithBalance(session.orgId),
-    createMovementService().listPendingDeposits(session.orgId),
+    createMovementService().listPendingDepositsPage(session.orgId, { limit: 1 }),
   ]);
   const summary = rows.reduce(
     (acc, row) => {
@@ -132,8 +132,8 @@ export default async function ScrTreasurerHomePage() {
             </span>
             <span className="text-sm text-text-secondary">{copy.pendingRegularization}</span>
             <div className="flex items-center justify-between gap-3">
-              <strong className="text-3xl text-text-primary">{pendingDeposits.length}</strong>
-              <StatusPill tone={pendingDeposits.length > 0 ? "warning" : "success"} label={pendingDeposits.length > 0 ? copy.pendingStatus : copy.regularizedStatus} />
+              <strong className="text-3xl text-text-primary">{pendingPage.totalCount}</strong>
+              <StatusPill tone={pendingPage.totalCount > 0 ? "warning" : "success"} label={pendingPage.totalCount > 0 ? copy.pendingStatus : copy.regularizedStatus} />
             </div>
             <span className="text-sm text-text-secondary">{copy.pendingRegularizationHint}</span>
           </Link>

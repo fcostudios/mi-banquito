@@ -1,4 +1,4 @@
-import { generateDecliningBalanceSchedule } from "./rules/loans/declining-balance";
+import { formatMoney4Units, parseMoney4Units } from "./money4";
 
 export type LiquidityPoint = {
   monthOn: string;
@@ -10,15 +10,16 @@ export type HypotheticalLoanTerms = {
   termPeriods?: number;
 };
 
-function formatMoney(value: string | number): string {
-  return new Intl.NumberFormat("es-EC", {
-    style: "currency",
-    currency: "USD",
-  }).format(Number(value));
-}
+const MONEY4_CENT_UNITS = BigInt(100);
+const PERCENT_MONEY4_DENOMINATOR = BigInt(1_000_000);
 
-function formatMoney4(value: number): string {
-  return value.toFixed(4);
+function formatMoneyUnits(value: bigint): string {
+  const absolute = value < BigInt(0) ? -value : value;
+  const roundedCents = (absolute + BigInt(50)) / MONEY4_CENT_UNITS;
+  const sign = value < BigInt(0) && roundedCents !== BigInt(0) ? "-" : "";
+  const whole = String(roundedCents / BigInt(100)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const cents = String(roundedCents % BigInt(100)).padStart(2, "0");
+  return `${sign}$${whole},${cents}`;
 }
 
 function monthName(monthOn: string): string {
@@ -29,21 +30,32 @@ function monthName(monthOn: string): string {
   }).format(date);
 }
 
-function cumulativeScheduledCollection(amount: number, terms: Required<HypotheticalLoanTerms>, monthIndex: number): number {
-  if (monthIndex <= 0 || amount <= 0) {
-    return 0;
-  }
+function roundNonNegative(numerator: bigint, denominator: bigint): bigint {
+  return (numerator + denominator / BigInt(2)) / denominator;
+}
 
-  const schedule = generateDecliningBalanceSchedule({
-    principal: amount,
-    ratePerPeriod: Number(terms.rateValue) / 100,
-    termPeriods: terms.termPeriods,
-    adminFeeRate: 0,
+function cumulativeScheduledCollections(input: {
+  loanUnits: bigint;
+  rateUnits: bigint;
+  termPeriods: number;
+}): bigint[] {
+  const principalCents = roundNonNegative(input.loanUnits, MONEY4_CENT_UNITS);
+  const periods = BigInt(input.termPeriods);
+  const basePrincipalCents = principalCents / periods;
+  const remainderCents = principalCents % periods;
+  let remainingPrincipalCents = principalCents;
+  let cumulativeCents = BigInt(0);
+
+  return Array.from({ length: input.termPeriods }, (_, index) => {
+    const principalDueCents = basePrincipalCents + (BigInt(index) < remainderCents ? BigInt(1) : BigInt(0));
+    const interestDueCents = roundNonNegative(
+      remainingPrincipalCents * input.rateUnits,
+      PERCENT_MONEY4_DENOMINATOR,
+    );
+    remainingPrincipalCents -= principalDueCents;
+    cumulativeCents += principalDueCents + interestDueCents;
+    return cumulativeCents;
   });
-
-  return schedule.installments
-    .slice(0, monthIndex)
-    .reduce((total, row) => total + Number(row.principalDue) + Number(row.interestDue), 0);
 }
 
 export function applyHypotheticalLoan(
@@ -51,21 +63,33 @@ export function applyHypotheticalLoan(
   amount: string,
   terms: HypotheticalLoanTerms = {},
 ): LiquidityPoint[] {
-  const loanAmount = Number(amount || 0);
-  const normalizedLoanAmount = Number.isFinite(loanAmount) && loanAmount > 0 ? loanAmount : 0;
-  const normalizedTerms = {
-    rateValue: terms.rateValue ?? "0.0000",
-    termPeriods: terms.termPeriods ?? 10,
-  };
+  let loanUnits: bigint;
+  try {
+    loanUnits = parseMoney4Units(amount || "0.0000");
+  } catch {
+    return series;
+  }
+  if (loanUnits <= BigInt(0)) return series;
 
-  return series.map((row, index) => ({
-    ...row,
-    projectedBalance: formatMoney4(
-      Number(row.projectedBalance)
-        - normalizedLoanAmount
-        + cumulativeScheduledCollection(normalizedLoanAmount, normalizedTerms, index),
-    ),
-  }));
+  const termPeriods = terms.termPeriods ?? 10;
+  if (termPeriods <= 0 || termPeriods % 1 !== 0) {
+    throw new Error("termPeriods must be a positive integer");
+  }
+  const rateUnits = parseMoney4Units(terms.rateValue ?? "0.0000");
+  if (rateUnits < BigInt(0)) throw new Error("ratePerPeriod must be zero or greater");
+  const cumulativeCents = cumulativeScheduledCollections({ loanUnits, rateUnits, termPeriods });
+
+  return series.map((row, index) => {
+    const collectedCents = index <= 0
+      ? BigInt(0)
+      : cumulativeCents[Math.min(index, termPeriods) - 1] ?? BigInt(0);
+    return {
+      ...row,
+      projectedBalance: formatMoney4Units(
+        parseMoney4Units(row.projectedBalance) - loanUnits + collectedCents * MONEY4_CENT_UNITS,
+      ),
+    };
+  });
 }
 
 export function liquidityNarrative(input: { series: LiquidityPoint[]; commitment: string }): string {
@@ -75,15 +99,15 @@ export function liquidityNarrative(input: { series: LiquidityPoint[]; commitment
   }
 
   const minimumPoint = input.series.reduce((current, row) => (
-    Number(row.projectedBalance) < Number(current.projectedBalance) ? row : current
+    parseMoney4Units(row.projectedBalance) < parseMoney4Units(current.projectedBalance) ? row : current
   ), firstPoint);
   const yearEndPoint = input.series[input.series.length - 1] ?? firstPoint;
-  const delta = Number(yearEndPoint.projectedBalance) - Number(input.commitment);
-  const direction = delta < 0 ? "por debajo" : "por encima";
+  const delta = parseMoney4Units(yearEndPoint.projectedBalance) - parseMoney4Units(input.commitment);
+  const direction = delta < BigInt(0) ? "por debajo" : "por encima";
 
   return [
-    `Tu mes mínimo es ${monthName(minimumPoint.monthOn)} con ${formatMoney(minimumPoint.projectedBalance)}.`,
-    `Llegarás a fin de año con ${formatMoney(yearEndPoint.projectedBalance)},`,
-    `lo cual está ${formatMoney(Math.abs(delta))} ${direction} del compromiso.`,
+    `Tu mes mínimo es ${monthName(minimumPoint.monthOn)} con ${formatMoneyUnits(parseMoney4Units(minimumPoint.projectedBalance))}.`,
+    `Llegarás a fin de año con ${formatMoneyUnits(parseMoney4Units(yearEndPoint.projectedBalance))},`,
+    `lo cual está ${formatMoneyUnits(delta < BigInt(0) ? -delta : delta)} ${direction} del compromiso.`,
   ].join(" ");
 }

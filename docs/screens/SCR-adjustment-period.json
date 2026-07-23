@@ -1,0 +1,61 @@
+{
+ "description": "Platform operator opens a 7-day adjustment window on a closed period to register corrections of the closed month. requirePlatformOperator() on page and Server Action; notFound() on unresolvable org. Added by CHG-012 (page shipped in US-083; page self-declares data-screen=SCR-adjustment-period).",
+ "id": "SCR-adjustment-period",
+ "route": "/admin/orgs/[id]/period-close/[periodCloseId]/adjust",
+ "title": "Abrir período de ajuste",
+ "roles": [
+  "platform_operator"
+ ],
+ "meta": {
+  "change_id": "CHG-012",
+  "owner": "fcostudios__mi-banquito",
+  "release": "R1",
+  "stories": [
+   "US-083"
+  ]
+ },
+ "layout": {
+  "sections": [
+   {
+    "id": "adjust_context",
+    "type": "info-banner",
+    "kind": "info",
+    "icon": "calendar-clock",
+    "title": "Abrir período de ajuste",
+    "content": "Permite registrar correcciones del mes cerrado durante una ventana temporal de 7 días."
+   },
+   {
+    "id": "adjust_form",
+    "type": "form",
+    "action": "openAdjustmentPeriodAction",
+    "fields": [
+     {
+      "id": "reason",
+      "label": "Motivo del ajuste *",
+      "type": "textarea",
+      "required": true
+     },
+     {
+      "id": "confirm",
+      "label": "Confirmo que entiendo que se reabre una ventana de 7 días sobre un mes cerrado",
+      "type": "checkbox",
+      "required": true
+     }
+    ],
+    "submit": {
+     "label": "Abrir período de ajuste",
+     "success": "re-renders in place (revalidatePath); no navigation"
+    }
+   }
+  ]
+ },
+ "navigation": {
+  "inbound": [
+   {
+    "from": "SCR-admin-org-detail",
+    "kind": "tile_navigate"
+   }
+  ],
+  "outbound": []
+ }
+}

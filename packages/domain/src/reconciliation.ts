@@ -280,6 +280,15 @@ function money4FromUnits(units: bigint): string {
 const sumAmountUnits = (rows: Array<{ amount: string | number }>): bigint =>
   rows.reduce((total, row) => total + moneyUnits4(row.amount), BigInt(0));
 
+const signedExpenseAmountUnits = (row: { amount: string | number; reversesId: string | null }): bigint => {
+  const units = moneyUnits4(row.amount);
+  return row.reversesId ? -units : units;
+};
+
+const sumSignedExpenseUnits = (
+  rows: Array<{ amount: string | number; reversesId: string | null }>,
+): bigint => rows.reduce((total, row) => total + signedExpenseAmountUnits(row), BigInt(0));
+
 function actionsByAlertId(rows: Array<typeof alertAction.$inferSelect>): Map<string, Array<typeof alertAction.$inferSelect>> {
   const grouped = new Map<string, Array<typeof alertAction.$inferSelect>>();
   for (const row of rows) {
@@ -333,12 +342,11 @@ async function deriveCyclePoolBalance(
         lte(withdrawal.datedOn, input.cycle.closesOn),
         isNull(withdrawal.reversesId),
       )) as Array<{ amount: string | number }>;
-  const expenses = await tx.select({ amount: expense.amount }).from(expense)
+  const expenses = await tx.select({ amount: expense.amount, reversesId: expense.reversesId }).from(expense)
       .where(and(
         eq(expense.orgId, input.orgId),
         lte(expense.incurredOn, input.cycle.closesOn),
-        isNull(expense.reversesId),
-      )) as Array<{ amount: string | number }>;
+      )) as Array<{ amount: string | number; reversesId: string | null }>;
   const disbursements = await tx.select({ amount: loanDisbursement.amount }).from(loanDisbursement)
       .where(and(
         eq(loanDisbursement.orgId, input.orgId),
@@ -359,7 +367,7 @@ async function deriveCyclePoolBalance(
     sumAmountUnits(contributions)
     + sumAmountUnits(repayments)
     - sumAmountUnits(withdrawals)
-    - sumAmountUnits(expenses)
+    - sumSignedExpenseUnits(expenses)
     - sumAmountUnits(disbursements)
     + regularizationTotal,
   );
@@ -434,7 +442,7 @@ async function buildMonthlyCloseEvidence(
       .where(and(eq(withdrawal.orgId, input.orgId), gte(withdrawal.datedOn, input.cycle.opensOn), lte(withdrawal.datedOn, input.cycle.closesOn), isNull(withdrawal.reversesId)))
       .orderBy(withdrawal.datedOn) as Array<typeof withdrawal.$inferSelect>;
   const expenseRows = await tx.select().from(expense)
-      .where(and(eq(expense.orgId, input.orgId), gte(expense.incurredOn, input.cycle.opensOn), lte(expense.incurredOn, input.cycle.closesOn), isNull(expense.reversesId)))
+      .where(and(eq(expense.orgId, input.orgId), gte(expense.incurredOn, input.cycle.opensOn), lte(expense.incurredOn, input.cycle.closesOn)))
       .orderBy(expense.incurredOn) as Array<typeof expense.$inferSelect>;
   const disbursementRows = await tx.select().from(loanDisbursement)
       .where(and(eq(loanDisbursement.orgId, input.orgId), gte(loanDisbursement.disbursedOn, input.cycle.opensOn), lte(loanDisbursement.disbursedOn, input.cycle.closesOn)))
@@ -489,7 +497,13 @@ async function buildMonthlyCloseEvidence(
       ...contributionRows.map((row) => ({ kind: "contribution", datedOn: row.datedOn, memberId: row.memberId, amount: money4(String(row.amount)), note: row.notes })),
       ...repaymentRows.map((row) => ({ kind: "repayment", datedOn: row.datedOn, memberId: row.memberId, amount: money4(String(row.amount)), note: row.notes })),
       ...withdrawalRows.map((row) => ({ kind: "withdrawal", datedOn: row.datedOn, memberId: row.memberId, amount: money4(String(row.amount)), note: row.notes })),
-      ...expenseRows.map((row) => ({ kind: "expense", datedOn: row.incurredOn, memberId: row.beneficiaryMemberId, amount: money4(String(row.amount)), note: row.purpose })),
+      ...expenseRows.map((row) => ({
+        kind: "expense",
+        datedOn: row.incurredOn,
+        memberId: row.beneficiaryMemberId,
+        amount: money4FromUnits(signedExpenseAmountUnits(row)),
+        note: row.purpose,
+      })),
       ...disbursementRows.map((row) => ({ kind: "loan_disbursement", datedOn: row.disbursedOn, memberId: null, amount: money4(String(row.amount)), note: row.loanId })),
       ...transferRows.map((row) => ({ kind: "transfer", datedOn: row.datedOn, memberId: null, amount: money4(String(row.amount)), note: row.purpose })),
     ].sort((a, b) => `${a.datedOn}-${a.kind}-${a.amount}`.localeCompare(`${b.datedOn}-${b.kind}-${b.amount}`)),
@@ -537,10 +551,10 @@ async function buildMonthlyCloseEvidence(
       interestAmount: money4(String(row.interestAmount)),
     })),
     movementSummary: {
-      bankFees: money4FromUnits(sumAmountUnits(expenseRows.filter((row) => row.category === "bank_fee"))),
-      supplies: money4FromUnits(sumAmountUnits(expenseRows.filter((row) => row.category === "supplies"))),
-      sharedExpenses: money4FromUnits(sumAmountUnits(expenseRows.filter((row) => row.category === "shared_expense"))),
-      operatingExpenses: money4FromUnits(sumAmountUnits(expenseRows.filter((row) => row.category === "operating"))),
+      bankFees: money4FromUnits(sumSignedExpenseUnits(expenseRows.filter((row) => row.category === "bank_fee"))),
+      supplies: money4FromUnits(sumSignedExpenseUnits(expenseRows.filter((row) => row.category === "supplies"))),
+      sharedExpenses: money4FromUnits(sumSignedExpenseUnits(expenseRows.filter((row) => row.category === "shared_expense"))),
+      operatingExpenses: money4FromUnits(sumSignedExpenseUnits(expenseRows.filter((row) => row.category === "operating"))),
       transfers: money4FromUnits(sumAmountUnits(transferRows.map((row) => ({ amount: String(row.amount) })))),
       netFundBalance: "0.0000",
       pendingRegularizations: 0,

@@ -9,11 +9,23 @@ export * from "./audit";
 export * from "./blob-cleanup";
 export * from "./collections";
 export * from "./compensation";
+export * from "./treasurer-compensation";
+export * from "./transparency";
+export * from "./extraordinary-collections";
 export * from "./interest";
 export * from "./ledger";
 export * from "./liquidity";
 export * from "./loan";
 export * from "./movements";
+export * from "./member-statements";
+export {
+  addMoney4,
+  compareMoney4,
+  formatMoney4Units,
+  parseMoney4Units,
+  parseNonNegativeMoney4,
+  subtractMoney4,
+} from "./money4";
 export * from "./pilot";
 export * from "./platform";
 export * from "./payments";

@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { createMovementService } from "@mi-banquito/domain";
+import {
+  CompensationCeilingExceededError,
+  createMovementService,
+  createTreasurerCompensationService,
+} from "@mi-banquito/domain";
 import { requireTreasurer } from "@/lib/auth/require-session";
 import { deleteExpenseSlip, uploadExpenseSlip } from "@/lib/expense-slip-storage";
 import {
@@ -42,7 +46,7 @@ const transferSchema = z.object({
 }).strict();
 
 const regularizationSchema = z.object({
-  regularizesKind: z.enum(["contribution", "repayment"]),
+  regularizesKind: z.enum(["contribution", "repayment", "extraordinary_collection"]),
   regularizesId: z.string().uuid(),
   toAccountId: z.string().uuid(),
   amount: z.string().min(1),
@@ -50,6 +54,16 @@ const regularizationSchema = z.object({
   notes: z.string().max(2_000).optional().default(""),
   clientRequestId: z.string().uuid(),
   confirmed: z.literal("yes"),
+}).strict();
+
+const fiscalYearSchema = z.coerce.number().int().min(2000).max(2200);
+const treasurerCompensationSchema = z.object({
+  fiscalYear: fiscalYearSchema,
+  accountId: z.string().uuid(),
+  amount: z.string().min(1).max(32),
+  datedOn: z.string().date(),
+  notes: z.string().trim().max(2_000).optional(),
+  clientRequestId: z.string().uuid(),
 }).strict();
 
 function parseScalarFields(formData: FormData, keys: readonly string[], options: { allowSlip?: boolean } = {}) {
@@ -78,6 +92,13 @@ function expenseSlipFile(formData: FormData): File | undefined {
   if (values.length === 0) return undefined;
   if (values.length > 1 || typeof values[0] === "string") throw new z.ZodError([]);
   return values[0].size > 0 ? values[0] : undefined;
+}
+
+function validatedFiscalYear(formData: FormData): number | undefined {
+  const values = formData.getAll("fiscalYear");
+  if (values.length !== 1 || typeof values[0] !== "string") return undefined;
+  const parsed = fiscalYearSchema.safeParse(values[0]);
+  return parsed.success ? parsed.data : undefined;
 }
 
 function movementErrorCode(error: unknown): string {
@@ -113,6 +134,46 @@ function movementErrorCode(error: unknown): string {
   return "action-failed";
 }
 
+function recordMovementPath(values: Record<string, string | number | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(values)) {
+    if (value !== undefined) params.set(key, String(value));
+  }
+  return `${ROUTE_SCR_RECORD_MOVEMENT}?${params.toString()}`;
+}
+
+function compensationErrorPath(error: unknown, fiscalYear?: number): string {
+  if (error instanceof CompensationCeilingExceededError) {
+    return recordMovementPath({
+      error: "compensation-ceiling-exceeded",
+      fiscalYear,
+      cumulativeEntitlement: error.figures.cumulativeEntitlement,
+      cumulativePaid: error.figures.cumulativePaid,
+      payableNow: error.figures.payableNow,
+    });
+  }
+  if (error instanceof z.ZodError) return recordMovementPath({ error: "invalid-form", fiscalYear });
+  if (!(error instanceof Error)) return recordMovementPath({ error: "action-failed", fiscalYear });
+  if (error.message === "compensation_idempotency_conflict") {
+    return recordMovementPath({ error: "compensation-request-conflict", fiscalYear });
+  }
+  if (error.message === "compensation_account_unavailable") {
+    return recordMovementPath({ error: "account-unavailable", fiscalYear });
+  }
+  if (error.message === "compensation_actor_not_active_treasurer") {
+    return recordMovementPath({ error: "compensation-actor-invalid", fiscalYear });
+  }
+  if (
+    error.message === "compensation_amount_invalid"
+    || error.message === "compensation_date_invalid"
+    || error.message === "compensation_fiscal_year_invalid"
+    || error.message === "compensation_payout_fiscal_year_mismatch"
+  ) {
+    return recordMovementPath({ error: "invalid-form", fiscalYear });
+  }
+  return recordMovementPath({ error: "action-failed", fiscalYear });
+}
+
 function revalidateMovementSurfaces() {
   revalidatePath(ROUTE_SCR_HISTORY);
   revalidatePath(ROUTE_HOME);
@@ -121,13 +182,12 @@ function revalidateMovementSurfaces() {
 }
 
 function successPath(input: { saved: "expense" | "transfer"; category: string; amount: string }) {
-  const params = new URLSearchParams({
+  return recordMovementPath({
     saved: input.saved,
     category: input.category,
     currency: "USD",
     amount: input.amount,
   });
-  return `${ROUTE_SCR_RECORD_MOVEMENT}?${params.toString()}`;
 }
 
 async function cleanupUploadedSlip(input: {
@@ -237,6 +297,42 @@ export async function recordTransferAction(formData: FormData) {
 
   revalidateMovementSurfaces();
   redirect(successPath({ saved: "transfer", category: "transfer", amount: String(result.amount) }));
+}
+
+export async function recordTreasurerCompensationAction(formData: FormData) {
+  const session = await requireTreasurer();
+  const redirectFiscalYear = validatedFiscalYear(formData);
+  let saved: {
+    result: Awaited<ReturnType<ReturnType<typeof createTreasurerCompensationService>["recordPayout"]>>;
+    fiscalYear: number;
+  };
+  try {
+    const parsed = treasurerCompensationSchema.parse(parseScalarFields(formData, [
+      "fiscalYear",
+      "accountId",
+      "amount",
+      "datedOn",
+      "notes",
+      "clientRequestId",
+    ]));
+    const result = await createTreasurerCompensationService().recordPayout({
+      ...parsed,
+      orgId: session.orgId,
+      actorId: session.actorId,
+    });
+    saved = { result, fiscalYear: parsed.fiscalYear };
+  } catch (error) {
+    redirect(compensationErrorPath(error, redirectFiscalYear));
+  }
+
+  revalidateMovementSurfaces();
+  redirect(recordMovementPath({
+    saved: "expense",
+    category: "treasurer_comp_payout",
+    currency: "USD",
+    amount: String(saved.result.amount),
+    fiscalYear: saved.fiscalYear,
+  }));
 }
 
 export async function regularizePendingDepositAction(formData: FormData) {

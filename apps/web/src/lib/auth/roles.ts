@@ -6,19 +6,21 @@ export const ROLE_HIERARCHY = ["TESORERA", "PRESIDENTE", "MIEMBRO", "PLATFORM_OP
 export type AppRole = (typeof ROLE_HIERARCHY)[number];
 
 /** Returns the highest role from an array of role strings. */
-export function highestRole(roles: string[]): AppRole {
+export function highestRole(roles: string[]): AppRole | undefined {
   const normalized = roles.map((r) => r.toLowerCase().replace("role_", ""));
   for (let i = ROLE_HIERARCHY.length - 1; i >= 0; i--) {
     if (normalized.includes(ROLE_HIERARCHY[i].toLowerCase())) {
       return ROLE_HIERARCHY[i];
     }
   }
-  return "TESORERA"; // least-privilege default
+  return undefined;
 }
 
 /** Check if a role has at least the given minimum role. */
 export function hasMinRole(userRoles: string[], minRole: AppRole): boolean {
-  const userHighest = ROLE_HIERARCHY.indexOf(highestRole(userRoles));
+  const highest = highestRole(userRoles);
+  if (!highest) return false;
+  const userHighest = ROLE_HIERARCHY.indexOf(highest);
   const required = ROLE_HIERARCHY.indexOf(minRole);
   return userHighest >= required;
 }

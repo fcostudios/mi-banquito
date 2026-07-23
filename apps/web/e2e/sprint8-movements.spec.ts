@@ -74,11 +74,24 @@ test.beforeAll(async ({}, testInfo) => {
     now,
     ACTOR_ID,
   ]);
+  await pool.query(`
+    INSERT INTO group_config (
+      org_id, version, valid_from, valid_to, contribution_cycle_kind, contribution_amount,
+      currency_code, loan_rate_model, loan_rate_value, loan_rate_period_unit, loan_grace_periods,
+      loan_to_savings_cap_ratio, interest_resolution, repayment_split_rule, pays_savings_interest,
+      savings_interest_rate, year_end_share_out_formula, safety_margin_amount,
+      reconciliation_tolerance_amount, late_threshold_days, mora_threshold_days,
+      fiscal_year_start_month, fiscal_year_start_day, config, created_at, created_by, created_by_kind
+    ) VALUES ($1, 1, '2026-01-01', NULL, 'monthly', 20, 'USD', 'declining_balance', 1,
+      'monthly', 0, 3, 'daily', 'interest_first', false, NULL, 'time_weighted', 0, 0, 1, 5,
+      1, 1, '{}'::jsonb, $2, $3, 'member')
+  `, [orgId, now, ACTOR_ID]);
 });
 
 test.afterAll(async () => {
   if (!pool) return;
   try {
+    await pool.query("DELETE FROM group_config WHERE org_id = $1", [orgId]);
     await pool.query("DELETE FROM account WHERE org_id = $1", [orgId]);
     await pool.query("DELETE FROM organization WHERE id = $1", [orgId]);
   } finally {

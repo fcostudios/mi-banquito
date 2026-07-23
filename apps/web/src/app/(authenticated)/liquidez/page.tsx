@@ -1,4 +1,5 @@
 import { createLiquidityService } from "@mi-banquito/domain";
+import { formatUsdMoney4 } from "@mi-banquito/ui";
 
 import { requireTreasurer } from "@/lib/auth/require-session";
 import messages from "@/lib/i18n/en-US.json";
@@ -8,13 +9,6 @@ import { LiquiditySandbox } from "./liquidity-sandbox";
 export const dynamic = "force-dynamic";
 
 const copy = messages.liquidez;
-
-function formatMoney(value: string): string {
-  return new Intl.NumberFormat("es-EC", {
-    style: "currency",
-    currency: "USD",
-  }).format(Number(value));
-}
 
 export default async function ScrCashFlowProjectionPage() {
   const session = await requireTreasurer();
@@ -27,23 +21,31 @@ export default async function ScrCashFlowProjectionPage() {
         <p className="mt-2 text-text-secondary">{copy.description}</p>
       </header>
 
-      <section className="grid gap-3 rounded-md border border-border bg-surface p-5 md:grid-cols-3">
-        <div>
+      <section className="grid gap-3 rounded-md border border-border bg-surface p-5 md:grid-cols-2 xl:grid-cols-5" data-testid="available_capital">
+        <div data-testid="physical_cash_balance">
+          <p className="text-sm text-text-secondary">{copy.physicalCashBalance}</p>
+          <p className="text-2xl font-bold text-text-primary">{formatUsdMoney4(projection.physicalCashBalance)}</p>
+        </div>
+        <div data-testid="collection_cash_balance">
+          <p className="text-sm text-text-secondary">{copy.collectionCashBalance}</p>
+          <p className="text-2xl font-bold text-text-primary">{formatUsdMoney4(projection.collectionCashBalance)}</p>
+        </div>
+        <div data-testid="pool_balance">
+          <p className="text-sm text-text-secondary">{copy.regularizedDistributableBalance}</p>
+          <p className="text-2xl font-bold text-text-primary">{formatUsdMoney4(projection.regularizedDistributableBalance)}</p>
+        </div>
+        <div data-testid="available_capital_value">
           <p className="text-sm text-text-secondary">{copy.availableCapital}</p>
-          <p className="text-2xl font-bold text-text-primary">{formatMoney(projection.availableCapital)}</p>
+          <p className="text-2xl font-bold text-text-primary">{formatUsdMoney4(projection.availableCapital)}</p>
         </div>
-        <div>
-          <p className="text-sm text-text-secondary">{copy.poolBalance}</p>
-          <p className="text-2xl font-bold text-text-primary">{formatMoney(projection.poolBalance)}</p>
-        </div>
-        <div>
+        <div data-testid="base_fund_pool">
           <p className="text-sm text-text-secondary">{copy.baseFundPool}</p>
-          <p className="text-2xl font-bold text-text-primary">{formatMoney(projection.baseFundPool)}</p>
+          <p className="text-2xl font-bold text-text-primary">{formatUsdMoney4(projection.baseFundPool)}</p>
         </div>
-        <p className="text-sm text-text-secondary md:col-span-3">{copy.baseFundExplanation}</p>
+        <p className="text-sm text-text-secondary md:col-span-2 xl:col-span-5">{copy.baseFundExplanation}</p>
       </section>
 
-      <section className="rounded-md border border-border bg-surface p-5">
+      <section className="rounded-md border border-border bg-surface p-5" data-testid="narrative">
         <h2 className="text-xl font-semibold text-text-primary">{copy.summary}</h2>
         <p className="mt-2 text-text-secondary">{projection.narrative}</p>
       </section>

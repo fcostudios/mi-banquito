@@ -19,20 +19,20 @@ import {
 } from "@mi-banquito/db/schema";
 import { withTenantTransaction, withWritableTenantTransaction } from "@mi-banquito/db/tenant";
 import { canonicalJson, sha256Hex } from "./reporting";
+import { formatMoney4Units, parseMoney4Units } from "./money4";
 import { assertShareOutReversalAllowed, buildShareOutReversalPlan, isPositiveMoney4 } from "./year-end-reversal";
 import type { ShareOutReversalLineInput, ShareOutReversalPlan } from "./year-end-reversal";
 
 function cents4(value: string | number): bigint {
-  return BigInt(Math.round(Number(value) * 10000));
+  return parseMoney4Units(String(value));
 }
 
 const ZERO = BigInt(0);
 const TEN_THOUSAND = BigInt(10000);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function money4(value: bigint): string {
-  const sign = value < ZERO ? "-" : "";
-  const abs = value < ZERO ? -value : value;
-  return `${sign}${abs / TEN_THOUSAND}.${String(abs % TEN_THOUSAND).padStart(4, "0")}`;
+  return formatMoney4Units(value);
 }
 
 export function fiscalYearForDate(dateOnly: string, input: { startMonth: number; startDay: number }): number {
@@ -48,7 +48,7 @@ export function computeTwoPoolDraft(input: {
   members: Array<{ memberId: string; accumulatedSavings: string; saldoPonderadoUsdDias: string; loanActivityBasis: string }>;
 }) {
   const total = cents4(input.repartoTotal);
-  const loanPool = cents4(Number(input.repartoTotal) * Number(input.loanPoolPct));
+  const loanPool = total * cents4(input.loanPoolPct) / TEN_THOUSAND;
   const savingsPool = total - loanPool;
   const loanBasisTotal = input.members.reduce((sum, row) => sum + cents4(row.loanActivityBasis), ZERO);
   const weightedTotal = input.members.reduce((sum, row) => sum + cents4(row.saldoPonderadoUsdDias), ZERO);
@@ -158,8 +158,44 @@ export function createShareOutService(options: { now?: () => Date } = {}) {
         };
       });
     },
-    async runDraft(input: { orgId: string; actorId: string; year: number }) {
+    async runDraft(input: { orgId: string; actorId: string; year: number; clientRequestId: string }) {
+      if (!UUID_PATTERN.test(input.clientRequestId)) {
+        throw new Error("share_out_client_request_id_invalid");
+      }
       return withWritableTenantTransaction(input.orgId, async (tx) => {
+        await tx.execute(sql`
+          SELECT pg_advisory_xact_lock(hashtextextended(${'tenant-money:' + input.orgId}, 0))
+        `);
+        const [priorCommand] = await tx.select({
+          subjectId: auditLogEntry.subjectId,
+          payloadSnapshot: auditLogEntry.payloadSnapshot,
+        }).from(auditLogEntry)
+          .where(and(
+            eq(auditLogEntry.orgId, input.orgId),
+            eq(auditLogEntry.actionKind, "shareout.draft.created"),
+            sql`${auditLogEntry.payloadSnapshot}->>'clientRequestId' = ${input.clientRequestId}`,
+          ))
+          .limit(1);
+        if (priorCommand) {
+          const payload = priorCommand.payloadSnapshot as { actorId?: unknown; year?: unknown; decisionId?: unknown };
+          if (
+            payload.actorId !== input.actorId
+            || payload.year !== input.year
+            || typeof payload.decisionId !== "string"
+          ) {
+            throw new Error("share_out_idempotency_conflict");
+          }
+          return {
+            shareOutId: priorCommand.subjectId,
+            decisionId: payload.decisionId,
+            year: input.year,
+          };
+        }
+        const [existingDraft] = await tx.select({ id: yearEndShareOut.id }).from(yearEndShareOut)
+          .where(and(eq(yearEndShareOut.orgId, input.orgId), eq(yearEndShareOut.year, input.year)))
+          .limit(1);
+        if (existingDraft) throw new Error("share_out_already_exists");
+
         await tx.execute(sql`REFRESH MATERIALIZED VIEW mv_member_time_weighted_balance`);
         await tx.execute(sql`REFRESH MATERIALIZED VIEW mv_loan_activity_points`);
         await tx.execute(sql`REFRESH MATERIALIZED VIEW mv_distributable_surplus`);
@@ -174,7 +210,11 @@ export function createShareOutService(options: { now?: () => Date } = {}) {
           .limit(1);
         if (!decision) throw new Error("surplus_governance_decision_required");
 
-        const [closeRow] = await tx.select({ close: periodClose, periodLabel: contributionCycle.cycleLabel })
+        const [closeRow] = await tx.select({
+          close: periodClose,
+          periodLabel: contributionCycle.cycleLabel,
+          closesOn: contributionCycle.closesOn,
+        })
           .from(periodClose)
           .innerJoin(contributionCycle, and(eq(contributionCycle.id, periodClose.cycleId), eq(contributionCycle.orgId, periodClose.orgId)))
           .where(and(
@@ -196,6 +236,15 @@ export function createShareOutService(options: { now?: () => Date } = {}) {
           .limit(1);
         if (!closeRow) throw new Error("year_end_period_close_required");
 
+        const liveBalanceResult = await tx.execute<{ liveBalance: string }>(sql`
+          SELECT fund_pool_balance(${input.orgId}::uuid, ${closeRow.closesOn}::date)::text AS "liveBalance"
+        `);
+        const liveBalanceRows = Array.isArray(liveBalanceResult) ? liveBalanceResult : liveBalanceResult.rows ?? [];
+        const liveBalance = String(liveBalanceRows[0]?.liveBalance ?? "0.0000");
+        if (parseMoney4Units(decision.repartoTotal) > parseMoney4Units(liveBalance)) {
+          throw new Error("share_out_exceeds_regularized_balance");
+        }
+
         const weightedRows = await tx.select().from(memberTimeWeightedBalance)
           .where(and(eq(memberTimeWeightedBalance.orgId, input.orgId), eq(memberTimeWeightedBalance.fiscalYear, input.year)));
         const loanRows = await tx.select().from(loanActivityPoints)
@@ -212,13 +261,13 @@ export function createShareOutService(options: { now?: () => Date } = {}) {
             loanActivityBasis: String(loanByMember.get(row.memberId) ?? "0.0000"),
           })),
         });
-        const now = new Date();
+        const now = clock();
         const [shareOut] = await tx.insert(yearEndShareOut).values({
           orgId: input.orgId,
           year: input.year,
           periodCloseId: closeRow.close.id,
           formulaAtRun: "two_pool_v1",
-          totalPoolAtRun: decision.distributableSurplus,
+          totalPoolAtRun: liveBalance,
           totalCommitment: decision.repartoTotal,
           totalApproved: null,
           surplusOrShortfallAtApproval: null,
@@ -261,6 +310,26 @@ export function createShareOutService(options: { now?: () => Date } = {}) {
             createdAt: now,
           });
         }
+        await tx.insert(auditLogEntry).values({
+          orgId: input.orgId,
+          actorKind: "member",
+          actorId: input.actorId,
+          actionKind: "shareout.draft.created",
+          subjectKind: "year_end_share_out",
+          subjectId: shareOut.id,
+          payloadSnapshot: {
+            clientRequestId: input.clientRequestId,
+            actorId: input.actorId,
+            year: input.year,
+            decisionId: decision.id,
+            periodCloseId: closeRow.close.id,
+            repartoTotal: decision.repartoTotal,
+            totalPoolAtRun: liveBalance,
+          },
+          reason: null,
+          at: now,
+          createdAt: now,
+        });
         return { shareOutId: shareOut.id, decisionId: decision.id, year: input.year };
       });
     },

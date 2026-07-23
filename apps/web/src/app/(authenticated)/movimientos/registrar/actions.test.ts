@@ -5,7 +5,18 @@ import { and, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { del, put } from "@vercel/blob";
 
-import { account, alert, auditLogEntry, expense, organization, slipPhoto, transfer } from "@mi-banquito/db/schema";
+import {
+  account,
+  alert,
+  auditLogEntry,
+  expense,
+  groupConfig,
+  member,
+  organization,
+  slipPhoto,
+  transfer,
+  treasurerCompensationDisbursement,
+} from "@mi-banquito/db/schema";
 
 if (!process.env.DATABASE_URL) {
   try {
@@ -52,8 +63,10 @@ let withTenantTransaction: typeof import("@mi-banquito/db/tenant")["withTenantTr
 let recordExpenseAction: typeof import("./actions")["recordExpenseAction"];
 let recordTransferAction: typeof import("./actions")["recordTransferAction"];
 let regularizePendingDepositAction: typeof import("./actions")["regularizePendingDepositAction"];
+let recordTreasurerCompensationAction: typeof import("./actions")["recordTreasurerCompensationAction"];
 let fromAccountId: string;
 let toAccountId: string;
+let foreignAccountId: string;
 const originalBypass = process.env.E2E_AUTH_BYPASS;
 const originalOrgId = process.env.AUTH0_ORGANIZATION_DB_ORG_ID;
 
@@ -75,6 +88,17 @@ function transferForm(clientRequestId = randomUUID()) {
   formData.set("amount", "7.25");
   formData.set("datedOn", "2026-07-11");
   formData.set("notes", "Mover a caja");
+  formData.set("clientRequestId", clientRequestId);
+  return formData;
+}
+
+function compensationForm(clientRequestId = randomUUID(), amount = "30.00") {
+  const formData = new FormData();
+  formData.set("fiscalYear", "2026");
+  formData.set("accountId", fromAccountId);
+  formData.set("amount", amount);
+  formData.set("datedOn", "2026-07-11");
+  formData.set("notes", "Pago aprobado");
   formData.set("clientRequestId", clientRequestId);
   return formData;
 }
@@ -155,9 +179,77 @@ describe("movement server actions", () => {
     ]).returning();
     fromAccountId = rows[0]?.id ?? "";
     toAccountId = rows[1]?.id ?? "";
+    const [foreignAccount] = await db.insert(account).values({
+      orgId: FOREIGN_ORG_ID,
+      name: "Banco extranjero",
+      type: "group_bank",
+      isGroupFund: true,
+      status: "active",
+      clientRequestId: randomUUID(),
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      createdBy: ACTOR_ID,
+    }).returning();
+    foreignAccountId = foreignAccount?.id ?? "";
+    await db.insert(member).values({
+      id: ACTOR_ID,
+      orgId: ORG_ID,
+      displayName: "Tesorera de prueba",
+      joinedOn: "2025-01-01",
+      role: "tesorera",
+      status: "activo",
+      initialSavingsBalance: "0.0000",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      createdBy: ACTOR_ID,
+      createdByKind: "member",
+    });
+    await db.insert(groupConfig).values({
+      orgId: ORG_ID,
+      version: 1,
+      validFrom: new Date("2025-01-01T00:00:00.000Z"),
+      validTo: null,
+      contributionCycleKind: "monthly",
+      contributionAmount: "20.0000",
+      currencyCode: "USD",
+      loanRateModel: "declining_balance",
+      loanRateValue: "1.0000",
+      loanRatePeriodUnit: "monthly",
+      loanGracePeriods: 0,
+      loanToSavingsCapRatio: "3.00",
+      interestResolution: "daily",
+      repaymentSplitRule: "interest_first",
+      paysSavingsInterest: false,
+      savingsInterestRate: null,
+      yearEndShareOutFormula: "time_weighted",
+      safetyMarginAmount: "0.0000",
+      reconciliationToleranceAmount: "0.0000",
+      lateThresholdDays: 1,
+      moraThresholdDays: 5,
+      fiscalYearStartMonth: 1,
+      fiscalYearStartDay: 1,
+      config: {},
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      createdBy: ACTOR_ID,
+      createdByKind: "member",
+    });
+    await db.insert(treasurerCompensationDisbursement).values({
+      orgId: ORG_ID,
+      memberId: ACTOR_ID,
+      periodLabel: "2026",
+      amount: "55.0000",
+      currencyCode: "USD",
+      kindAtDisbursement: { kind: "fixed_periodic", nextDueOn: "2026-01-01", period: "yearly" },
+      withdrawalId: null,
+      disbursedOn: "2026-01-01",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
     process.env.AUTH0_ORGANIZATION_DB_ORG_ID = ORG_ID;
     process.env.E2E_AUTH_BYPASS = "1";
-    ({ recordExpenseAction, recordTransferAction, regularizePendingDepositAction } = await import("./actions"));
+    ({
+      recordExpenseAction,
+      recordTransferAction,
+      recordTreasurerCompensationAction,
+      regularizePendingDepositAction,
+    } = await import("./actions"));
   });
 
   beforeEach(async () => {
@@ -170,7 +262,7 @@ describe("movement server actions", () => {
       await tx.execute(sql.raw("SET LOCAL session_replication_role = replica"));
       await tx.delete(auditLogEntry).where(and(
         eq(auditLogEntry.orgId, ORG_ID),
-        sql`${auditLogEntry.actionKind} IN ('movement.expense', 'movement.transfer', 'movement.regularization')`,
+        sql`${auditLogEntry.actionKind} IN ('movement.expense', 'movement.transfer', 'movement.regularization', 'treasurer_compensation.paid')`,
       ));
       await tx.delete(alert).where(eq(alert.orgId, ORG_ID));
       await tx.delete(transfer).where(eq(transfer.orgId, ORG_ID));
@@ -187,11 +279,15 @@ describe("movement server actions", () => {
       await tx.delete(transfer).where(eq(transfer.orgId, ORG_ID));
       await tx.delete(expense).where(eq(expense.orgId, ORG_ID));
       await tx.delete(slipPhoto).where(eq(slipPhoto.orgId, ORG_ID));
+      await tx.delete(treasurerCompensationDisbursement).where(eq(treasurerCompensationDisbursement.orgId, ORG_ID));
+      await tx.delete(groupConfig).where(eq(groupConfig.orgId, ORG_ID));
+      await tx.delete(member).where(eq(member.orgId, ORG_ID));
       await tx.delete(account).where(eq(account.orgId, ORG_ID));
     });
     await withTenantTransaction(FOREIGN_ORG_ID, async (tx) => {
       await tx.execute(sql.raw("SET LOCAL session_replication_role = replica"));
       await tx.delete(slipPhoto).where(eq(slipPhoto.orgId, FOREIGN_ORG_ID));
+      await tx.delete(account).where(eq(account.orgId, FOREIGN_ORG_ID));
     });
     await db.delete(organization).where(eq(organization.id, ORG_ID));
     await db.delete(organization).where(eq(organization.id, FOREIGN_ORG_ID));
@@ -218,6 +314,138 @@ describe("movement server actions", () => {
       "/liquidez",
       "/movimientos/registrar",
     ]));
+  });
+
+  it("records the exact payable compensation through the governed action and replays once", async () => {
+    const clientRequestId = randomUUID();
+    const path = "/movimientos/registrar?saved=expense&category=treasurer_comp_payout&currency=USD&amount=30.0000&fiscalYear=2026";
+
+    await expectRedirect(() => recordTreasurerCompensationAction(compensationForm(clientRequestId)), path);
+    await expectRedirect(() => recordTreasurerCompensationAction(compensationForm(clientRequestId)), path);
+
+    const rows = await withTenantTransaction(ORG_ID, (tx) => tx.select().from(expense).where(and(
+      eq(expense.orgId, ORG_ID),
+      eq(expense.clientRequestId, clientRequestId),
+    )));
+    expect(rows).toEqual([expect.objectContaining({
+      accountId: fromAccountId,
+      beneficiaryMemberId: ACTOR_ID,
+      category: "treasurer_comp_payout",
+      purpose: "pago a tesorera",
+      amount: "30.0000",
+    })]);
+  });
+
+  it("returns refreshed safe figures for a stale preview and writes nothing", async () => {
+    await expectRedirect(
+      () => recordTreasurerCompensationAction(compensationForm(randomUUID(), "55.01")),
+      "/movimientos/registrar?error=compensation-ceiling-exceeded&fiscalYear=2026&cumulativeEntitlement=55.0000&cumulativePaid=0.0000&payableNow=55.0000",
+    );
+    const rows = await withTenantTransaction(ORG_ID, (tx) => tx.select().from(expense).where(and(
+      eq(expense.orgId, ORG_ID),
+      eq(expense.category, "treasurer_comp_payout"),
+    )));
+    const foreignRows = await withTenantTransaction(FOREIGN_ORG_ID, (tx) => tx.select().from(expense).where(
+      eq(expense.orgId, FOREIGN_ORG_ID),
+    ));
+    expect(rows).toEqual([]);
+    expect(foreignRows).toEqual([]);
+  });
+
+  it("authenticates before strict compensation parsing", async () => {
+    process.env.E2E_AUTH_BYPASS = "0";
+    const malformed = new FormData();
+    malformed.set("orgId", FOREIGN_ORG_ID);
+    await expectRedirect(() => recordTreasurerCompensationAction(malformed), "/auth/login");
+    process.env.E2E_AUTH_BYPASS = "1";
+  });
+
+  it.each([
+    ["unknown field", (formData: FormData) => formData.set("orgId", FOREIGN_ORG_ID)],
+    ["duplicate amount", (formData: FormData) => formData.append("amount", "1.00")],
+    ["invalid year", (formData: FormData) => formData.set("fiscalYear", "1999")],
+    ["invalid date", (formData: FormData) => formData.set("datedOn", "2026-02-31")],
+  ])("strictly rejects compensation %s", async (_case, mutate) => {
+    const formData = compensationForm();
+    mutate(formData);
+    await expectRedirect(() => recordTreasurerCompensationAction(formData), _case === "invalid year"
+      ? "/movimientos/registrar?error=invalid-form"
+      : "/movimientos/registrar?error=invalid-form&fiscalYear=2026");
+    const rows = await withTenantTransaction(ORG_ID, (tx) => tx.select().from(expense).where(and(
+      eq(expense.orgId, ORG_ID),
+      eq(expense.category, "treasurer_comp_payout"),
+    )));
+    expect(rows).toEqual([]);
+  });
+
+  it("distinguishes replay conflicts and account/actor boundaries without leaking details", async () => {
+    const clientRequestId = randomUUID();
+    await expectRedirect(
+      () => recordTreasurerCompensationAction(compensationForm(clientRequestId, "10.00")),
+      "/movimientos/registrar?saved=expense&category=treasurer_comp_payout&currency=USD&amount=10.0000&fiscalYear=2026",
+    );
+    await expectRedirect(
+      () => recordTreasurerCompensationAction(compensationForm(clientRequestId, "9.00")),
+      "/movimientos/registrar?error=compensation-request-conflict&fiscalYear=2026",
+    );
+    const unavailable = compensationForm();
+    unavailable.set("accountId", foreignAccountId);
+    await expectRedirect(
+      () => recordTreasurerCompensationAction(unavailable),
+      "/movimientos/registrar?error=account-unavailable&fiscalYear=2026",
+    );
+
+    await withTenantTransaction(ORG_ID, async (tx) => {
+      await tx.update(member).set({ role: "aportante", status: "activo" }).where(and(
+        eq(member.orgId, ORG_ID),
+        eq(member.id, ACTOR_ID),
+      ));
+    });
+    try {
+      await expectRedirect(
+        () => recordTreasurerCompensationAction(compensationForm()),
+        "/movimientos/registrar?error=compensation-actor-invalid&fiscalYear=2026",
+      );
+    } finally {
+      await withTenantTransaction(ORG_ID, async (tx) => {
+        await tx.update(member).set({ role: "tesorera", status: "activo" }).where(and(
+          eq(member.orgId, ORG_ID),
+          eq(member.id, ACTOR_ID),
+        ));
+      });
+    }
+    const compensationAudits = await withTenantTransaction(ORG_ID, (tx) => tx.select().from(auditLogEntry).where(and(
+      eq(auditLogEntry.orgId, ORG_ID),
+      eq(auditLogEntry.actionKind, "treasurer_compensation.paid"),
+    )));
+    const compensationExpenses = await withTenantTransaction(ORG_ID, (tx) => tx.select().from(expense).where(and(
+      eq(expense.orgId, ORG_ID),
+      eq(expense.category, "treasurer_comp_payout"),
+    )));
+    const foreignExpenses = await withTenantTransaction(FOREIGN_ORG_ID, (tx) => tx.select().from(expense).where(
+      eq(expense.orgId, FOREIGN_ORG_ID),
+    ));
+    expect(compensationAudits).toEqual([expect.objectContaining({ subjectId: compensationExpenses[0]?.id })]);
+    expect(compensationExpenses).toEqual([expect.objectContaining({ clientRequestId })]);
+    expect(foreignExpenses).toEqual([]);
+  });
+
+  it("preserves a validated non-current fiscal year with matching typed figures", async () => {
+    const accepted = compensationForm(randomUUID(), "10.00");
+    accepted.set("fiscalYear", "2027");
+    accepted.set("datedOn", "2027-01-11");
+    await expectRedirect(
+      () => recordTreasurerCompensationAction(accepted),
+      "/movimientos/registrar?saved=expense&category=treasurer_comp_payout&currency=USD&amount=10.0000&fiscalYear=2027",
+    );
+
+    const stale = compensationForm(randomUUID(), "46.00");
+    stale.set("fiscalYear", "2027");
+    stale.set("datedOn", "2027-01-11");
+    await expectRedirect(
+      () => recordTreasurerCompensationAction(stale),
+      "/movimientos/registrar?error=compensation-ceiling-exceeded&fiscalYear=2027&cumulativeEntitlement=55.0000&cumulativePaid=10.0000&payableNow=45.0000",
+    );
   });
 
   it("records a transfer once and redirects with fixed transfer success state", async () => {
@@ -325,14 +553,64 @@ describe("movement server actions", () => {
     expect(rows).toEqual([{ id: attachedExpenseId }]);
   });
 
-  it("maps governed payout attempts to fixed failure state", async () => {
+  it.each(["treasurer_comp_payout", "solidarity_payout"])(
+    "keeps governed %s attempts out of the generic expense action",
+    async (category) => {
     const formData = expenseForm();
-    formData.set("category", "treasurer_comp_payout");
+    formData.set("category", category);
 
     await expectRedirect(
       () => recordExpenseAction(formData),
       "/movimientos/registrar?error=governed-payout-required",
     );
+    },
+  );
+
+  it("returns exhausted figures after the shared entitlement was fully paid", async () => {
+    await expectRedirect(
+      () => recordTreasurerCompensationAction(compensationForm(randomUUID(), "55.00")),
+      "/movimientos/registrar?saved=expense&category=treasurer_comp_payout&currency=USD&amount=55.0000&fiscalYear=2026",
+    );
+    await expectRedirect(
+      () => recordTreasurerCompensationAction(compensationForm(randomUUID(), "0.01")),
+      "/movimientos/registrar?error=compensation-ceiling-exceeded&fiscalYear=2026&cumulativeEntitlement=55.0000&cumulativePaid=55.0000&payableNow=0.0000",
+    );
+  });
+
+  it("rolls the payout back when its audit append fails", async () => {
+    const clientRequestId = randomUUID();
+    const suffix = randomUUID().replaceAll("-", "").slice(0, 16);
+    const trigger = `reject_comp_action_audit_${suffix}`;
+    const triggerFunction = `${trigger}_fn`;
+    await db.execute(sql.raw(`
+      CREATE FUNCTION ${triggerFunction}() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.action_kind = 'treasurer_compensation.paid'
+          AND NEW.payload_snapshot->>'clientRequestId' = '${clientRequestId}' THEN
+          RAISE EXCEPTION 'reject action audit';
+        END IF;
+        RETURN NEW;
+      END $$
+    `));
+    await db.execute(sql.raw(`
+      CREATE TRIGGER ${trigger}
+      BEFORE INSERT ON audit_log_entry
+      FOR EACH ROW EXECUTE FUNCTION ${triggerFunction}()
+    `));
+    try {
+      await expectRedirect(
+        () => recordTreasurerCompensationAction(compensationForm(clientRequestId, "10.00")),
+        "/movimientos/registrar?error=action-failed&fiscalYear=2026",
+      );
+    } finally {
+      await db.execute(sql.raw(`DROP TRIGGER IF EXISTS ${trigger} ON audit_log_entry`));
+      await db.execute(sql.raw(`DROP FUNCTION IF EXISTS ${triggerFunction}()`));
+    }
+    const rows = await withTenantTransaction(ORG_ID, (tx) => tx.select().from(expense).where(and(
+      eq(expense.orgId, ORG_ID),
+      eq(expense.clientRequestId, clientRequestId),
+    )));
+    expect(rows).toEqual([]);
   });
 
   it("decodes, uploads, and persists a valid expense slip", async () => {

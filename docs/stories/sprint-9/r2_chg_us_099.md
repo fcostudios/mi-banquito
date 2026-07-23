@@ -17,9 +17,9 @@ As a member / presidente / anyone with the public link, I want to see the fund b
 | Size | 3 SP |
 | Release | R2 |
 | Domain | review/chg |
-| Business Rules | — |
+| Business Rules | BR-09, BR-12, BR-14, BR-16 |
 | Backstage Process | — |
-| Blocked By | — |
+| Blocked By | US-048, US-097 |
 
 
 ## Acceptance Criteria
@@ -44,4 +44,4 @@ As a member / presidente / anyone with the public link, I want to see the fund b
 - Integration: full period across all four screens + per-member PDF renders consistent net figures.
 
 ## Dependencies
-- Functional prerequisites (scope): **US-092** + **US-094** (regularization/movement data), **US-097** (solidarity payout/collection to display), and **US-048** (per-member statement being extended). `Blocked By` Meta row is `—`; these produce the ledger rows these surfaces aggregate.
+- Functional prerequisites (scope): **US-092** + **US-094** (regularization/movement data), **US-097** (solidarity payout/collection to display), and **US-048** (per-member statement being extended). `Blocked By` Meta row is `US-048, US-097` (CHG-011 / DEC-MB-004: US-048 must be scheduled before or with Sprint 9 — this story extends the statement surface US-048 builds); US-092/US-094 are already verified upstream producers.

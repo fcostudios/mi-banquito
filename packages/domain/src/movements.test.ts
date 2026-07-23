@@ -13,6 +13,8 @@ import {
   contribution,
   contributionCycle,
   expense,
+  extraordinaryCollection,
+  extraordinaryCollectionLine,
   loan,
   member,
   organization,
@@ -200,6 +202,8 @@ describe("movement service with PostgreSQL", () => {
         await tx.delete(slipPhoto).where(eq(slipPhoto.orgId, orgId));
         await tx.delete(repayment).where(eq(repayment.orgId, orgId));
         await tx.delete(contribution).where(eq(contribution.orgId, orgId));
+        await tx.delete(extraordinaryCollectionLine).where(eq(extraordinaryCollectionLine.orgId, orgId));
+        await tx.delete(extraordinaryCollection).where(eq(extraordinaryCollection.orgId, orgId));
         await tx.delete(loan).where(eq(loan.orgId, orgId));
         await tx.delete(account).where(eq(account.orgId, orgId));
         await tx.delete(groupConfig).where(eq(groupConfig.orgId, orgId));
@@ -357,6 +361,110 @@ describe("movement service with PostgreSQL", () => {
     return { row, memberId, sourceAccountId: sourceAccount.id };
   }
 
+  async function seedReversedPendingSource(sourceKind: "contribution" | "repayment") {
+    if (sourceKind === "contribution") {
+      const pending = await seedPendingContribution({ amount: "12.0000" });
+      const [original] = await db.select().from(contribution).where(and(
+        eq(contribution.orgId, ORG_A),
+        eq(contribution.id, pending.row.id),
+      ));
+      if (!original) throw new Error("test_contribution_source_missing");
+      await db.insert(contribution).values({
+        ...original,
+        id: randomUUID(),
+        reversesId: original.id,
+        reverseReason: "Reversed pending source",
+        clientRequestId: null,
+      });
+      return { id: original.id, sourceAccountId: pending.sourceAccountId, amount: original.amount };
+    }
+
+    const sourceAccount = await seedAccount({ name: `Reversed repayment ${randomUUID()}`, isGroupFund: false });
+    await seedInflows({
+      orgId: ORG_A,
+      accountId: sourceAccount.id,
+      contributionAmount: "1.0000",
+      repaymentAmount: "13.0000",
+    });
+    const [original] = await db.select().from(repayment).where(and(
+      eq(repayment.orgId, ORG_A),
+      eq(repayment.accountId, sourceAccount.id),
+    ));
+    if (!original) throw new Error("test_repayment_source_missing");
+    await db.insert(repayment).values({
+      ...original,
+      id: randomUUID(),
+      reversesId: original.id,
+      reverseReason: "Reversed pending source",
+      clientRequestId: null,
+    });
+    return { id: original.id, sourceAccountId: sourceAccount.id, amount: original.amount };
+  }
+
+  async function seedPendingCollectionLine(input: {
+    orgId?: string;
+    amount?: string;
+    accountId?: string;
+  } = {}) {
+    const orgId = input.orgId ?? ORG_A;
+    const sourceAccount = input.accountId
+      ? { id: input.accountId }
+      : await seedAccount({ orgId, name: `Collection personal ${randomUUID()}`, isGroupFund: false });
+    const memberId = randomUUID();
+    await db.insert(member).values({
+      id: memberId,
+      orgId,
+      displayName: `Collection contributor ${memberId}`,
+      joinedOn: "2026-01-01",
+      role: "aportante",
+      status: "activo",
+      initialSavingsBalance: "0.0000",
+      createdAt: NOW,
+      createdBy: ACTOR_ID,
+      createdByKind: "system",
+    });
+    return withTenantTransaction(orgId, async (tx) => {
+      const [header] = await tx.insert(extraordinaryCollection).values({
+        orgId,
+        kind: "solidarity",
+        purpose: `Collection ${randomUUID()}`,
+        beneficiaryMemberId: memberId,
+        targetAmount: null,
+        status: "open",
+        openedOn: "2026-07-10",
+        paidOutExpenseId: null,
+        surplusAmount: null,
+        disposition: null,
+        dispositionMotive: null,
+        surplusTransferId: null,
+        recognitionFiscalYear: null,
+        createdAt: NOW,
+        createdBy: ACTOR_ID,
+      }).returning();
+      if (!header) throw new Error("test_collection_not_created");
+      const [row] = await tx.insert(extraordinaryCollectionLine).values({
+        orgId,
+        collectionId: header.id,
+        memberId,
+        amount: input.amount ?? "10.0000",
+        accountId: sourceAccount.id,
+        reconciliationStatus: "pending",
+        datedOn: "2026-07-10",
+        slipPhotoId: null,
+        reversesId: null,
+        reverseReason: null,
+        createdAt: NOW,
+        createdBy: ACTOR_ID,
+      }).returning();
+      if (!row) throw new Error("test_collection_line_not_created");
+      await tx.update(extraordinaryCollection).set({ status: "collecting" }).where(and(
+        eq(extraordinaryCollection.orgId, orgId),
+        eq(extraordinaryCollection.id, header.id),
+      ));
+      return { row, header, memberId, sourceAccountId: sourceAccount.id };
+    });
+  }
+
   it("lists only active group-fund accounts for the requested tenant", async () => {
     await seedAccount({ name: "Zeta" });
     await seedAccount({ name: "Archived", status: "archived" });
@@ -457,11 +565,511 @@ describe("movement service with PostgreSQL", () => {
     const transfers = await withTenantTransaction(ORG_A, (tx) => tx.select().from(transfer)
       .where(and(eq(transfer.orgId, ORG_A), eq(transfer.regularizesId, pending.row.id))));
     expect(source?.reconciliationStatus).toBe("regularized");
-    expect(transfers.map((row) => [row.fromAccountId, row.toAccountId, row.amount, row.purpose])).toEqual([
+    expect(transfers.map((row) => [row.fromAccountId, row.toAccountId, row.amount, row.purpose])).toEqual(expect.arrayContaining([
       [pending.sourceAccountId, target.id, "40.0000", "regularization"],
       [pending.sourceAccountId, target.id, "60.0000", "regularization"],
-    ]);
+    ]));
+    expect(transfers).toHaveLength(2);
   });
+
+  it("regularizes a collection line only after exact partial then complete coverage", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingCollectionLine({ amount: "10.0000" });
+    const target = await seedAccount({ name: "Collection group target" });
+
+    const partial = await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "extraordinary_collection",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "4.0000",
+      datedOn: "2026-07-21",
+      clientRequestId: randomUUID(),
+    });
+    expect(partial).toMatchObject({ coverage: "4.0000", regularized: false, remaining: "6.0000" });
+
+    const complete = await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "extraordinary_collection",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "6.0000",
+      datedOn: "2026-07-21",
+      clientRequestId: randomUUID(),
+    });
+    expect(complete).toMatchObject({ coverage: "10.0000", regularized: true, remaining: "0.0000" });
+
+    const [source] = await withTenantTransaction(ORG_A, (tx) => tx.select({
+      reconciliationStatus: extraordinaryCollectionLine.reconciliationStatus,
+    }).from(extraordinaryCollectionLine).where(and(
+      eq(extraordinaryCollectionLine.orgId, ORG_A),
+      eq(extraordinaryCollectionLine.id, pending.row.id),
+    )));
+    expect(source?.reconciliationStatus).toBe("regularized");
+  });
+
+  it("lists live pending collection lines with contributor and account details in deterministic order", async () => {
+    const first = await seedPendingCollectionLine({ amount: "10.0000" });
+    const second = await seedPendingCollectionLine({ amount: "7.1250" });
+    const reversed = await seedPendingCollectionLine({ amount: "3.0000" });
+    await withTenantTransaction(ORG_A, async (tx) => {
+      await tx.insert(extraordinaryCollectionLine).values({
+        orgId: ORG_A,
+        collectionId: reversed.header.id,
+        memberId: reversed.memberId,
+        amount: reversed.row.amount,
+        accountId: reversed.sourceAccountId,
+        reconciliationStatus: "pending",
+        datedOn: reversed.row.datedOn,
+        slipPhotoId: null,
+        reversesId: reversed.row.id,
+        reverseReason: "Reversal fixture",
+        createdAt: NOW,
+        createdBy: ACTOR_ID,
+      });
+    });
+    await seedPendingCollectionLine({ orgId: ORG_B, amount: "99.0000" });
+
+    const rows = (await createMovementService().listPendingDeposits(ORG_A))
+      .filter((row) => row.sourceKind === "extraordinary_collection");
+
+    expect(rows.map((row) => row.id)).toEqual([first.row.id, second.row.id].sort());
+    expect(rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: first.row.id,
+        orgId: ORG_A,
+        sourceKind: "extraordinary_collection",
+        amount: "10.0000",
+        remaining: "10.0000",
+        currencyCode: "USD",
+        accountId: first.sourceAccountId,
+        accountName: expect.stringContaining("Collection personal"),
+        memberId: first.memberId,
+        memberName: expect.stringContaining("Collection contributor"),
+        notes: first.header.purpose,
+      }),
+    ]));
+    expect(rows.some((row) => row.id === reversed.row.id)).toBe(false);
+  });
+
+  it("pages pending deposits by datedOn, sourceKind, and id without duplicates", async () => {
+    const seeded = await Promise.all(Array.from({ length: 5 }, (_, index) => (
+      seedPendingCollectionLine({ amount: `${index + 1}.0000` })
+    )));
+    await seedPendingCollectionLine({ orgId: ORG_B, amount: "99.0000" });
+    const service = createMovementService();
+
+    const first = await service.listPendingDeposits(ORG_A, { limit: 2 });
+    const firstLast = first.at(-1)!;
+    const second = await service.listPendingDeposits(ORG_A, {
+      limit: 2,
+      cursor: {
+        datedOn: firstLast.datedOn,
+        sourceKind: firstLast.sourceKind,
+        id: firstLast.id,
+      },
+    });
+    const secondLast = second.at(-1)!;
+    const third = await service.listPendingDeposits(ORG_A, {
+      limit: 2,
+      cursor: {
+        datedOn: secondLast.datedOn,
+        sourceKind: secondLast.sourceKind,
+        id: secondLast.id,
+      },
+    });
+
+    expect([first.length, second.length, third.length]).toEqual([2, 2, 1]);
+    const pagedIds = [...first, ...second, ...third].map((row) => row.id);
+    expect(new Set(pagedIds).size).toBe(5);
+    expect(pagedIds).toEqual(seeded.map(({ row }) => row.id).sort());
+  });
+
+  it("returns exact pagination metadata and deep lookup across more than fifty mixed pending sources", async () => {
+    const personal = await seedAccount({ name: "Paged mixed personal", isGroupFund: false });
+    for (let index = 0; index < 11; index += 1) {
+      await seedInflows({
+        orgId: ORG_A,
+        accountId: personal.id,
+        contributionAmount: `${index + 1}.0000`,
+        repaymentAmount: `${index + 21}.0000`,
+      });
+    }
+    for (let index = 0; index < 35; index += 1) {
+      await seedPendingCollectionLine({
+        accountId: personal.id,
+        amount: `${index + 41}.0000`,
+      });
+    }
+    const foreign = await seedPendingCollectionLine({ orgId: ORG_B, amount: "99.0000" });
+    const service = createMovementService();
+
+    const first = await service.listPendingDepositsPage(ORG_A, { limit: 20 });
+    const second = await service.listPendingDepositsPage(ORG_A, { limit: 20, cursor: first.nextCursor });
+    const third = await service.listPendingDepositsPage(ORG_A, { limit: 20, cursor: second.nextCursor });
+
+    expect([first.totalCount, second.totalCount, third.totalCount]).toEqual([57, 57, 57]);
+    expect([first.rows.length, second.rows.length, third.rows.length]).toEqual([20, 20, 17]);
+    expect(first.nextCursor).toEqual(expect.objectContaining({
+      datedOn: expect.any(String), sourceKind: expect.any(String), id: expect.any(String),
+    }));
+    expect(second.nextCursor).not.toBeNull();
+    expect(third.nextCursor).toBeNull();
+    const allRows = [...first.rows, ...second.rows, ...third.rows];
+    expect(new Set(allRows.map((row) => `${row.sourceKind}:${row.id}`)).size).toBe(57);
+    const last = third.rows.at(-1);
+    if (!last) throw new Error("test_last_pending_deposit_missing");
+    await expect(service.listPendingDepositsPage(ORG_A, {
+      limit: 20,
+      cursor: { datedOn: last.datedOn, sourceKind: last.sourceKind, id: last.id },
+    })).resolves.toMatchObject({ rows: [], nextCursor: null, totalCount: 57 });
+
+    const outsideFirstPage = allRows.find((row) => (
+      row.sourceKind === "extraordinary_collection"
+      && !first.rows.some((firstRow) => firstRow.id === row.id)
+    ));
+    if (!outsideFirstPage) throw new Error("test_outside_page_collection_missing");
+    await expect(service.getPendingDeposit(ORG_A, {
+      sourceKind: "extraordinary_collection",
+      id: outsideFirstPage.id,
+    })).resolves.toMatchObject({
+      id: outsideFirstPage.id,
+      orgId: ORG_A,
+      sourceKind: "extraordinary_collection",
+      remaining: outsideFirstPage.amount,
+    });
+    await expect(service.getPendingDeposit(ORG_A, {
+      sourceKind: "extraordinary_collection",
+      id: foreign.row.id,
+    })).resolves.toBeNull();
+  });
+
+  it("validates pending-deposit page limits and cursors before querying", async () => {
+    const service = createMovementService();
+    for (const limit of [0, 1.5, 101]) {
+      await expect(service.listPendingDeposits(ORG_A, { limit }))
+        .rejects.toThrow("pending_deposit_limit_invalid");
+    }
+    for (const cursor of [
+      { datedOn: "2026-02-30", sourceKind: "contribution" as const, id: randomUUID() },
+      { datedOn: "2026-07-21", sourceKind: "invalid" as never, id: randomUUID() },
+      { datedOn: "2026-07-21", sourceKind: "repayment" as const, id: "not-a-uuid" },
+    ]) {
+      await expect(service.listPendingDeposits(ORG_A, { cursor }))
+        .rejects.toThrow("pending_deposit_cursor_invalid");
+    }
+  });
+
+  it("rejects collection overcoverage and invalid money without appending transfers", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingCollectionLine({ amount: "10.0000" });
+    const target = await seedAccount({ name: "Collection cap target" });
+    await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "extraordinary_collection",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "4.0000",
+      datedOn: "2026-07-21",
+      clientRequestId: randomUUID(),
+    });
+
+    await expect(service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "extraordinary_collection",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "6.0001",
+      datedOn: "2026-07-21",
+      clientRequestId: randomUUID(),
+    })).rejects.toThrow("regularization_amount_exceeds_remaining");
+    for (const amount of ["0", "-1", "NaN", "0.00001", "100000000000000.0000"]) {
+      await expect(service.regularizePendingDeposit({
+        orgId: ORG_A,
+        actorId: ACTOR_ID,
+        regularizesKind: "extraordinary_collection",
+        regularizesId: pending.row.id,
+        toAccountId: target.id,
+        amount,
+        datedOn: "2026-07-21",
+        clientRequestId: randomUUID(),
+      })).rejects.toThrow("movement_amount_invalid");
+    }
+    const rows = await withTenantTransaction(ORG_A, (tx) => tx.select().from(transfer).where(and(
+      eq(transfer.orgId, ORG_A),
+      eq(transfer.regularizesId, pending.row.id),
+    )));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.amount).toBe("4.0000");
+  });
+
+  it("rejects wrong-source and unavailable collection regularization accounts", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingCollectionLine();
+    const target = await seedAccount({ name: "Valid collection target" });
+    const wrongSource = await seedAccount({ name: "Wrong collection source", isGroupFund: false });
+    const personalTarget = await seedAccount({ name: "Personal collection target", isGroupFund: false });
+    const archivedTarget = await seedAccount({ name: "Archived collection target", status: "archived" });
+    const foreignTarget = await seedAccount({ orgId: ORG_B, name: "Foreign collection target" });
+
+    await expect(db.execute(sql`
+      INSERT INTO transfer (
+        org_id, from_account_id, to_account_id, amount, currency_code, dated_on,
+        purpose, regularizes_kind, regularizes_id, created_at, created_by
+      ) VALUES (
+        ${ORG_A}, ${wrongSource.id}, ${target.id}, 10.0000, 'USD', '2026-07-21',
+        'regularization', 'extraordinary_collection', ${pending.row.id}, ${NOW}, ${ACTOR_ID}
+      )
+    `)).rejects.toThrow("regularization_source_unavailable");
+
+    for (const toAccountId of [personalTarget.id, archivedTarget.id, foreignTarget.id]) {
+      await expect(service.regularizePendingDeposit({
+        orgId: ORG_A,
+        actorId: ACTOR_ID,
+        regularizesKind: "extraordinary_collection",
+        regularizesId: pending.row.id,
+        toAccountId,
+        amount: "10.0000",
+        datedOn: "2026-07-21",
+        clientRequestId: randomUUID(),
+      })).rejects.toThrow("regularization_target_unavailable");
+    }
+    expect(await withTenantTransaction(ORG_A, (tx) => tx.select().from(transfer).where(and(
+      eq(transfer.orgId, ORG_A),
+      eq(transfer.regularizesId, pending.row.id),
+    )))).toEqual([]);
+  });
+
+  it.each(["contribution", "repayment"] as const)(
+    "rejects service regularization of a reversed %s original by UUID",
+    async (sourceKind) => {
+      const source = await seedReversedPendingSource(sourceKind);
+      const target = await seedAccount({ name: `Reversed ${sourceKind} target` });
+
+      await expect(createMovementService({ now: () => NOW }).regularizePendingDeposit({
+        orgId: ORG_A,
+        actorId: ACTOR_ID,
+        regularizesKind: sourceKind,
+        regularizesId: source.id,
+        toAccountId: target.id,
+        amount: source.amount,
+        datedOn: "2026-07-21",
+        clientRequestId: randomUUID(),
+      })).rejects.toThrow("regularization_source_unavailable");
+    },
+  );
+
+  it.each(["contribution", "repayment"] as const)(
+    "rejects direct SQL regularization of a reversed %s original with stable SQLSTATE",
+    async (sourceKind) => {
+      const source = await seedReversedPendingSource(sourceKind);
+      const target = await seedAccount({ name: `Direct reversed ${sourceKind} target` });
+
+      await expect(db.execute(sql`
+        INSERT INTO transfer (
+          org_id, from_account_id, to_account_id, amount, currency_code, dated_on,
+          purpose, regularizes_kind, regularizes_id, created_at, created_by
+        ) VALUES (
+          ${ORG_A}, ${source.sourceAccountId}, ${target.id}, ${source.amount}, 'USD', '2026-07-21',
+          'regularization', ${sourceKind}, ${source.id}, ${NOW}, ${ACTOR_ID}
+        )
+      `)).rejects.toMatchObject({ code: "23514", message: "regularization_source_unavailable" });
+    },
+  );
+
+  it("hides reversed, inactive-header, archived-source, and cross-tenant collection lines", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const target = await seedAccount({ name: "Collection rejection target" });
+    const reversed = await seedPendingCollectionLine();
+    await withTenantTransaction(ORG_A, async (tx) => {
+      await tx.insert(extraordinaryCollectionLine).values({
+        orgId: ORG_A,
+        collectionId: reversed.header.id,
+        memberId: reversed.memberId,
+        amount: reversed.row.amount,
+        accountId: reversed.sourceAccountId,
+        reconciliationStatus: "pending",
+        datedOn: reversed.row.datedOn,
+        slipPhotoId: null,
+        reversesId: reversed.row.id,
+        reverseReason: "Reversed source fixture",
+        createdAt: NOW,
+        createdBy: ACTOR_ID,
+      });
+    });
+    const inactiveHeader = await seedPendingCollectionLine();
+    await db.execute(sql.raw("SET session_replication_role = replica"));
+    await db.update(extraordinaryCollection).set({ status: "cancelled" }).where(and(
+      eq(extraordinaryCollection.orgId, ORG_A),
+      eq(extraordinaryCollection.id, inactiveHeader.header.id),
+    ));
+    await db.execute(sql.raw("SET session_replication_role = origin"));
+    const archivedSource = await seedPendingCollectionLine();
+    await db.update(account).set({ status: "archived" }).where(and(
+      eq(account.orgId, ORG_A),
+      eq(account.id, archivedSource.sourceAccountId),
+    ));
+    const foreign = await seedPendingCollectionLine({ orgId: ORG_B });
+
+    for (const regularizesId of [reversed.row.id, inactiveHeader.row.id, archivedSource.row.id]) {
+      await expect(service.regularizePendingDeposit({
+        orgId: ORG_A,
+        actorId: ACTOR_ID,
+        regularizesKind: "extraordinary_collection",
+        regularizesId,
+        toAccountId: target.id,
+        amount: "10.0000",
+        datedOn: "2026-07-21",
+        clientRequestId: randomUUID(),
+      })).rejects.toThrow("regularization_source_unavailable");
+    }
+    await expect(service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "extraordinary_collection",
+      regularizesId: foreign.row.id,
+      toAccountId: target.id,
+      amount: "10.0000",
+      datedOn: "2026-07-21",
+      clientRequestId: randomUUID(),
+    })).rejects.toThrow("regularization_source_unavailable");
+  });
+
+  it("serializes concurrent exact collection coverage and preserves audit and idempotency", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingCollectionLine();
+    const target = await seedAccount({ name: "Concurrent collection target" });
+    const command = {
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "extraordinary_collection" as const,
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "10.0000",
+      datedOn: "2026-07-21",
+    };
+    const requestId = randomUUID();
+    const replayed = await Promise.all([
+      service.regularizePendingDeposit({ ...command, clientRequestId: requestId }),
+      service.regularizePendingDeposit({ ...command, clientRequestId: requestId }),
+    ]);
+    expect(new Set(replayed.map((result) => result.transfer.id)).size).toBe(1);
+    expect(replayed).toEqual([
+      expect.objectContaining({ coverage: "10.0000", remaining: "0.0000", regularized: true }),
+      expect.objectContaining({ coverage: "10.0000", remaining: "0.0000", regularized: true }),
+    ]);
+    await expect(service.regularizePendingDeposit({
+      ...command,
+      amount: "9.9999",
+      clientRequestId: requestId,
+    })).rejects.toThrow("movement_idempotency_conflict");
+
+    const transfers = await withTenantTransaction(ORG_A, (tx) => tx.select().from(transfer).where(and(
+      eq(transfer.orgId, ORG_A),
+      eq(transfer.regularizesId, pending.row.id),
+    )));
+    const audits = await withTenantTransaction(ORG_A, (tx) => tx.select().from(auditLogEntry).where(and(
+      eq(auditLogEntry.orgId, ORG_A),
+      eq(auditLogEntry.actionKind, "movement.regularization"),
+      eq(auditLogEntry.subjectId, transfers[0]!.id),
+    )));
+    expect(transfers).toHaveLength(1);
+    expect(transfers[0]).toMatchObject({
+      fromAccountId: pending.sourceAccountId,
+      toAccountId: target.id,
+      regularizesKind: "extraordinary_collection",
+      regularizesId: pending.row.id,
+      purpose: "regularization",
+    });
+    expect(audits).toHaveLength(1);
+    expect(audits[0]?.payloadSnapshot).toMatchObject({
+      regularizesKind: "extraordinary_collection",
+      regularizesId: pending.row.id,
+      clientRequestId: requestId,
+      coverage: "10.0000",
+      remaining: "0.0000",
+      regularized: true,
+    });
+  });
+
+  it("allows only one distinct concurrent command to cover a collection line exactly", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingCollectionLine();
+    const target = await seedAccount({ name: "Distinct concurrent collection target" });
+    const command = {
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "extraordinary_collection" as const,
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "10.0000",
+      datedOn: "2026-07-21",
+    };
+
+    const outcomes = await Promise.allSettled([
+      service.regularizePendingDeposit({ ...command, clientRequestId: randomUUID() }),
+      service.regularizePendingDeposit({ ...command, clientRequestId: randomUUID() }),
+    ]);
+
+    expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+    expect(outcomes.filter((outcome) => outcome.status === "rejected")).toEqual([
+      expect.objectContaining({ reason: expect.objectContaining({ message: "regularization_source_already_regularized" }) }),
+    ]);
+    expect(await withTenantTransaction(ORG_A, (tx) => tx.select().from(transfer).where(and(
+      eq(transfer.orgId, ORG_A),
+      eq(transfer.regularizesId, pending.row.id),
+    )))).toHaveLength(1);
+  });
+
+  it("counts only live unreversed collection regularization transfers as coverage", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const pending = await seedPendingCollectionLine();
+    const target = await seedAccount({ name: "Live coverage collection target" });
+    const partial = await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "extraordinary_collection",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "4.0000",
+      datedOn: "2026-07-21",
+      clientRequestId: randomUUID(),
+    });
+    await db.execute(sql.raw("SET session_replication_role = replica"));
+    await db.insert(transfer).values({
+      orgId: ORG_A,
+      fromAccountId: target.id,
+      toAccountId: pending.sourceAccountId,
+      amount: "4.0000",
+      currencyCode: "USD",
+      datedOn: "2026-07-21",
+      purpose: "regularization_reversal",
+      regularizesKind: "extraordinary_collection",
+      regularizesId: pending.row.id,
+      clientRequestId: randomUUID(),
+      slipPhotoId: null,
+      reversesId: partial.transfer.id,
+      createdAt: NOW,
+      createdBy: ACTOR_ID,
+    });
+    await db.execute(sql.raw("SET session_replication_role = origin"));
+
+    await expect(service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "extraordinary_collection",
+      regularizesId: pending.row.id,
+      toAccountId: target.id,
+      amount: "10.0000",
+      datedOn: "2026-07-21",
+      clientRequestId: randomUUID(),
+    })).resolves.toMatchObject({ coverage: "10.0000", remaining: "0.0000", regularized: true });
+  });
+
 
   it("verifies the archived payload after live renames and backdated movements", async () => {
     const group = await seedAccount({ name: "Archived bank label" });
@@ -522,6 +1130,8 @@ describe("movement service with PostgreSQL", () => {
       groupName: "Archived organization label",
       generatedAt: NOW.toISOString(),
       movements: payload.verificationMovements,
+      periodLabel: payload.periodLabel,
+      pdfUri: `/statement-archive/public/${hash}.pdf`,
     });
     expect(sha256Hex(canonicalJson(payload))).toBe(hash);
     await db.update(organization).set({ displayName: "Movements test A" }).where(eq(organization.id, ORG_A));
@@ -571,6 +1181,7 @@ describe("movement service with PostgreSQL", () => {
       movements: [],
       legacy: true,
       periodLabel: "Asamblea extraordinaria",
+      pdfUri: `/statement-archive/public/${legacyHash}.pdf`,
     });
   });
 
@@ -1880,6 +2491,129 @@ describe("movement service with PostgreSQL", () => {
     ]);
     expect(transferAccountDeltas({ from, to, amount: "30.0000" })).toEqual({ from: "-30.0000", to: "30.0000" });
     expect(transferFundDelta({ from, to, amount: "30.0000" })).toBe("0.0000");
+  });
+
+  it("nets reversed ordinary and partial regularization transfers out of tenant account balances", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const bank = await seedAccount({ name: "Reversal balance bank" });
+    const cash = await seedAccount({ name: "Reversal balance cash" });
+    const ordinary = await service.recordTransfer({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      fromAccountId: bank.id,
+      toAccountId: cash.id,
+      amount: "5.0000",
+      datedOn: "2026-07-21",
+      clientRequestId: randomUUID(),
+    });
+    await db.insert(transfer).values({
+      orgId: ORG_A,
+      fromAccountId: cash.id,
+      toAccountId: bank.id,
+      amount: "5.0000",
+      currencyCode: "USD",
+      datedOn: "2026-07-22",
+      purpose: "transfer_reversal",
+      regularizesKind: null,
+      regularizesId: null,
+      reversesId: ordinary.id,
+      createdAt: NOW,
+      createdBy: ACTOR_ID,
+    });
+
+    const pending = await seedPendingCollectionLine({ amount: "10.0000" });
+    const regularization = await service.regularizePendingDeposit({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      regularizesKind: "extraordinary_collection",
+      regularizesId: pending.row.id,
+      toAccountId: bank.id,
+      amount: "4.0000",
+      datedOn: "2026-07-21",
+      clientRequestId: randomUUID(),
+    });
+    await db.insert(transfer).values({
+      orgId: ORG_A,
+      fromAccountId: bank.id,
+      toAccountId: pending.sourceAccountId,
+      amount: "4.0000",
+      currencyCode: "USD",
+      datedOn: "2026-07-22",
+      purpose: "regularization_reversal",
+      regularizesKind: "extraordinary_collection",
+      regularizesId: pending.row.id,
+      reversesId: regularization.transfer.id,
+      createdAt: NOW,
+      createdBy: ACTOR_ID,
+    });
+
+    const balances = await service.listActiveGroupAccountBalances(ORG_A);
+    expect(balances.map(({ name, balance }) => ({ name, balance }))).toEqual([
+      { name: "Reversal balance bank", balance: "0.0000" },
+      { name: "Reversal balance cash", balance: "0.0000" },
+    ]);
+  });
+
+  it("excludes both sides of reversed contribution, repayment, and expense pairs from account balances", async () => {
+    const service = createMovementService({ now: () => NOW });
+    const groupAccount = await seedAccount({ name: "Reversed ledger pairs" });
+    await seedInflows({
+      orgId: ORG_A,
+      accountId: groupAccount.id,
+      contributionAmount: "11.0000",
+      repaymentAmount: "7.0000",
+    });
+    const [originalContribution] = await db.select().from(contribution).where(and(
+      eq(contribution.orgId, ORG_A), eq(contribution.accountId, groupAccount.id),
+    ));
+    const [originalRepayment] = await db.select().from(repayment).where(and(
+      eq(repayment.orgId, ORG_A), eq(repayment.accountId, groupAccount.id),
+    ));
+    if (!originalContribution || !originalRepayment) throw new Error("test_balance_inflows_missing");
+    await db.insert(contribution).values({
+      ...originalContribution,
+      id: randomUUID(),
+      reversesId: originalContribution.id,
+      reverseReason: "Reverse balance contribution",
+      clientRequestId: null,
+    });
+    await db.insert(repayment).values({
+      ...originalRepayment,
+      id: randomUUID(),
+      reversesId: originalRepayment.id,
+      reverseReason: "Reverse balance repayment",
+      clientRequestId: null,
+    });
+    const reversedExpense = await service.recordExpense({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      accountId: groupAccount.id,
+      category: "operating",
+      amount: "5.0000",
+      datedOn: "2026-07-21",
+      clientRequestId: randomUUID(),
+    });
+    await db.insert(expense).values({
+      ...reversedExpense,
+      id: randomUUID(),
+      purpose: `reversal: ${reversedExpense.purpose}`,
+      reversesId: reversedExpense.id,
+      reverseReason: "Reverse balance expense",
+      clientRequestId: null,
+    });
+    await service.recordExpense({
+      orgId: ORG_A,
+      actorId: ACTOR_ID,
+      accountId: groupAccount.id,
+      category: "operating",
+      amount: "3.0000",
+      datedOn: "2026-07-21",
+      clientRequestId: randomUUID(),
+    });
+
+    await expect(service.listActiveGroupAccountBalances(ORG_A)).resolves.toEqual([
+      expect.objectContaining({ id: groupAccount.id, balance: "-3.0000" }),
+    ]);
   });
 
   it("rejects same, missing, archived, non-group, and cross-tenant transfer accounts without rows or audits", async () => {

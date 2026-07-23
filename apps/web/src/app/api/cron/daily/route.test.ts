@@ -51,6 +51,7 @@ beforeEach(() => {
     configsScanned: 0,
     dueConfigs: 0,
     disbursementsAwarded: 0,
+    disbursementsAccruedWithoutCash: 0,
     skippedExistingDisbursements: 0,
     configsAdvanced: 0,
     failures: [],

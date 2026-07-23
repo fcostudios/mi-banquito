@@ -20,3 +20,59 @@ describe("US-008 inherited schema repair classifier", () => {
     })).toBe(false);
   });
 });
+
+describe("Sprint 9 inherited schema upgrade classifier", () => {
+  it("selects only a healthy pre-Sprint-9 database with no partial markers", () => {
+    expect(typeof schemaApply.isSprint9UpgradeState).toBe("function");
+    expect(schemaApply.isSprint9UpgradeState?.({
+      preSprint9HealthOk: true,
+      headHealthOk: false,
+      hasCollectionTable: true,
+      hasRecognitionFiscalYear: false,
+      hasDispositionEnum: false,
+      hasTerminalAuditIndex: false,
+    })).toBe(true);
+    expect(schemaApply.isSprint9UpgradeState?.({
+      preSprint9HealthOk: false,
+      headHealthOk: false,
+      hasCollectionTable: true,
+      hasRecognitionFiscalYear: false,
+      hasDispositionEnum: false,
+      hasTerminalAuditIndex: false,
+    })).toBe(false);
+    expect(schemaApply.isSprint9UpgradeState?.({
+      preSprint9HealthOk: true,
+      headHealthOk: false,
+      hasCollectionTable: true,
+      hasRecognitionFiscalYear: true,
+      hasDispositionEnum: true,
+      hasTerminalAuditIndex: false,
+    })).toBe(false);
+    expect(schemaApply.isSprint9UpgradeState?.({
+      preSprint9HealthOk: true,
+      headHealthOk: true,
+      hasCollectionTable: true,
+      hasRecognitionFiscalYear: true,
+      hasDispositionEnum: true,
+      hasTerminalAuditIndex: true,
+    })).toBe(false);
+  });
+
+  it("identifies a partial Sprint 9 state for fail-closed handling", () => {
+    expect(typeof schemaApply.isSprint9PartialState).toBe("function");
+    expect(schemaApply.isSprint9PartialState?.({
+      preSprint9HealthOk: true,
+      headHealthOk: false,
+      hasRecognitionFiscalYear: true,
+      hasDispositionEnum: false,
+      hasTerminalAuditIndex: false,
+    })).toBe(true);
+    expect(schemaApply.isSprint9PartialState?.({
+      preSprint9HealthOk: true,
+      headHealthOk: false,
+      hasRecognitionFiscalYear: false,
+      hasDispositionEnum: false,
+      hasTerminalAuditIndex: false,
+    })).toBe(false);
+  });
+});

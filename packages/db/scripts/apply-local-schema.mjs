@@ -4,11 +4,12 @@
 // migration carries RLS policies and triggers. This script applies that SQL and
 // then installs update timestamp triggers derived from the current migration.
 import { config } from "dotenv";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import pg from "pg";
 import {
   collectSchemaHealth,
+  collectSchemaHealthWithClient,
   evaluateSchemaHealth,
   EXPECTED_FORCED_RLS_TABLE_NAMES,
   EXPECTED_POLICY_TABLES,
@@ -17,6 +18,7 @@ import {
   EXPECTED_TRIGGER_TABLES,
   EXPECTED_UPDATED_AT_TABLES,
   REQUIRED_FUNCTIONS,
+  parseExpectedSchema,
   readMigrationSql,
 } from "./verify-schema.mjs";
 
@@ -56,6 +58,39 @@ const US_008_INTEREST_GAINS_MIGRATION_URL = new URL(
 const US_008_FAIL_CLOSED_RLS_MIGRATION_URL = new URL(
   "../src/migrations/V20260719115020__fail_closed_tenant_policies.sql",
   import.meta.url
+);
+const MIGRATIONS_URL = new URL("../src/migrations/", import.meta.url);
+const SPRINT_9_FIRST_MIGRATION =
+  "V20260721125900__extraordinary_collection_upgrade_preflight.sql";
+const SPRINT_9_UPGRADE_MIGRATION_URLS = [
+  "V20260721125900__extraordinary_collection_upgrade_preflight.sql",
+  "V20260721130000__extraordinary_collection_lifecycle.sql",
+  "V20260721133000__extraordinary_collection_guard_fixes.sql",
+  "V20260721133500__extraordinary_collection_financial_bindings.sql",
+  "V20260721134000__collection_tenant_finite_money.sql",
+  "V20260721135000__collection_line_open_guard.sql",
+  "V20260721135500__collection_regularization_reversal_guards.sql",
+  "V20260721135600__regularization_live_source_guards.sql",
+  "V20260721135700__collection_payout_replay_correction.sql",
+  "V20260721135800__collection_payout_account_required.sql",
+  "V20260721135900__unique_active_treasurer.sql",
+  "V20260721140000__sprint9_balance_projections.sql",
+  "V20260721140100__ledger_reversal_and_collection_binding_guards.sql",
+  "V20260721140200__retained_collection_reclassification.sql",
+  "V20260721140300__retained_payout_effective_date_binding.sql",
+  "V20260721140400__collection_terminal_chronology_and_audit_index.sql",
+  "V20260721140500__retained_client_request_uniqueness_fence.sql",
+  "V20260721140600__retained_all_command_client_fence.sql",
+].map((fileName) => new URL(`../src/migrations/${fileName}`, import.meta.url));
+const PRE_SPRINT_9_EXPECTED_SCHEMA = parseExpectedSchema(
+  readdirSync(MIGRATIONS_URL)
+    .filter(
+      (fileName) =>
+        fileName.endsWith(".sql") && fileName < SPRINT_9_FIRST_MIGRATION
+    )
+    .sort()
+    .map((fileName) => readFileSync(new URL(fileName, MIGRATIONS_URL), "utf8"))
+    .join("\n")
 );
 const SPRINT_1_ADDITIVE_TABLES = new Set([
   "base_fund_quota_config",
@@ -156,10 +191,67 @@ export function isOnlyMissingUs008Repair(existingHealth) {
   return sawRepairableGap;
 }
 
-async function currentSchemaHealth(databaseUrl) {
+export function isSprint9UpgradeState({
+  preSprint9HealthOk,
+  headHealthOk,
+  hasCollectionTable,
+  hasRecognitionFiscalYear,
+  hasDispositionEnum,
+  hasTerminalAuditIndex,
+}) {
+  return Boolean(
+    preSprint9HealthOk &&
+      !headHealthOk &&
+      hasCollectionTable &&
+      !hasRecognitionFiscalYear &&
+      !hasDispositionEnum &&
+      !hasTerminalAuditIndex
+  );
+}
+
+export function isSprint9PartialState({
+  preSprint9HealthOk,
+  headHealthOk,
+  hasRecognitionFiscalYear,
+  hasDispositionEnum,
+  hasTerminalAuditIndex,
+}) {
+  return Boolean(
+    preSprint9HealthOk &&
+      !headHealthOk &&
+      (hasRecognitionFiscalYear || hasDispositionEnum || hasTerminalAuditIndex)
+  );
+}
+
+async function readSprint9UpgradeState(pool) {
+  const result = await pool.query(`
+SELECT
+  to_regclass('public.extraordinary_collection') IS NOT NULL AS has_collection_table,
+  EXISTS (
+    SELECT 1 FROM pg_type WHERE typname = 'extraordinary_collection_disposition_enum'
+  ) AS has_disposition_enum,
+  to_regclass('public.idx_audit_collection_terminal_lookup') IS NOT NULL AS has_terminal_audit_index,
+  EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'extraordinary_collection'
+      AND column_name = 'recognition_fiscal_year'
+  ) AS has_recognition_fiscal_year
+`);
+  return {
+    hasCollectionTable: result.rows[0]?.has_collection_table === true,
+    hasRecognitionFiscalYear:
+      result.rows[0]?.has_recognition_fiscal_year === true,
+    hasDispositionEnum: result.rows[0]?.has_disposition_enum === true,
+    hasTerminalAuditIndex: result.rows[0]?.has_terminal_audit_index === true,
+  };
+}
+
+async function currentSchemaHealth(databaseUrl, expectedSchema) {
   try {
     const actual = await collectSchemaHealth(databaseUrl, process.env.DB_DRIVER);
-    return evaluateSchemaHealth(actual);
+    return evaluateSchemaHealth(actual, expectedSchema);
   } catch {
     return null;
   }
@@ -300,6 +392,10 @@ export async function main() {
   }
 
   const existingHealth = await currentSchemaHealth(databaseUrl);
+  const preSprint9Health = await currentSchemaHealth(
+    databaseUrl,
+    PRE_SPRINT_9_EXPECTED_SCHEMA
+  );
   const pool = new pg.Pool({ connectionString: databaseUrl });
   try {
     await applyBaseFundQuotaSlipKind(pool);
@@ -307,6 +403,45 @@ export async function main() {
     console.error(`✗ local additive migration apply failed: ${err.message}`);
     await pool.end();
     return 1;
+  }
+  let sprint9UpgradeState;
+  try {
+    sprint9UpgradeState = await readSprint9UpgradeState(pool);
+  } catch (err) {
+    console.error(`✗ local Sprint 9 upgrade detection failed: ${err.message}`);
+    await pool.end();
+    return 1;
+  }
+  if (isSprint9UpgradeState({
+    ...sprint9UpgradeState,
+    preSprint9HealthOk: preSprint9Health?.ok === true,
+    headHealthOk: existingHealth?.ok === true,
+  })) {
+    const client = await pool.connect();
+    try {
+      const sql = SPRINT_9_UPGRADE_MIGRATION_URLS
+        .map((migrationUrl) => readFileSync(migrationUrl, "utf8"))
+        .join("\n");
+      await client.query("BEGIN");
+      await client.query(sql);
+      const repairedActual = await collectSchemaHealthWithClient(client);
+      const repairedHealth = evaluateSchemaHealth(repairedActual);
+      if (!repairedHealth?.ok) {
+        throw new Error(
+          repairedHealth?.errors.join("; ") ?? "health unavailable"
+        );
+      }
+      await client.query("COMMIT");
+      console.log("local Sprint 9 additive schema upgrade applied");
+      return 0;
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error(`✗ local Sprint 9 schema upgrade failed: ${err.message}`);
+      return 1;
+    } finally {
+      client.release();
+      await pool.end();
+    }
   }
   if (existingHealth?.ok) {
     try {
@@ -420,6 +555,18 @@ export async function main() {
     } finally {
       await pool.end();
     }
+  }
+
+  if (isSprint9PartialState({
+    ...sprint9UpgradeState,
+    preSprint9HealthOk: preSprint9Health?.ok === true,
+    headHealthOk: existingHealth?.ok === true,
+  })) {
+    console.error(
+      "✗ local Sprint 9 schema upgrade refused: partial Sprint 9 objects detected"
+    );
+    await pool.end();
+    return 1;
   }
 
   const sql = readMigrationSql();

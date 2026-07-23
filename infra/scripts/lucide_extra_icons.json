@@ -1,0 +1,18 @@
+{
+  "description": "Curated non-nav lucide icons used by app UI (headers, banners, dashboards). Unioned into allowed_lucide_icons.json by regenerate-sidebar.py and validated against lucide_valid_exports.json (IMP-325 hardening). Add deliberately; a typo fails the generator loud.",
+  "icons": [
+    "Bell",
+    "Building2",
+    "Calendar",
+    "CircleCheck",
+    "Info",
+    "Key",
+    "LayoutDashboard",
+    "ListChecks",
+    "Plus",
+    "ShieldCheck",
+    "TrendingUp",
+    "UploadCloud",
+    "User"
+  ]
+}

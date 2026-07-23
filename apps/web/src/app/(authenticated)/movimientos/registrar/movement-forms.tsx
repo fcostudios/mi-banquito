@@ -1,7 +1,10 @@
 import { ButtonPrimary, FormField, InputText, Select } from "@mi-banquito/ui";
+import type { PendingDepositCursor, RegularizableKind } from "@mi-banquito/domain";
+import { Info, ShieldCheck } from "lucide-react";
 
 import messages from "@/lib/i18n/en-US.json";
 import { ROUTE_SCR_HISTORY } from "@/lib/routes";
+import { pendingMovementHref } from "./pending-pagination";
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 type SearchValue = string | string[] | undefined;
@@ -19,9 +22,16 @@ export type MovementFormsProps = {
   expenseAction: FormAction;
   transferAction: FormAction;
   regularizationAction: FormAction;
+  compensationAction: FormAction;
+  compensation: {
+    cumulativeEntitlement: string;
+    cumulativePaid: string;
+    payableNow: string;
+  };
+  fiscalYear: number;
   pendingDeposits: Array<{
     id: string;
-    sourceKind: "contribution" | "repayment";
+    sourceKind: RegularizableKind;
     memberName: string;
     accountId: string | null;
     accountName: string | null;
@@ -29,9 +39,11 @@ export type MovementFormsProps = {
     remaining: string;
     datedOn: string;
   }>;
+  nextCursor?: PendingDepositCursor | null;
   expenseClientRequestId: string;
   transferClientRequestId: string;
   regularizationClientRequestId: string;
+  compensationClientRequestId: string;
   today: string;
 };
 
@@ -47,6 +59,16 @@ const categoryValues = [
 
 function scalar(value: SearchValue): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function safeMoney4(value: SearchValue): string | undefined {
+  const scalarValue = scalar(value);
+  return scalarValue && /^\d{1,14}\.\d{4}$/.test(scalarValue) ? scalarValue : undefined;
+}
+
+function displayMoney(value: string): string {
+  const [whole, fraction] = value.split(".");
+  return `USD ${whole}.${fraction?.slice(0, 2) ?? "00"}`;
 }
 
 function accountLabel(account: MovementAccountOption): string {
@@ -82,6 +104,21 @@ function Feedback({ search }: { search: Record<string, SearchValue> }) {
   }
 
   const error = scalar(search.error);
+  if (error === "compensation-ceiling-exceeded") {
+    const cumulativeEntitlement = safeMoney4(search.cumulativeEntitlement);
+    const cumulativePaid = safeMoney4(search.cumulativePaid);
+    const payableNow = safeMoney4(search.payableNow);
+    if (cumulativeEntitlement && cumulativePaid && payableNow) {
+      return (
+        <div className="rounded-md border border-error-text bg-error-bg p-3 text-sm font-semibold text-text-primary" role="alert">
+          {copy.compensationOverCeiling
+            .replace("{{cumulativeEntitlement}}", displayMoney(cumulativeEntitlement))
+            .replace("{{cumulativePaid}}", displayMoney(cumulativePaid))
+            .replace("{{payableNow}}", displayMoney(payableNow))}
+        </div>
+      );
+    }
+  }
   const errorMessage = error && Object.prototype.hasOwnProperty.call(copy.errors, error)
     ? copy.errors[error as keyof typeof copy.errors]
     : undefined;
@@ -145,10 +182,15 @@ export function MovementForms({
   expenseAction,
   transferAction,
   regularizationAction,
+  compensationAction,
+  compensation,
+  fiscalYear,
   pendingDeposits,
+  nextCursor = null,
   expenseClientRequestId,
   transferClientRequestId,
   regularizationClientRequestId,
+  compensationClientRequestId,
   today,
 }: MovementFormsProps) {
   const defaultFrom = accounts[0]?.id;
@@ -157,6 +199,7 @@ export function MovementForms({
   const requestedId = scalar(search.regularizesId);
   const selectedPending = pendingDeposits.find((row) => row.sourceKind === requestedKind && row.id === requestedId)
     ?? pendingDeposits[0];
+  const compensationExhausted = compensation.payableNow === "0.0000";
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 sm:p-6">
@@ -180,7 +223,10 @@ export function MovementForms({
               {pendingDeposits.map((row) => (
                 <a
                   className="grid min-h-12 grid-cols-1 gap-1 border-b border-border py-2 text-primary sm:grid-cols-[1fr_auto]"
-                  href={`/movimientos/registrar?regularizesKind=${row.sourceKind}&regularizesId=${row.id}`}
+                  href={pendingMovementHref(search, {
+                    regularizesKind: row.sourceKind,
+                    regularizesId: row.id,
+                  })}
                   key={`${row.sourceKind}:${row.id}`}
                 >
                   <span>{row.memberName} · {row.accountName ?? copy.legacyAccount}</span>
@@ -188,6 +234,18 @@ export function MovementForms({
                 </a>
               ))}
             </div>
+            {nextCursor ? (
+              <a
+                className="inline-flex min-h-12 items-center justify-center rounded-md border border-primary px-4 font-semibold text-primary"
+                href={pendingMovementHref(search, {
+                  pendingDate: nextCursor.datedOn,
+                  pendingKind: nextCursor.sourceKind,
+                  pendingId: nextCursor.id,
+                })}
+              >
+                {copy.loadMorePending}
+              </a>
+            ) : null}
             {selectedPending?.accountId ? (
               <form action={regularizationAction} className="grid w-full grid-cols-1 gap-4">
                 <input name="clientRequestId" type="hidden" value={regularizationClientRequestId} />
@@ -223,7 +281,10 @@ export function MovementForms({
       </section>
 
       <section className="rounded-md border border-info-text bg-info-bg p-4 text-text-primary" data-testid="help_banner">
-        <h2 className="text-base font-semibold">{copy.helpTitle}</h2>
+        <div className="flex items-center gap-2">
+          <Info aria-hidden="true" className="size-5 shrink-0" focusable="false" />
+          <h2 className="text-base font-semibold">{copy.helpTitle}</h2>
+        </div>
         <p className="mt-1 text-sm">{copy.helpBody}</p>
       </section>
 
@@ -313,8 +374,58 @@ export function MovementForms({
           </section>
 
           <section className="rounded-md border border-info-text bg-info-bg p-4 text-text-primary" data-testid="ceiling_note">
-            <h2 className="text-base font-semibold">{copy.governedTitle}</h2>
-            <p className="mt-1 text-sm">{copy.governedBody}</p>
+            <div className="flex items-center gap-2">
+              <ShieldCheck aria-hidden="true" className="size-5 shrink-0" focusable="false" />
+              <h2 className="text-base font-semibold">{copy.compensationCeilingNoteTitle}</h2>
+            </div>
+            <p className="mt-1 text-sm">{copy.compensationCeilingNoteBody}</p>
+          </section>
+
+          <section
+            className="overflow-hidden rounded-md border border-primary bg-surface"
+            data-testid="treasurer_comp_ceiling"
+          >
+            <div className="border-b border-primary bg-info-bg px-4 py-4 sm:px-5">
+              <p className="text-sm font-semibold text-text-primary">{copy.compensationFiscalYear.replace("{{year}}", String(fiscalYear))}</p>
+              <h2 className="mt-1 text-xl font-bold text-text-primary">{copy.compensationTitle}</h2>
+            </div>
+            <div className="grid grid-cols-1 border-b border-border sm:grid-cols-3">
+              {([
+                ["cumulative_entitlement", copy.compensationEntitlement, compensation.cumulativeEntitlement],
+                ["cumulative_paid", copy.compensationPaid, compensation.cumulativePaid],
+                ["payable_now", copy.compensationAvailable, compensation.payableNow],
+              ] as const).map(([id, label, value], index) => (
+                <div
+                  className={`p-4 ${index < 2 ? "border-b border-border sm:border-b-0 sm:border-r" : ""}`}
+                  data-testid={id}
+                  key={id}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{label}</p>
+                  <p className={`mt-2 text-2xl font-bold ${index === 2 ? "text-primary" : "text-text-primary"}`}>
+                    {displayMoney(value)}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <form action={compensationAction} className="grid w-full grid-cols-1 gap-4 p-4 sm:p-5">
+              <input name="clientRequestId" type="hidden" value={compensationClientRequestId} />
+              <input name="fiscalYear" type="hidden" value={fiscalYear} />
+              <FormField controlId="compensation-account" labelKey={copy.expenseAccount}>
+                <Select defaultValue={defaultFrom} id="compensation-account" name="accountId" required>
+                  <AccountOptions accounts={accounts} />
+                </Select>
+              </FormField>
+              <MoneyAndDateFields prefix="compensation" today={today} />
+              {compensationExhausted ? (
+                <p className="rounded-md border border-warning-text bg-warning-bg p-3 text-sm font-semibold text-text-primary" role="status">
+                  {copy.compensationExhausted}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-3">
+                <ButtonPrimary disabled={compensationExhausted} labelKey={copy.saveCompensation} type="submit" />
+                <a className="font-semibold text-secondary underline-offset-4 hover:underline" href={ROUTE_SCR_HISTORY}>{copy.cancel}</a>
+              </div>
+            </form>
           </section>
         </>
       )}

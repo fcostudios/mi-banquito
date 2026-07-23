@@ -1,83 +1,206 @@
 {
-  "accessibility": { "ariaLandmarks": true, "skipToContent": true },
-  "description": "Record any non-contribution money movement per US-092 (fee/supplies/shared expense), US-093 (inter-account transfer), US-094 (regularize a deposit that landed in a non-group account — crown jewel), US-098 (treasurer-comp payout). Two clearly-headed sections (a salida and a movimiento-entre-cuentas) are both shown — the treasurer fills the one she needs; no runtime toggle (the generator does not emit form-field ids, so a select-driven conditional would be inert). BR-12/13/15/16.",
-  "i18n": { "es-EC": { "subtitle": "Comisiones, insumos, gastos compartidos, transferencias y regularizaciones", "title": "Registrar movimiento" } },
-  "id": "SCR-record-movement",
-  "layout": {
-    "kind": "page",
-    "sections": [
-      {
-        "id": "help_banner",
-        "type": "info-banner",
-        "kind": "info",
-        "icon": "info",
-        "title": "Para qué sirve esta pantalla",
-        "content": "Registra todo lo que entra o sale del fondo además de aportes y préstamos: comisiones del banco, insumos, desayunos, el pago a la beneficiaria de una colecta, el pago reconocido a la tesorera, y transferencias entre cuentas. Llena \"Salida del fondo\" para un gasto, o \"Movimiento entre cuentas\" para una transferencia o para regularizar un depósito que te llegó a tu cuenta personal. El pago a la tesorera nunca puede superar el monto reconocido por el grupo."
-      },
-      {
-        "id": "salida_group",
-        "type": "form",
-        "title": "Salida del fondo (gasto o pago)",
-        "fields": [
-          { "id": "account_id", "label": "Cuenta de donde sale", "required": true, "type": "autocomplete:Account" },
-          {
-            "id": "category",
-            "label": "Categoría *",
-            "required": true,
-            "type": "select",
-            "options": [
-              { "value": "bank_fee", "label": "Comisión bancaria" },
-              { "value": "supplies", "label": "Insumos (tintas, papel)" },
-              { "value": "shared_expense", "label": "Gasto compartido (desayunos)" },
-              { "value": "operating", "label": "Operativo" },
-              { "value": "treasurer_comp_payout", "label": "Pago a tesorera (reconocido)" },
-              { "value": "solidarity_payout", "label": "Pago solidario (colecta)" }
-            ]
-          },
-          { "id": "slip_photo", "label": "Foto de comprobante (opcional)", "type": "file" }
-        ]
-      },
-      {
-        "id": "transfer_group",
-        "type": "form",
-        "title": "— o — Movimiento entre cuentas (transferencia o regularización)",
-        "fields": [
-          { "id": "from_account_id", "label": "Desde la cuenta", "type": "autocomplete:Account" },
-          { "id": "to_account_id", "label": "Hacia la cuenta (debe ser del fondo)", "type": "autocomplete:Account" },
-          { "id": "regularizes_ref", "label": "Depósito que regularizas (solo si estás pasando al fondo un depósito que llegó a tu cuenta personal)", "type": "autocomplete:PendingDeposit" }
-        ]
-      },
-      {
-        "id": "common_tail",
-        "type": "form",
-        "title": "Monto y fecha",
-        "fields": [
-          { "id": "amount", "label": "Monto (USD) *", "required": true, "type": "currency" },
-          { "default": "today", "id": "dated_on", "label": "Fecha", "type": "date" },
-          { "id": "notes", "label": "Notas (opcional)", "type": "textarea" }
-        ],
-        "cancel": { "action": "navigate:SCR-history", "id": "btn_cancel", "label": "Cancelar" },
-        "submit": {
-          "action": "server_action:recordMovement",
-          "client_request_id": true,
-          "id": "btn_save_movement",
-          "label": "Guardar movimiento",
-          "navigate_to": "SCR-history"
-        }
-      },
-      {
-        "id": "ceiling_note",
-        "type": "info-banner",
-        "kind": "info",
-        "icon": "shield-check",
-        "title": "Tope del pago a la tesorera",
-        "content": "Cuando la categoría es \"Pago a tesorera\", el sistema solo acepta hasta el monto reconocido por el grupo este año: Reconocido $120.00 · ya pagado $40.00 · disponible $80.00. No puedes pasarte de ese tope."
-      }
+ "accessibility": {
+  "ariaLandmarks": true,
+  "skipToContent": true
+ },
+ "description": "Record any non-contribution money movement per US-092 (fee/supplies/shared expense), US-093 (inter-account transfer), US-094 (regularize a deposit that landed in a non-group account — crown jewel), US-098 (treasurer-comp payout). Two clearly-headed sections (a salida and a movimiento-entre-cuentas) are both shown — the treasurer fills the one she needs; no runtime toggle (the generator does not emit form-field ids, so a select-driven conditional would be inert). BR-12/13/15/16.",
+ "i18n": {
+  "es-EC": {
+   "subtitle": "Comisiones, insumos, gastos compartidos, transferencias y regularizaciones",
+   "title": "Registrar movimiento"
+  }
+ },
+ "id": "SCR-record-movement",
+ "layout": {
+  "kind": "page",
+  "sections": [
+   {
+    "id": "help_banner",
+    "type": "info-banner",
+    "kind": "info",
+    "icon": "info",
+    "title": "Para qué sirve esta pantalla",
+    "content": "Registra todo lo que entra o sale del fondo además de aportes y préstamos: comisiones del banco, insumos, desayunos, el pago a la beneficiaria de una colecta, el pago reconocido a la tesorera, y transferencias entre cuentas. Llena \"Salida del fondo\" para un gasto, o \"Movimiento entre cuentas\" para una transferencia o para regularizar un depósito que te llegó a tu cuenta personal. El pago a la tesorera nunca puede superar el monto reconocido por el grupo."
+   },
+   {
+    "id": "salida_group",
+    "type": "form",
+    "title": "Salida del fondo (gasto o pago)",
+    "fields": [
+     {
+      "id": "account_id",
+      "label": "Cuenta de donde sale",
+      "required": true,
+      "type": "autocomplete:Account"
+     },
+     {
+      "id": "category",
+      "label": "Categoría *",
+      "required": true,
+      "type": "select",
+      "options": [
+       {
+        "value": "bank_fee",
+        "label": "Comisión bancaria"
+       },
+       {
+        "value": "supplies",
+        "label": "Insumos (tintas, papel)"
+       },
+       {
+        "value": "shared_expense",
+        "label": "Gasto compartido (desayunos)"
+       },
+       {
+        "value": "operating",
+        "label": "Operativo"
+       },
+       {
+        "value": "treasurer_comp_payout",
+        "label": "Pago a tesorera (reconocido)"
+       },
+       {
+        "value": "solidarity_payout",
+        "label": "Pago solidario (colecta)"
+       }
+      ]
+     },
+     {
+      "id": "slip_photo",
+      "label": "Foto de comprobante (opcional)",
+      "type": "file"
+     }
+    ]
+   },
+   {
+    "id": "transfer_group",
+    "type": "form",
+    "title": "— o — Movimiento entre cuentas (transferencia o regularización)",
+    "fields": [
+     {
+      "id": "from_account_id",
+      "label": "Desde la cuenta",
+      "type": "autocomplete:Account"
+     },
+     {
+      "id": "to_account_id",
+      "label": "Hacia la cuenta (debe ser del fondo)",
+      "type": "autocomplete:Account"
+     },
+     {
+      "id": "regularizes_ref",
+      "label": "Depósito que regularizas (solo si estás pasando al fondo un depósito que llegó a tu cuenta personal)",
+      "type": "autocomplete:PendingDeposit"
+     }
+    ]
+   },
+   {
+    "id": "common_tail",
+    "type": "form",
+    "title": "Monto y fecha",
+    "fields": [
+     {
+      "id": "amount",
+      "label": "Monto (USD) *",
+      "required": true,
+      "type": "currency"
+     },
+     {
+      "default": "today",
+      "id": "dated_on",
+      "label": "Fecha",
+      "type": "date"
+     },
+     {
+      "id": "notes",
+      "label": "Notas (opcional)",
+      "type": "textarea"
+     }
     ],
-    "titleBar": { "subtitle": "Comisiones, insumos, gastos compartidos, transferencias y regularizaciones" }
-  },
-  "meta": { "change_id": "CHG-001", "owner": "fcostudios__mi-banquito", "release": "R1", "stories": ["US-092", "US-093", "US-094", "US-098"] },
-  "roles": ["tesorera"],
-  "route": "/movimientos/registrar",
-  "title": "Registrar movimiento"
+    "cancel": {
+     "action": "navigate:SCR-history",
+     "id": "btn_cancel",
+     "label": "Cancelar"
+    },
+    "submit": {
+     "action": "server_action:recordMovement",
+     "client_request_id": true,
+     "id": "btn_save_movement",
+     "label": "Guardar movimiento",
+     "navigate_to": "SCR-history"
+    }
+   },
+   {
+    "id": "ceiling_note",
+    "type": "info-banner",
+    "kind": "info",
+    "icon": "shield-check",
+    "title": "Tope del pago a la tesorera",
+    "content": "Cuando la categoría es \"Pago a tesorera\", el sistema solo acepta hasta lo disponible del monto reconocido por el grupo este año. \"Ya pagado\" incluye tanto los pagos automáticos del sistema como pagos manuales anteriores — es un solo derecho reconocido, nunca se paga dos veces (BR-15/CHG-011)."
+   },
+   {
+    "id": "treasurer_comp_ceiling",
+    "type": "data-preview",
+    "title": "Disponible para pago a tesorera",
+    "visibleWhen": {
+     "field": "category",
+     "equals": "treasurer_comp_payout"
+    },
+    "fields": [
+     {
+      "id": "cumulative_entitlement",
+      "label": "Reconocido (hasta este año)",
+      "type": "currency-display"
+     },
+     {
+      "id": "cumulative_paid",
+      "label": "Ya pagado (automático + manual)",
+      "type": "currency-display"
+     },
+     {
+      "id": "payable_now",
+      "label": "Disponible ahora",
+      "type": "currency-display",
+      "emphasis": true
+     }
+    ],
+    "states": {
+     "exhausted": {
+      "when": "payable_now <= 0",
+      "render": "submit disabled",
+      "copy": "Ya se pagó todo el monto reconocido este año (por el pago automático del sistema o pagos manuales anteriores). No hay disponible."
+     },
+     "error_over_ceiling": {
+      "code": "compensation_ceiling_exceeded",
+      "copy": "El monto supera lo disponible. Reconocido {cumulative_entitlement} · ya pagado {cumulative_paid} · disponible {payable_now}."
+     }
+    },
+    "meta": {
+     "chg": "CHG-011",
+     "rule": "BR-15",
+     "note": "cumulative_paid = withdrawals kind=treasurer_compensation_disbursement (US-050 cron) + prior treasurer_comp_payout expenses, cumulative through the fiscal year; per-year recognized = max(BR-07 accrual, recognition colectas by recognition_fiscal_year) — max, never sum (BR-15/CHG-011)"
+    },
+    "serverData": "Server-computed (no REST endpoint — matches app convention and api-contract-registry): the Server Component / Server Action supplies {cumulative_entitlement, cumulative_paid, payable_now} for the selected fiscal year via the domain compensation service (amended BR-15 formula). The record-treasurer-comp-payout Server Action recomputes payable_now inside the payout transaction (no TOCTOU)."
+   }
+  ],
+  "titleBar": {
+   "subtitle": "Comisiones, insumos, gastos compartidos, transferencias y regularizaciones"
+  }
+ },
+ "meta": {
+  "change_id": "CHG-001",
+  "owner": "fcostudios__mi-banquito",
+  "release": "R1",
+  "stories": [
+   "US-092",
+   "US-093",
+   "US-094",
+   "US-098"
+  ]
+ },
+ "roles": [
+  "tesorera"
+ ],
+ "route": "/movimientos/registrar",
+ "title": "Registrar movimiento"
 }

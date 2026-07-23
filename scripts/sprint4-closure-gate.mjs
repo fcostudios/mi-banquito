@@ -12,7 +12,7 @@ const requiredFiles = [
   "packages/domain/src/pilot.ts",
   "apps/web/src/app/(authenticated)/atrasos/page.tsx",
   "apps/web/src/app/(authenticated)/liquidez/page.tsx",
-  "apps/web/src/app/verify/[hash]/route.ts",
+  "apps/web/src/app/verify/[hash]/page.tsx",
   "apps/web/src/app/api/cron/promise-reminders/route.ts",
   "apps/web/e2e/sprint4.spec.ts",
 ];
@@ -68,6 +68,11 @@ for (const [rel, marker] of requiredText) {
 
 if (existsSync(resolve(root, "apps/web/src/app/(authenticated)/verify/[hash]/page.tsx"))) {
   console.error("[sprint4] public verifier must not live under (authenticated)");
+  failed = true;
+}
+
+if (existsSync(resolve(root, "apps/web/src/app/verify/[hash]/route.ts"))) {
+  console.error("[sprint4] public verifier route conflicts with the nav-map page");
   failed = true;
 }
 

@@ -1,4 +1,4 @@
-import { Banknote, HandCoins, Home, Settings, Users, Wallet } from "lucide-react";
+import { Banknote, HandCoins, Home, PlusCircle, Users, Wallet } from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { navItems } from "./nav-items.gen";
 
@@ -15,9 +15,9 @@ describe("generated nav items", () => {
     const adminHome = navItems.find((item) => item.id === "admin-home");
     const adminNewOrg = navItems.find((item) => item.id === "admin-orgs-new");
 
-    expect(adminHome?.label).toBe("Panel admin");
-    expect(adminHome?.icon).toBe(Settings);
+    expect(adminHome?.label).toBe("Inicio");
+    expect(adminHome?.icon).toBe(Home);
     expect(adminNewOrg?.label).toBe("Nueva organización");
-    expect(adminNewOrg?.icon).toBe(Users);
+    expect(adminNewOrg?.icon).toBe(PlusCircle);
   });
 });

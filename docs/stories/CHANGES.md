@@ -5,7 +5,7 @@
 
 | CHG | Status | Title | Stories | Sprints |
 |-----|--------|-------|---------|---------|
-| **CHG-001** | 📦 delivered | Treasury adjustments: fees, transfers/regularization, expenses, solidarity collection, treasurer-comp payout | US-091, US-092, US-093, US-094, US-095, US-096, US-097, US-098, US-099 | S8, S9 |
+| **CHG-001** | 🔨 dev_in_progress | Treasury adjustments: fees, transfers/regularization, expenses, solidarity collection, treasurer-comp payout | US-091, US-092, US-093, US-094, US-095, US-096, US-097, US-098, US-099 | S8, S9 |
 | **CHG-002** | 📦 delivered | Late/mora fee charge + formalize LoanFee entity (EOY cluster C4) | — | — |
 | **CHG-003** | 📦 delivered | Year-end cut & preservation: immutable balance snapshot + point-in-time query (EOY cluster C2) | — | — |
 | **CHG-004** | 📦 delivered | Surplus & two-pool reparto: surplus def + Assembly governance + two-pool distribution (EOY cluster C1) | — | — |
@@ -15,6 +15,8 @@
 | **CHG-008** | 📦 delivered | Multi-group management: one treasurer manages multiple banquito groups (cluster C8) | — | — |
 | **CHG-009** | 🟡 proposed | Rewrite mi-banquito sprint-0 foundation stories to the single-serverless architecture (drop Turborepo monorepo/5-package scaffold US-001; correct 29->34 entity-table count; align to dispatched Next.js/Drizzle/Auth0/Vercel stack) | — | — |
 | **CHG-010** | 📦 delivered | Organization.id as per-group uuid: decouple runtime tenant key from the IMP-198 Nous substrate project key (drop org_slug/project_slug) | — | — |
+| **CHG-011** | 🔨 dev_in_progress | Sprint 9 colecta/compensation spec repair | US-096, US-097, US-098, US-099 | S9 |
+| **CHG-012** | 🔷 spec_applied | Sprint 9 closure: nav-map completion + colecta contract reconciliation | US-096, US-097 | S9 |
 
 ---
 
@@ -22,7 +24,7 @@
 
 ### CHG-001: Treasury adjustments: fees, transfers/regularization, expenses, solidarity collection, treasurer-comp payout
 
-**Status:** 📦 `delivered`
+**Status:** 🔨 `dev_in_progress`
 **Source:** client_review
 **Requested by:** Francisco
 **Notes:** # CHG-001 — Impact Analysis: Treasury adjustments / movements
@@ -41,10 +43,10 @@
 | **US-093** | Treasurer records an inter-account transfer (bookkeeping) | Sprint 8 | ✅ verified | [r1_chg_us_093.md](sprint-8/r1_chg_us_093.md) |
 | **US-094** | Treasurer regularizes a deposit that landed in a non-group account *(crown jewel | Sprint 8 | ✅ verified | [r1_chg_us_094.md](sprint-8/r1_chg_us_094.md) |
 | **US-095** | Period close blocks while unregularized movements exist (reconciliation panel) | Sprint 8 | ✅ verified | [r1_chg_us_095.md](sprint-8/r1_chg_us_095.md) |
-| **US-096** | Treasurer starts an extraordinary / solidarity collection | Sprint 9 | ⬜ backlog | [r2_chg_us_096.md](sprint-9/r2_chg_us_096.md) |
-| **US-097** | Treasurer records a solidarity payout and closes the collection | Sprint 9 | ⬜ backlog | [r2_chg_us_097.md](sprint-9/r2_chg_us_097.md) |
-| **US-098** | Treasurer records a treasurer-compensation payout gated by a recognized amount | Sprint 9 | ⬜ backlog | [r2_chg_us_098.md](sprint-9/r2_chg_us_098.md) |
-| **US-099** | Statements, cash-flow, and public-verify reflect all movements net + collections | Sprint 9 | ⬜ backlog | [r2_chg_us_099.md](sprint-9/r2_chg_us_099.md) |
+| **US-096** | Treasurer starts an extraordinary / solidarity collection | Sprint 9 | 🔨 in_development | [r2_chg_us_096.md](sprint-9/r2_chg_us_096.md) |
+| **US-097** | Treasurer records a solidarity payout and closes the collection | Sprint 9 | 🔨 in_development | [r2_chg_us_097.md](sprint-9/r2_chg_us_097.md) |
+| **US-098** | Treasurer records a treasurer-compensation payout gated by a recognized amount | Sprint 9 | 🔨 in_development | [r2_chg_us_098.md](sprint-9/r2_chg_us_098.md) |
+| **US-099** | Statements, cash-flow, and public-verify reflect all movements net + collections | Sprint 9 | 🔨 in_development | [r2_chg_us_099.md](sprint-9/r2_chg_us_099.md) |
 
 ### CHG-002: Late/mora fee charge + formalize LoanFee entity (EOY cluster C4)
 
@@ -146,4 +148,40 @@ _No stories linked to this change yet._
 **Mode:** `spec_rebaseline` (operator override — se...
 
 _No stories linked to this change yet._
+
+### CHG-011: Sprint 9 colecta/compensation spec repair
+
+**Status:** 🔨 `dev_in_progress`
+**Source:** dev_feedback
+**Requested by:** Francisco
+**Notes:** # CHG-011 — Impact Analysis: Sprint 9 colecta/compensation spec repair (pre-dev gate)
+
+**Project:** `fcostudios__mi-banquito` · **Source:** dev_feedback (dev-agent review 2026-07-19 + Claude adversarial review of substrate state) · **Filed:** 2026-07-19
+**Status:** PROPOSED — spec-only repair of ...
+
+**Stories created by this change:**
+
+| Story | Name | Sprint | Status | File |
+|-------|------|--------|--------|------|
+| **US-096** | Treasurer starts an extraordinary / solidarity collection | Sprint 9 | 🔨 in_development | [r2_chg_us_096.md](sprint-9/r2_chg_us_096.md) |
+| **US-097** | Treasurer records a solidarity payout and closes the collection | Sprint 9 | 🔨 in_development | [r2_chg_us_097.md](sprint-9/r2_chg_us_097.md) |
+| **US-098** | Treasurer records a treasurer-compensation payout gated by a recognized amount | Sprint 9 | 🔨 in_development | [r2_chg_us_098.md](sprint-9/r2_chg_us_098.md) |
+| **US-099** | Statements, cash-flow, and public-verify reflect all movements net + collections | Sprint 9 | 🔨 in_development | [r2_chg_us_099.md](sprint-9/r2_chg_us_099.md) |
+
+### CHG-012: Sprint 9 closure: nav-map completion + colecta contract reconciliation
+
+**Status:** 🔷 `spec_applied`
+**Source:** dev_feedback
+**Requested by:** Francisco
+**Notes:** # CHG-012 — Impact Analysis: Sprint 9 closure — nav-map completion + colecta contract reconciliation
+
+**Project:** `fcostudios__mi-banquito` · **Source:** dev_feedback (Sprint 9 blocked events + decisions, pulled 2026-07-22) · **Filed:** 2026-07-22
+**Status:** PROPOSED — spec-only; unblocks the S...
+
+**Stories created by this change:**
+
+| Story | Name | Sprint | Status | File |
+|-------|------|--------|--------|------|
+| **US-096** | Treasurer starts an extraordinary / solidarity collection | Sprint 9 | 🔨 in_development | [r2_chg_us_096.md](sprint-9/r2_chg_us_096.md) |
+| **US-097** | Treasurer records a solidarity payout and closes the collection | Sprint 9 | 🔨 in_development | [r2_chg_us_097.md](sprint-9/r2_chg_us_097.md) |
 

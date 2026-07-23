@@ -20,10 +20,11 @@ vi.mock("@mi-banquito/domain", async (importOriginal) => {
       searchMembersWithBalance: () => Promise.resolve([]),
     }),
     createMovementService: () => ({
-      listPendingDeposits: () => Promise.resolve([
-        { id: "one", sourceKind: "contribution" },
-        { id: "two", sourceKind: "repayment" },
-      ]),
+      listPendingDepositsPage: () => Promise.resolve({
+        rows: [{ id: "one", sourceKind: "contribution" }],
+        nextCursor: { datedOn: "2026-07-21", sourceKind: "contribution", id: "one" },
+        totalCount: 137,
+      }),
     }),
   };
 });
@@ -34,7 +35,7 @@ describe("ScrTreasurerHomePage", () => {
 
     const closeLink = screen.getByRole("link", { name: /Pendientes de regularizar/i });
     expect(closeLink).toHaveAttribute("href", "/movimientos/registrar");
-    expect(within(closeLink).getByText("2")).toBeInTheDocument();
+    expect(within(closeLink).getByText("137")).toBeInTheDocument();
     expect(within(closeLink).getByText("Pendiente de regularizar")).toBeInTheDocument();
   });
 });
