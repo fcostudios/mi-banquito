@@ -275,7 +275,7 @@ describe("BR-16 transparency projection with PostgreSQL", () => {
             await tx.execute(sql`INSERT INTO repayment (id, org_id, loan_id, member_id, amount, currency_code,
               applied_to_principal, applied_to_interest, applied_to_fee, dated_on, recorded_at, account_id,
               reconciliation_status, reverses_id, reverse_reason, created_at, created_by, created_by_kind)
-              VALUES (${randomUUID()}, ${orgId}, ${loanId}, ${memberId}, ${`-${amount}`}, 'USD', ${amount}, 0, 0,
+              VALUES (${randomUUID()}, ${orgId}, ${loanId}, ${memberId}, ${`-${amount}`}, 'USD', ${`-${amount}`}, 0, 0,
                 '2026-07-21', now(), ${accountId}, 'regularized', ${original}, 'Property repayment correction',
                 now(), ${actorId}, 'member')`);
           });

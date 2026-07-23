@@ -34,9 +34,9 @@ BEGIN
       OR ABS(reversal.amount) IS DISTINCT FROM ABS(original.amount)
       OR reversal.currency_code IS DISTINCT FROM original.currency_code
       OR reversal.loan_id IS DISTINCT FROM original.loan_id OR reversal.member_id IS DISTINCT FROM original.member_id
-      OR reversal.applied_to_principal IS DISTINCT FROM original.applied_to_principal
-      OR reversal.applied_to_interest IS DISTINCT FROM original.applied_to_interest
-      OR reversal.applied_to_fee IS DISTINCT FROM original.applied_to_fee
+      OR ABS(reversal.applied_to_principal) IS DISTINCT FROM ABS(original.applied_to_principal)
+      OR ABS(reversal.applied_to_interest) IS DISTINCT FROM ABS(original.applied_to_interest)
+      OR ABS(reversal.applied_to_fee) IS DISTINCT FROM ABS(original.applied_to_fee)
       OR reversal.account_id IS DISTINCT FROM original.account_id
       OR reversal.reconciliation_status IS DISTINCT FROM original.reconciliation_status
       OR reversal.payment_receipt_id IS DISTINCT FROM original.payment_receipt_id
@@ -136,8 +136,9 @@ BEGIN
   IF NOT FOUND OR original.reverses_id IS NOT NULL OR NEW.org_id IS DISTINCT FROM original.org_id
     OR ABS(NEW.amount) IS DISTINCT FROM ABS(original.amount) OR NEW.currency_code IS DISTINCT FROM original.currency_code
     OR NEW.loan_id IS DISTINCT FROM original.loan_id OR NEW.member_id IS DISTINCT FROM original.member_id
-    OR NEW.applied_to_principal IS DISTINCT FROM original.applied_to_principal
-    OR NEW.applied_to_interest IS DISTINCT FROM original.applied_to_interest OR NEW.applied_to_fee IS DISTINCT FROM original.applied_to_fee
+    OR ABS(NEW.applied_to_principal) IS DISTINCT FROM ABS(original.applied_to_principal)
+    OR ABS(NEW.applied_to_interest) IS DISTINCT FROM ABS(original.applied_to_interest)
+    OR ABS(NEW.applied_to_fee) IS DISTINCT FROM ABS(original.applied_to_fee)
     OR NEW.account_id IS DISTINCT FROM original.account_id
     OR NEW.reconciliation_status IS DISTINCT FROM original.reconciliation_status
     OR NEW.payment_receipt_id IS DISTINCT FROM original.payment_receipt_id

@@ -94,9 +94,9 @@ export async function getPeriodTransparency(
       SELECT 'repayment', reversal.reverses_id, reversal.id, original.id, original.reverses_id,
         ABS(reversal.amount) = ABS(original.amount) AND reversal.currency_code = original.currency_code
           AND reversal.loan_id = original.loan_id AND reversal.member_id = original.member_id
-          AND reversal.applied_to_principal = original.applied_to_principal
-          AND reversal.applied_to_interest = original.applied_to_interest
-          AND reversal.applied_to_fee = original.applied_to_fee
+          AND ABS(reversal.applied_to_principal) = ABS(original.applied_to_principal)
+          AND ABS(reversal.applied_to_interest) = ABS(original.applied_to_interest)
+          AND ABS(reversal.applied_to_fee) = ABS(original.applied_to_fee)
           AND reversal.account_id IS NOT DISTINCT FROM original.account_id
           AND reversal.reconciliation_status = original.reconciliation_status
           AND reversal.payment_receipt_id IS NOT DISTINCT FROM original.payment_receipt_id

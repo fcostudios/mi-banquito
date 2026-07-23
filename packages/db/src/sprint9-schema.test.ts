@@ -1018,6 +1018,51 @@ describe("CHG-011 extraordinary collection schema", () => {
     }
   });
 
+  runIfDatabase("accepts a signed repayment reversal when its absolute allocation mirrors the original", async () => {
+    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const fixture = await seedFixture(client);
+      const loanId = randomUUID();
+      const repaymentId = randomUUID();
+      await client.query(`INSERT INTO loan (
+        id, org_id, member_id, borrower_kind, borrower_member_id, principal_amount, currency_code,
+        rate_value, rate_model, term_periods, grace_periods, originated_on, status, created_at, created_by, created_by_kind
+      ) VALUES ($1, $2, $3, 'member', $3, 10, 'USD', 1, 'declining_balance', 1, 0,
+        '2026-07-01', 'originated', now(), $4, 'member')`,
+      [loanId, fixture.orgId, fixture.memberId, fixture.actorId]);
+      await client.query(`INSERT INTO repayment (
+        id, org_id, loan_id, member_id, amount, currency_code, applied_to_principal,
+        applied_to_interest, applied_to_fee, dated_on, recorded_at, account_id,
+        reconciliation_status, created_at, created_by, created_by_kind
+      ) VALUES ($1, $2, $3, $4, 10, 'USD', 8, 1.5, 0.5, '2026-07-01', now(), $5,
+        'regularized', now(), $6, 'member')`,
+      [repaymentId, fixture.orgId, loanId, fixture.memberId, fixture.groupAccountId, fixture.actorId]);
+
+      const reversal = await client.query(`INSERT INTO repayment (
+        org_id, loan_id, member_id, amount, currency_code, applied_to_principal, applied_to_interest,
+        applied_to_fee, dated_on, recorded_at, account_id, reconciliation_status, reverses_id,
+        reverse_reason, created_at, created_by, created_by_kind
+      ) VALUES ($1, $2, $3, -10, 'USD', -8, -1.5, -0.5, '2026-07-02', now(), $4,
+        'regularized', $5, 'Correct signed allocation reversal', now(), $6, 'member')
+      RETURNING amount, applied_to_principal, applied_to_interest, applied_to_fee, reverses_id`,
+      [fixture.orgId, loanId, fixture.memberId, fixture.groupAccountId, repaymentId, fixture.actorId]);
+
+      expect(reversal.rows).toEqual([{
+        amount: "-10.0000",
+        applied_to_principal: "-8.0000",
+        applied_to_interest: "-1.5000",
+        applied_to_fee: "-0.5000",
+        reverses_id: repaymentId,
+      }]);
+    } finally {
+      await client.query("ROLLBACK").catch(() => undefined);
+      client.release();
+      await pool.end();
+    }
+  });
+
   runIfDatabase("fails an upgrade with stable actionable 23514 when legacy reversals are duplicated", async () => {
     const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
     const client = await pool.connect();
