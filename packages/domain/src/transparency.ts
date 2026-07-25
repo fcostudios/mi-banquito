@@ -166,6 +166,7 @@ export async function getPeriodTransparency(
       OR EXISTS (SELECT 1 FROM transfer_reversals GROUP BY reverses_id HAVING count(*) <> 1)
     ) AS invalid
   `);
+  // Stryker disable next-line OptionalChaining: @equivalent reviewer sign-off — the aggregate SELECT always returns exactly one integrity row.
   if (rowsOf(integrityResult)[0]?.invalid) {
     throw new Error("transparency_reversal_integrity_violation");
   }
@@ -295,6 +296,7 @@ export async function getPeriodTransparency(
     signedAmount: String(row.signedAmount),
   }));
 
+  // Stryker disable OptionalChaining: @equivalent reviewer sign-off — the aggregate balance SELECT always returns exactly one non-null row.
   return {
     rows,
     netFundBalance: String(balances?.netFundBalance ?? "0.0000"),
@@ -302,6 +304,7 @@ export async function getPeriodTransparency(
     collectionCashBalance: String(balances?.collectionCashBalance ?? "0.0000"),
     regularizedDistributableBalance: String(balances?.regularizedDistributableBalance ?? "0.0000"),
   };
+  // Stryker restore OptionalChaining
 }
 
 export function createTransparencyService(): TransparencyService {

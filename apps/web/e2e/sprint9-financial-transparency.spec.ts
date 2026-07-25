@@ -19,6 +19,7 @@ const FOREIGN_ACCOUNT_ID = randomUUID();
 const FOREIGN_EXPENSE_ID = randomUUID();
 const FOREIGN_SENTINEL = `FOREIGN_SENTINEL_${randomUUID()}`;
 const NOW = new Date("2026-07-22T12:00:00.000Z");
+const ACTION_DATE = NOW.toISOString().slice(0, 10);
 
 let pool: Pool;
 let orgId: string;
@@ -267,11 +268,15 @@ test("collect, regularize, pay, compensate, archive, and publicly verify", async
 
   await page.getByLabel("Motivo de la colecta").fill("Calamidad doméstica E2E");
   await page.getByLabel("Beneficiaria").selectOption({ label: "Rosa Tituaña" });
+  await page.locator("#collection-opened-on").fill(ACTION_DATE);
   await page.getByRole("button", { name: "Abrir colecta" }).click();
   await expect(page).toHaveURL(/collectionId=/);
   await page.getByLabel("Socia").selectOption({ label: "María Quishpe" });
   await page.getByLabel("Monto (USD)").fill("30.00");
   await page.getByLabel("¿En qué cuenta entró?").selectOption({ label: "Cuenta personal de la tesorera" });
+  await page.getByTestId("form_add_line").locator('input[name="datedOn"]').evaluate((element, actionDate) => {
+    (element as HTMLInputElement).value = actionDate;
+  }, ACTION_DATE);
   await page.getByRole("button", { name: "Agregar aporte" }).click();
 
   await expect(page.getByText("Pendiente", { exact: true })).toBeVisible();
@@ -279,6 +284,9 @@ test("collect, regularize, pay, compensate, archive, and publicly verify", async
   await expect(page.getByTestId("btn_payout")).toBeDisabled();
   await page.getByLabel("Hacia la cuenta").selectOption({ label: "Banco del grupo" });
   await page.getByText("Confirmo que el dinero ya está en la cuenta del grupo").click();
+  await page.locator('form[data-command="regularize"] input[name="datedOn"]').evaluate((element, actionDate) => {
+    (element as HTMLInputElement).value = actionDate;
+  }, ACTION_DATE);
   await page.getByRole("button", { name: "Confirmar regularización" }).click();
   await expect(page.getByText("Regularizado", { exact: true })).toBeVisible();
   await expect(page.getByTestId("btn_payout")).toBeEnabled();
@@ -286,12 +294,18 @@ test("collect, regularize, pay, compensate, archive, and publicly verify", async
   await page.getByLabel("Monto a pagar (USD)").fill("25.00");
   const payoutForm = page.getByTestId("form_payout");
   await payoutForm.getByLabel("Si sobra dinero").selectOption("retained");
+  await payoutForm.locator('input[name="datedOn"]').evaluate((element, actionDate) => {
+    (element as HTMLInputElement).value = actionDate;
+  }, ACTION_DATE);
   await page.getByRole("button", { name: "Registrar pago y cerrar colecta" }).click();
   await expect(page.getByText("Escribe la referencia de la votación del grupo.", { exact: true })).toBeVisible();
   const validPayoutForm = page.getByTestId("form_payout");
   await validPayoutForm.getByLabel("Monto a pagar (USD)").fill("25.00");
   await validPayoutForm.getByLabel("Si sobra dinero").selectOption("retained");
   await validPayoutForm.getByLabel("Referencia de la votación").fill("Acta julio 2026");
+  await validPayoutForm.locator('input[name="datedOn"]').evaluate((element, actionDate) => {
+    (element as HTMLInputElement).value = actionDate;
+  }, ACTION_DATE);
   await page.getByRole("button", { name: "Registrar pago y cerrar colecta" }).click();
   await expect(page.getByText("Colecta cerrada", { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("form_payout")).toHaveCount(0);
@@ -303,10 +317,12 @@ test("collect, regularize, pay, compensate, archive, and publicly verify", async
   await expect(page.getByTestId("payable_now")).toContainText("USD 25.00");
   await page.getByLabel("Monto (USD)").last().fill("25.01");
   await page.getByLabel("Cuenta de donde sale").last().selectOption(GROUP_ACCOUNT_ID);
+  await page.locator("#compensation-date").fill(ACTION_DATE);
   await page.getByRole("button", { name: "Guardar pago a tesorera" }).click();
   await expect(page.getByText(/El monto supera lo disponible/)).toBeVisible();
   await expect(page.getByText(/disponible USD 25\.00/)).toBeVisible();
   await page.getByLabel("Monto (USD)").last().fill("25.00");
+  await page.locator("#compensation-date").fill(ACTION_DATE);
   await page.getByRole("button", { name: "Guardar pago a tesorera" }).click();
   await expect(page.getByTestId("payable_now")).toContainText("USD 0.00");
   await expect(page.getByText(/Ya se pagó todo el monto reconocido/)).toBeVisible();
