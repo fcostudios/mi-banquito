@@ -266,6 +266,7 @@ async function collectionHoldingProjection(
     inArray(account.id, lineAccountIds),
   )).for("update");
   const lineAccountById = new Map(lineAccounts.map((row) => [row.id, row]));
+  // Stryker disable next-line OptionalChaining: @equivalent reviewer sign-off — the same-org FK guarantees every live line account is present in this locked projection.
   const externalLineIds = liveLines.filter((line) => (
     lineAccountById.get(line.accountId)?.isGroupFund === false
   )).map((line) => line.id);

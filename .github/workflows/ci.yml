@@ -84,6 +84,8 @@ jobs:
         run: pnpm audit:sprints0-1
       - name: Unit tests
         run: pnpm test
+      - name: Sprint 9 critical-path mutation gate
+        run: pnpm test:mutation
       - name: Blob consumer and SDK contracts
         env:
           BLOB_LIVE_REQUIRED: ${{ vars.BLOB_LIVE_REQUIRED || '0' }}

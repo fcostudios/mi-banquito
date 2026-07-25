@@ -162,6 +162,24 @@ describe("BR-16 transparency projection with PostgreSQL", () => {
     });
   });
 
+  it("accepts a one-day transparency period", async () => {
+    const result = await createTransparencyService().getPeriod({
+      orgId,
+      fromDate: "2026-07-10",
+      throughDate: "2026-07-10",
+    });
+
+    expect(result.rows.map((row) => row.sourceId)).toContain(ids.bankFee);
+  });
+
+  it("rejects an inverted transparency period with the canonical error", async () => {
+    await expect(createTransparencyService().getPeriod({
+      orgId,
+      fromDate: "2026-07-11",
+      throughDate: "2026-07-10",
+    })).rejects.toThrow("transparency_period_invalid");
+  });
+
   it("emits every baseline and Sprint-9 row exactly once, including reversals, without tenant leakage", async () => {
     const result = await createTransparencyService().getPeriod({
       orgId, fromDate: "2026-07-01", throughDate: "2026-07-31",

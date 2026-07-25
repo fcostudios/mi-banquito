@@ -8,6 +8,7 @@
     "type-check": "turbo run type-check",
     "lint": "turbo run lint",
     "test": "turbo run test --concurrency=1",
+    "test:mutation": "stryker run",
     "test:e2e": "pnpm --filter mi-banquito-web test:e2e",
     "audit:sprint0": "node scripts/sprint0-ac-audit.mjs",
     "audit:sprints0-1": "node scripts/sprint0-1-ac-audit.mjs",
@@ -19,6 +20,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
+    "@stryker-mutator/core": "9.6.1",
+    "@stryker-mutator/vitest-runner": "9.6.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "jsdom": "^29.1.1",

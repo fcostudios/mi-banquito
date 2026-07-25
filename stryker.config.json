@@ -1,0 +1,43 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "vitest",
+  "plugins": [
+    "@stryker-mutator/vitest-runner"
+  ],
+  "vitest": {
+    "configFile": "packages/domain/vitest.config.ts",
+    "dir": "packages/domain",
+    "related": false
+  },
+  "mutate": [
+    "packages/domain/src/money4.ts",
+    "packages/domain/src/extraordinary-collections.ts",
+    "packages/domain/src/treasurer-compensation.ts:56-82",
+    "packages/domain/src/treasurer-compensation.ts:110-159",
+    "packages/domain/src/transparency.ts"
+  ],
+  "coverageAnalysis": "perTest",
+  "disableTypeChecks": "packages/domain/src/**/*.ts",
+  "ignorePatterns": [
+    "/.worktrees",
+    "/.turbo",
+    "/.vercel",
+    "/.next",
+    "/apps",
+    "/docs",
+    "/artifacts",
+    "/test-results",
+    "/playwright-report"
+  ],
+  "concurrency": 1,
+  "reporters": [
+    "clear-text",
+    "json",
+    "html"
+  ],
+  "thresholds": {
+    "high": 90,
+    "low": 80,
+    "break": 80
+  }
+}

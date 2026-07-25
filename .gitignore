@@ -8,6 +8,8 @@ node_modules/
 .next/
 out/
 .turbo/
+.stryker-tmp/
+reports/
 apps/web/.next/
 dist/
 packages/*/dist/
