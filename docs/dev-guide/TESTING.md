@@ -38,8 +38,9 @@ The **aggregate + projection layers should be the widest part of the suite**, no
 
 ## 3. Effectiveness-critical paths (the gated set)
 
-> The few areas where a silent fault is materially costly. Mutation testing runs on the diff
-> intersected with this set. Adding logic here without updating this file is a review smell.
+> The few areas where a silent fault is materially costly. Mutation testing runs on **the diff**;
+> this set decides which **stories owe mutation evidence** before they can close — two separate
+> mechanisms. Adding logic here without updating this file is a review smell.
 > *(Authoritative machine-derived set: [`testing/critical-paths.md`](../../testing/critical-paths.md),
 > generated from this project's business rules + graph. Keep current.)*
 
@@ -73,7 +74,7 @@ The **aggregate + projection layers should be the widest part of the suite**, no
 
 ## 4. CI gates
 
-- **Effectiveness gate:** diff-scoped **mutation score ≥ 80%** on changed code within §3. Surviving mutants must be killed or annotated `@equivalent: <reason>` with reviewer sign-off. *(Threshold provisional — recalibrate after the first month of real diffs.)*
+- **Effectiveness gate:** **mutation score ≥ 80%** on the changed code a run mutates (`pnpm test:mutation` scopes to the diff automatically). A story touching §3 cannot close without this evidence; surviving mutants must be killed or annotated `@equivalent: <reason>` with reviewer sign-off. *(Threshold provisional — recalibrate after the first month of real diffs.)*
 - **Coverage:** reported as a *diagnostic only*; it never gates. A PR cannot pass on coverage alone.
 - **Contract:** external-API contract verification must pass; a broken provider contract fails the build even if mocked unit tests pass.
 - **Flake:** any test failing intermittently on unchanged code is quarantined within 1 working day (tagged `@quarantine`, ticketed) and excluded from the gate until fixed or deleted.
@@ -83,7 +84,7 @@ Pipeline order (fail-fast): lint/type → domain+property → aggregate+projecti
 ## 5. Agent test-generation loop
 
 1. Generate tests for changed code in §3.
-2. CI runs diff-scoped mutation.
+2. Run `pnpm test:mutation` — it scopes to this branch's diff and runs ONE campaign (a diff with nothing mutatable exits immediately). Do not hand-write per-story mutation configs.
 3. **Keep only tests that kill previously-surviving mutants;** drop coverage-only redundant tests.
 4. Report surviving mutants as an "assurance gap" for the author to close.
 5. CI reports **mock-to-test ratio** and **assertion-to-print ratio**; large deviation from the repo baseline is flagged.
@@ -103,13 +104,15 @@ Encourage agent test-writing for **small, well-specified correctness bugs with c
 | Coverage (diagnostic) | c8 / istanbul |
 
 ```bash
-# NOTE: these task names are wired by the test harness (TE-2); until then the
-# package ships no test runner — do not assume `test`/`test:mutation` run yet.
-<test>             # unit + aggregate + projection (fast)
-<test:integration> # Testcontainers
-<test:contract>    # contract verification
-<test:mutation>    # mutation on critical-path diff  ← the gate
-<test:e2e>         # critical journeys
+pnpm test           # unit + aggregate + projection (fast) — Vitest, wired (TE-2)
+pnpm test:mutation  # ONE diff-scoped mutation campaign  ← the gate
+                    #   scopes to <merge-base>..HEAD, filtered to mutatable
+                    #   sources; exits 0 immediately when the diff has none.
+                    #   MUTATION_BASE=<ref> overrides the compared branch.
+# Not yet wired by the generator — add them as the project needs them:
+<test:integration>  # Testcontainers
+<test:contract>     # contract verification
+<test:e2e>          # critical journeys
 ```
 
 ## 7. PR checklist (copy into the PR description)

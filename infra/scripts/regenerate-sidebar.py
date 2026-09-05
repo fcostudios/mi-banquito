@@ -30,7 +30,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
+import unicodedata
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -160,13 +162,162 @@ def label_key(item_id: str) -> str:
     return f"nav.{key}"
 
 
-def build_sidebar_array(items: list[dict], valid: frozenset[str]) -> tuple[list[str], list[str]]:
+def slugify_section(label: str) -> str:
+    """ASCII slug for a legacy string-form section entry.
+
+    NOT a translation: ``slugify_section("OPERACIÓN") == "operacion"``, not
+    "operation". A project needing a translated machine value declares it via
+    the canonical object form.
+    """
+    decomposed = unicodedata.normalize("NFKD", label)
+    ascii_only = decomposed.encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", "-", ascii_only.lower()).strip("-")
+
+
+class SectionVocabulary:
+    """The sidebar's declared section vocabulary (IMP-351 / I02+I03).
+
+    The nav map is HR-30's source of truth for sidebar UX and has always been
+    able to declare ``app_shell.sidebar.sections`` plus a ``section`` on each
+    item. This generator ignored both — zero occurrences of the word — so the
+    declared grouping never reached the app. That is why ``fcostudios__smp``
+    forked this file, and why the fork then had to hardcode one tenant's Spanish
+    section names in a file shared by every project.
+
+    This class is the primitive: the nav map declares the vocabulary, the
+    generator consumes it. Per-item ``section:``, the ``navSections`` const and
+    the ``NavSectionId`` union all resolve through ONE instance, so the three
+    cannot drift apart.
+
+    Two declaration shapes (see ``$defs.Sidebar.sections``):
+
+    * CANONICAL ``[{"id": "operation", "label_en": …, "label_es": …}]`` — the id
+      is the machine value. Needed whenever it is not a slugification of the
+      label, the common case in a translated UI: smp wants
+      ``OPERACIÓN → operation`` and ``slugify("OPERACIÓN")`` is ``operacion``.
+      The mapping is DECLARED data; it cannot be derived.
+    * LEGACY ``["OPERACIÓN", …]`` — declares no id, so one is slugified from the
+      entry. Lossy BY DESIGN. Kept because smp ships this shape today and the
+      substrate must read what is on disk (migrating a project's nav map is a
+      CHG on that project, not a substrate change).
+
+    ``items[].section`` resolves **id first, then label_en/label_es**.
+    """
+
+    def __init__(self, entries: list) -> None:
+        self.ids: list[str] = []
+        self._by_id: dict[str, str] = {}
+        self._by_label: dict[str, str] = {}
+        for entry in entries:
+            if isinstance(entry, dict):
+                section_id = entry.get("id")
+                labels = [entry.get("label_en"), entry.get("label_es")]
+            else:
+                section_id = slugify_section(str(entry))
+                labels = [str(entry)]
+            if not section_id:
+                continue
+            self.ids.append(section_id)
+            self._by_id[section_id] = section_id
+            for label in labels:
+                if label:
+                    self._by_label.setdefault(str(label), section_id)
+
+    def contract_violations(self) -> list[str]:
+        """IMP-351 / I04 — declaration errors that make the vocabulary incoherent.
+
+        Returns human-readable messages; the caller raises. These mirror
+        ``spec_parsers/sidebar_parser.py::analyze_section_contract`` exactly —
+        the two implementations are necessarily separate (this file is a static
+        module mirrored into the dev package and cannot import the substrate),
+        so a test runs both against one set of fixtures and asserts they agree.
+
+        The generator applies them UNCONDITIONALLY, with no mode switch: an
+        incoherent vocabulary is not a policy question, it is output the
+        generator cannot produce correctly. Same posture as the IMP-325 icon
+        check. Mode (`off`/`warn-only`/`strict`) governs ready-check 100, which
+        surfaces the same violations before a regeneration is attempted.
+        """
+        problems: list[str] = []
+        seen: set[str] = set()
+        for section_id in self.ids:
+            if section_id in seen:
+                problems.append(
+                    f"app_shell.sidebar.sections declares '{section_id}' more "
+                    f"than once; section ids must be unique"
+                )
+            seen.add(section_id)
+        id_set = set(self.ids)
+        for label, owner_id in sorted(self._by_label.items()):
+            if label in id_set and label != owner_id:
+                problems.append(
+                    f"section '{owner_id}' has label '{label}', which is also "
+                    f"the id of section '{label}'. items[].section='{label}' "
+                    f"resolves to '{label}' (id wins), never to '{owner_id}' — "
+                    f"rename one of them"
+                )
+        return problems
+
+    def resolve(self, value):
+        """Machine id for an ``items[].section`` value, or None if undeclared.
+
+        Precedence is id-then-label so a label colliding with a *different*
+        section's id can never silently re-point an item. That collision is a
+        declaration error reported by the ``sidebar_contract`` gate — JSON
+        Schema cannot express a cross-entry comparison, which is exactly the gap
+        that made the tenant hand-write their checks.
+        """
+        if value is None:
+            return None
+        if value in self._by_id:
+            return self._by_id[value]
+        return self._by_label.get(value)
+
+
+def resolve_sections(nav: dict):
+    """Return a SectionVocabulary, or None when the project declares no sections.
+
+    ACTIVATION GATE. Absent ``sections`` means the project does not group its
+    sidebar and the generator emits no grouping at all — ``mi-banquito`` and
+    ``kontract`` declare none today and their output must stay byte-identical.
+    """
+    entries = ((nav.get("app_shell") or {}).get("sidebar") or {}).get("sections")
+    if not entries:
+        return None
+    vocab = SectionVocabulary(list(entries))
+    if not vocab.ids:
+        return None
+    problems = vocab.contract_violations()
+    if problems:
+        raise ValueError(
+            "sidebar section contract violated:\n  - " + "\n  - ".join(problems)
+        )
+    return vocab
+
+
+def build_sidebar_array(
+    items: list[dict],
+    valid: frozenset[str],
+    sections=None,
+) -> tuple[list[str], list[str]]:
     """Return (imports, array_lines) for the sidebar items."""
     icons_used: set[str] = set()
     lines: list[str] = []
     for it in items:
         resolved = resolve_icon(it.get("icon"), valid)
         icons_used.add(resolved)
+        # IMP-351 / I03 — emit the declared grouping. Skipped entirely when the
+        # project declares no sections, so ungrouped projects stay byte-identical.
+        section_line = ""
+        if sections is not None:
+            section_id = sections.resolve(it.get("section"))
+            if section_id is None:
+                raise ValueError(
+                    f"{it['id']}: sidebar section {it.get('section')!r} is not "
+                    f"declared in app_shell.sidebar.sections "
+                    f"(declared: {', '.join(sections.ids)})"
+                )
+            section_line = f'    section: "{section_id}",\n'
         lines.append(
             "  {\n"
             f'    id: "{it["id"]}",\n'
@@ -175,7 +326,8 @@ def build_sidebar_array(items: list[dict], valid: frozenset[str]) -> tuple[list[
             f'    icon: {resolved},\n'
             f'    href: "{it["route"]}",\n'
             f'    screenId: "{it.get("screen", "")}",\n'
-            f"    roles: {tsroles(it.get('roles', []))},\n"
+            + section_line
+            + f"    roles: {tsroles(it.get('roles', []))},\n"
             + (f'    badge: "{it["badge"]}",\n' if it.get("badge") else "")
             + (f'    position: "{it["position"]}",\n' if it.get("position") else "")
             + "  }"
@@ -187,7 +339,8 @@ def generate_ts(nav: dict, valid: frozenset[str] | None = None) -> str:
     if valid is None:
         valid = load_valid_exports()
     sidebar_items = _sidebar_items(nav)
-    icons, lines = build_sidebar_array(sidebar_items, valid)
+    sections = resolve_sections(nav)
+    icons, lines = build_sidebar_array(sidebar_items, valid, sections)
 
     meta = nav.get("meta", {})
     generated_at = meta.get("updated") or meta.get("generated", "unknown")
@@ -220,18 +373,39 @@ def generate_ts(nav: dict, valid: frozenset[str] | None = None) -> str:
         user_role = " | ".join(f'"{r}"' for r in sorted(role_set))
     else:
         user_role = "string"
+    # IMP-351 / I03 — the section block. Emitted ONLY when the nav map declares
+    # sections; every line below resolves through the same SectionVocabulary as
+    # the per-item `section:` value, so the union, the const and the items
+    # cannot disagree.
+    if sections is not None:
+        section_union = " | ".join(f'"{s}"' for s in sections.ids)
+        section_block = (
+            f"export type NavSectionId = {section_union};\n\n"
+            "export const navSections = [\n"
+            + "\n".join(f'  {{ id: "{s}" }},' for s in sections.ids)
+            + "\n] as const satisfies readonly { id: NavSectionId }[];\n\n"
+        )
+        section_field = "  section: NavSectionId;\n"
+        user_role_tail = "\n"
+    else:
+        section_block = ""
+        section_field = ""
+        user_role_tail = "\n\n"
+
     type_def = (
         "// UserRole — the distinct roles the nav map gates sidebar items on.\n"
         "// Generated locally (the dev team may re-home this in a real auth hook).\n"
-        f"export type UserRole = {user_role};\n\n"
-        "export interface NavItem {\n"
+        f"export type UserRole = {user_role};{user_role_tail}"
+        + section_block
+        + "export interface NavItem {\n"
         "  id: string;\n"
         "  label: string;\n"
         "  labelKey: string;\n"
         "  icon: LucideIcon;\n"
         "  href: string;\n"
         "  screenId: string;\n"
-        "  roles?: UserRole[];\n"
+        + section_field
+        + "  roles?: UserRole[];\n"
         '  /** Key on the API unread-count response — renders a numeric badge when > 0. */\n'
         "  badge?: string;\n"
         '  /** Sidebar placement bucket — "bottom" pins to the foot (e.g. Profile,\n'

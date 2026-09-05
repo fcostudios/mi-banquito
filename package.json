@@ -8,7 +8,7 @@
     "type-check": "turbo run type-check",
     "lint": "turbo run lint",
     "test": "turbo run test --concurrency=1",
-    "test:mutation": "stryker run",
+    "test:mutation": "node scripts/mutation-scope.mjs",
     "test:e2e": "pnpm --filter mi-banquito-web test:e2e",
     "audit:sprint0": "node scripts/sprint0-ac-audit.mjs",
     "audit:sprints0-1": "node scripts/sprint0-1-ac-audit.mjs",
@@ -16,7 +16,8 @@
     "audit:sprint2": "node scripts/sprint2-closure-gate.mjs",
     "audit:sprint3": "node scripts/sprint3-closure-gate.mjs",
     "audit:sprint4": "node scripts/sprint4-closure-gate.mjs",
-    "audit:sprint5": "node scripts/sprint5-closure-gate.mjs"
+    "audit:sprint5": "node scripts/sprint5-closure-gate.mjs",
+    "lint:tests": "node scripts/check-test-mocks.mjs . && node scripts/check-test-oracles.mjs ."
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

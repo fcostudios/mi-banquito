@@ -1,5 +1,5 @@
 {
-  "synced_at": "2026-07-22T10:12:42.042799+00:00",
+  "synced_at": "2026-09-05T16:35:53.261856+00:00",
   "project_id": "fcostudios__mi-banquito",
   "files": {
     "docs/stories/sprint-1/r1_admin_us_016.md": {
@@ -843,11 +843,11 @@
       "source": "/Users/fcolomas/Projects/nous/Nous/Specs/fcostudios/mi-banquito/v1/html_mocks/journey_player.html"
     },
     "docs/stories/SPRINT_PLAN.md": {
-      "hash": "fae12baaa9f533b0",
+      "hash": "b49d8ef985445257",
       "source": "generated"
     },
     "docs/stories/CHANGES.md": {
-      "hash": "69a9f2f00bf1f088",
+      "hash": "0d225b6352cad50e",
       "source": "generated"
     },
     "docs/stories/ASSIGNMENTS.md": {
@@ -855,11 +855,11 @@
       "source": "generated"
     },
     "testing/critical-paths.md": {
-      "hash": "9ecf159c0cd8dae7",
+      "hash": "9c024307d7cc1845",
       "source": "generated"
     },
     ".nous-project.json": {
-      "hash": "7abd2d756c760556",
+      "hash": "0001210219c05cc8",
       "source": "generated"
     },
     "docs/stories/INDEX.md": {
@@ -871,7 +871,7 @@
       "source": "/Users/fcolomas/Projects/nous/Nous/dev_package_staging/infra/scripts/allowed_lucide_icons.json"
     },
     "infra/scripts/regenerate-sidebar.py": {
-      "hash": "89571eec73b94992",
+      "hash": "cff1ea558d5e45a4",
       "source": "/Users/fcolomas/Projects/nous/Nous/dev_package_staging/infra/scripts/regenerate-sidebar.py"
     },
     "apps/web/src/components/shell/nav-items.gen.ts": {
@@ -893,6 +893,34 @@
     "infra/scripts/lucide_valid_exports.json": {
       "hash": "7d01fdad0b6ea7ae",
       "source": "/Users/fcolomas/Projects/nous/Nous/dev_package_staging/infra/scripts/lucide_valid_exports.json"
+    },
+    "infra/scripts/validate-routes.sh": {
+      "hash": "fb6321e3722aa91e",
+      "source": "/Users/fcolomas/Projects/nous/Nous/dev_package_staging/infra/scripts/validate-routes.sh"
+    },
+    "infra/scripts/__pycache__/regenerate-sidebar.cpython-314.pyc": {
+      "hash": "bdc3f58d3a193429",
+      "source": "/Users/fcolomas/Projects/nous/Nous/dev_package_staging/infra/scripts/__pycache__/regenerate-sidebar.cpython-314.pyc"
+    },
+    "scripts/check-test-mocks.mjs": {
+      "hash": "fbb4a204114e99b0",
+      "source": "toolchain"
+    },
+    "scripts/check-test-oracles.mjs": {
+      "hash": "7ddc269d008a8c18",
+      "source": "toolchain"
+    },
+    "scripts/mutation-scope.mjs": {
+      "hash": "012c58ff905ee46f",
+      "source": "toolchain"
+    },
+    "stryker.conf.json": {
+      "hash": "820f06c9bc854279",
+      "source": "toolchain"
+    },
+    "package.json": {
+      "hash": "d952a5802ab3b921",
+      "source": "toolchain"
     }
   }
 }

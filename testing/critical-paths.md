@@ -1,8 +1,9 @@
 # Effectiveness-critical paths
 
 > Generated from `nous.db` — do not hand-edit. The few areas where a silent fault is
-> materially costly. Mutation testing (the effectiveness gate) runs on the diff intersected
-> with this set. Governed by the **Test Effectiveness Standard** §3.1.
+> materially costly. Mutation testing runs on **the diff**; this set decides which
+> **stories owe mutation evidence** before they can close — two separate mechanisms.
+> Governed by the **Test Effectiveness Standard** §3.1.
 
 ## Always-mandated (Standard §3.1)
 

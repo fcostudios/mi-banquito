@@ -145,6 +145,7 @@ if [ ${#missing_in_map[@]} -gt 0 ]; then
   echo "   Fix: update Nous/Specs/v1/07c_navigation_map.json to add these routes."
   echo "        Nav map is authoritative — no exemptions, no back doors."
   echo "        Nous edit → sync → code, in that order."
+  echo "   Report: emit one nav_gap event per missing route (see docs/dev-guide/FEEDBACK.md)."
   echo
   EXIT=1
 else
