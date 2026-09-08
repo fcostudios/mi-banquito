@@ -25,6 +25,14 @@ describe("loan repayment contract", () => {
     expect(loanRepaymentFormSchema.safeParse(validRepayment).success).toBe(false);
     expect(loanRepaymentFormSchema.safeParse({
       ...validRepayment,
+      paymentMode: "",
+    }).success).toBe(false);
+    expect(loanRepaymentFormSchema.safeParse({
+      ...validRepayment,
+      paymentMode: "next_installment",
+    }).success).toBe(true);
+    expect(loanRepaymentFormSchema.safeParse({
+      ...validRepayment,
       paymentMode: "principal_payment",
     }).success).toBe(true);
   });
