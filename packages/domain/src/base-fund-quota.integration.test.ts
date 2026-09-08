@@ -93,6 +93,8 @@ describe("base-fund quota invariants with Postgres", () => {
       },
     };
 
+    await expect(service.getBaseFundQuotaDefaults(ORG_ID)).resolves.toBeUndefined();
+
     await expect(service.recordBaseFundQuotaPayment(ORG_ID, ACTOR_ID, payment))
       .rejects.toThrow("base_fund_quota_config_required");
 
@@ -106,6 +108,12 @@ describe("base-fund quota invariants with Postgres", () => {
         createdBy: ACTOR_ID,
         createdByKind: "member",
       });
+    });
+
+    await expect(service.getBaseFundQuotaDefaults(ORG_ID)).resolves.toMatchObject({
+      fiscalYear: FISCAL_YEAR,
+      amount: "25.0000",
+      members: [expect.objectContaining({ id: MEMBER_ID })],
     });
 
     await service.recordBaseFundQuotaPayment(ORG_ID, ACTOR_ID, payment);

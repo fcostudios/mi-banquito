@@ -145,4 +145,27 @@ describe("ScrRecordRepaymentPage", () => {
     }));
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
+
+  it("requires the treasurer to explicitly choose how the payment is allocated", async () => {
+    previewMemberPayment.mockResolvedValue({
+      receiptId: "",
+      allocations: [],
+      unappliedAmount: "0.0000",
+      requiresExtraDecision: false,
+    });
+
+    render(await ScrRecordRepaymentPage({
+      params: Promise.resolve({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }),
+    }));
+
+    const nextInstallment = screen.getByRole("radio", { name: "Pagar próxima cuota" });
+    const principalPayment = screen.getByRole("radio", { name: "Abonar a capital" });
+
+    expect(nextInstallment).not.toBeChecked();
+    expect(principalPayment).not.toBeChecked();
+    expect(nextInstallment).toBeRequired();
+    expect(principalPayment).toBeRequired();
+    expect(screen.getByText(/incluye la comisión y el interés programado/i)).toBeInTheDocument();
+    expect(screen.getByText(/interés vencido o devengado hasta la fecha/i)).toBeInTheDocument();
+  });
 });

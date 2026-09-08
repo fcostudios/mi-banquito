@@ -461,6 +461,7 @@ describe("audit atomicity", () => {
         accountId: "99999999-9999-4999-8999-999999999999",
         amount: "15.0000",
         datedOn: "2026-07-02",
+        paymentMode: "next_installment",
       }), DynamicAuditWriteFailure);
     });
 

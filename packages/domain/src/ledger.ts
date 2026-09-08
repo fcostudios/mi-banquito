@@ -447,7 +447,7 @@ export interface LedgerService {
   recordContribution(orgId: string, actorId: string, input: ContributionForm): Promise<typeof contribution.$inferSelect>;
   listContributions(orgId: string): Promise<Array<typeof contribution.$inferSelect & { memberName: string }>>;
   reverseContribution(orgId: string, actorId: string, input: ReverseContributionForm): Promise<void>;
-  getBaseFundQuotaDefaults(orgId: string): Promise<{ fiscalYear: number; amount: string; members: MemberRow[] }>;
+  getBaseFundQuotaDefaults(orgId: string): Promise<{ fiscalYear: number; amount: string; members: MemberRow[] } | undefined>;
   recordBaseFundQuotaPayment(orgId: string, actorId: string, input: BaseFundQuotaPaymentForm & {
     slipPhoto?: { id: string; uri: string; mimeType: "image/jpeg" | "image/png" | "image/webp"; byteSize: number; contentHash: string };
   }): Promise<typeof baseFundQuotaPayment.$inferSelect>;
@@ -1069,7 +1069,7 @@ export const createLedgerService = (options: LedgerServiceOptions = {}): LedgerS
     const fiscalYear = new Date().getUTCFullYear();
     const [config] = await withTenantTransaction(orgId, (tx) => tx.select().from(baseFundQuotaConfig)
       .where(and(eq(baseFundQuotaConfig.orgId, orgId), eq(baseFundQuotaConfig.fiscalYear, fiscalYear))));
-    if (!config) throw new Error("base_fund_quota_config_required");
+    if (!config) return undefined;
     const members = await this.listMembers(orgId);
     return { fiscalYear, amount: config.perMemberAmount, members };
   },
