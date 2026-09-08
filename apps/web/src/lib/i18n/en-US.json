@@ -910,7 +910,10 @@
       "title": "Registrar cuota base",
       "fiscalYear": "Año fiscal",
       "paidOn": "Pagado el",
-      "submit": "Registrar cuota base"
+      "submit": "Registrar cuota base",
+      "configRequiredTitle": "Configura la cuota base antes de registrar pagos",
+      "configRequiredBody": "Todavía no hay un monto de cuota base aprobado para el año fiscal actual. En móvil, abre Configuración del grupo y guarda el año y monto acordados.",
+      "configure": "Ir a Configuración del grupo"
     }
   },
   "sprint2": {
@@ -994,7 +997,9 @@
       "datedOn": "Fecha de pago",
       "mode": "Tipo de pago",
       "nextInstallment": "Pagar próxima cuota",
+      "nextInstallmentHelp": "Aplica el pago a la próxima cuota e incluye la comisión y el interés programado de esa cuota.",
       "principalPayment": "Abonar a capital",
+      "principalPaymentHelp": "Primero cubre únicamente el interés vencido o devengado hasta la fecha; el resto reduce el capital.",
       "waterfallWarning": "BR-26 puede aplicar este pago primero a mora, intereses o aportes vencidos antes de abonar al préstamo seleccionado.",
       "account": "¿En qué cuenta entró?",
       "accountHelp": "Una cuenta personal deja el pago pendiente de regularizar hasta pasarlo al fondo.",

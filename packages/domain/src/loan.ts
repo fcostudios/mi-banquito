@@ -771,7 +771,7 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
     const scheduledInterest = Number(scheduledInterestDueOn(scheduleRows, input.datedOn));
     const outstandingPrincipal = money4(Math.max(0, Number(currentLoan.principalAmount) - paidPrincipal));
     const outstandingInterest = money4(Math.max(0, scheduledInterest + accruedInterest - paidInterest));
-    const paymentMode = input.paymentMode ?? "next_installment";
+    const paymentMode = input.paymentMode;
     const split = paymentMode === "next_installment"
       ? calculateNextInstallmentSplit({
         amount: money4(input.amount),
@@ -948,6 +948,7 @@ export const createLoanService = (options: LoanServiceOptions = {}): LoanService
               repaymentId,
               loanId: input.loanId,
               amount: money4(input.amount),
+              paymentMode,
               accountId: selectedAccount.id,
               reconciliationStatus,
               split,

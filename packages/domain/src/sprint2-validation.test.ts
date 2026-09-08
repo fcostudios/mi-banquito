@@ -98,6 +98,7 @@ describe("Sprint 2 form validation", () => {
       amount: "125.0000",
       datedOn: "2026-06-30",
       accountId: "44444444-4444-4444-8444-444444444444",
+      paymentMode: "next_installment",
       slipPhotoId: "",
     });
 

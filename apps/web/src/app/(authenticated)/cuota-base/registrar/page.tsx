@@ -4,6 +4,7 @@ import { requireTreasurer } from "@/lib/auth/require-session";
 import { todayISO } from "@/lib/format/es-ec";
 import messages from "@/lib/i18n/en-US.json";
 import { recordBaseFundQuotaPaymentAction } from "./actions";
+import { BaseFundQuotaConfigRequired } from "./config-required";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,15 @@ const copy = messages.sprint1;
 export default async function ScrRecordBaseFundQuotaPage() {
   const session = await requireTreasurer();
   const defaults = await createLedgerService().getBaseFundQuotaDefaults(session.orgId);
+
+  if (!defaults) {
+    return (
+      <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6" data-screen="SCR-record-base-fund-quota">
+        <h1 className="text-2xl font-bold text-text-primary">{copy.quota.title}</h1>
+        <BaseFundQuotaConfigRequired />
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
