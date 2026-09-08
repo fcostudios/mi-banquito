@@ -309,7 +309,7 @@ export const loanRepaymentFormSchema = z.object({
   accountId: uuidString,
   amount: moneyString,
   datedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  paymentMode: z.enum(["next_installment", "principal_payment"]).default("next_installment"),
+  paymentMode: z.enum(["next_installment", "principal_payment"]),
   slipPhotoId: uuidString.optional().or(z.literal("")),
   notes: z.string().max(500).optional(),
 });

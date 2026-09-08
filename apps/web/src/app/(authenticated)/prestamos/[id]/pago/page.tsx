@@ -85,9 +85,15 @@ export default async function ScrRecordRepaymentPage({
         </FormField>
         <fieldset className="grid gap-2">
           <legend className="text-sm font-semibold text-text-primary">{copy.mode}</legend>
-          <div className="grid gap-1">
-            <Radio name="paymentMode" value="next_installment" defaultChecked label={copy.nextInstallment} />
-            <Radio name="paymentMode" value="principal_payment" label={copy.principalPayment} />
+          <div className="grid gap-3">
+            <div>
+              <Radio name="paymentMode" value="next_installment" required label={copy.nextInstallment} />
+              <p className="pl-6 text-sm text-text-secondary">{copy.nextInstallmentHelp}</p>
+            </div>
+            <div>
+              <Radio name="paymentMode" value="principal_payment" required label={copy.principalPayment} />
+              <p className="pl-6 text-sm text-text-secondary">{copy.principalPaymentHelp}</p>
+            </div>
           </div>
         </fieldset>
         <FormField labelKey={copy.slip}>

@@ -324,6 +324,7 @@ describe("Sprint 2 loan domain rules", () => {
         accountId: "99999999-9999-4999-8999-999999999999",
         amount: "16.0000",
         datedOn: "2026-07-02",
+        paymentMode: "next_installment",
       });
 
       expect(result.split).toMatchObject({
@@ -352,6 +353,72 @@ describe("Sprint 2 loan domain rules", () => {
         paidPrincipalToDate: "0.0000",
         status: "pendiente",
       });
+    } finally {
+      vi.doUnmock("@mi-banquito/db");
+      vi.resetModules();
+    }
+  });
+
+  it("records an explicit same-day capital payment mode in the immutable audit snapshot", async () => {
+    const fakeDb = new FakeDb([
+      [],
+      [{
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        borrowerKind: "member",
+        borrowerMemberId: "55555555-5555-4555-8555-555555555555",
+        principalAmount: "100.0000",
+        currencyCode: "USD",
+        status: "activo",
+      }],
+      [],
+      [{
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        orgId: "11111111-1111-4111-8111-111111111111",
+        loanId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        periodIndex: 1,
+        dueOn: "2026-08-02",
+        principalDue: "100.0000",
+        interestDue: "5.0000",
+        paidPrincipalToDate: "0.0000",
+        paidInterestToDate: "0.0000",
+        status: "pendiente",
+      }],
+      [],
+      [{
+        id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        loanScheduleId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        amount: "1.0000",
+        datedOn: "2026-08-02",
+        feeKind: "admin",
+      }],
+      [{ displayName: "Pancho" }],
+    ]);
+    vi.resetModules();
+    vi.doMock("@mi-banquito/db", () => ({ db: fakeDb }));
+
+    try {
+      const { createLoanService } = await import("./loan");
+      const result = await createLoanService().recordRepayment({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        actorId: "22222222-2222-4222-8222-222222222222",
+        clientRequestId: "33333333-3333-4333-8333-333333333333",
+        loanId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        accountId: "99999999-9999-4999-8999-999999999999",
+        amount: "100.0000",
+        datedOn: "2026-07-02",
+        paymentMode: "principal_payment",
+      });
+
+      expect(result.split).toMatchObject({
+        appliedToFee: "0.0000",
+        appliedToInterest: "0.0000",
+        appliedToPrincipal: "100.0000",
+        remainingFee: "1.0000",
+      });
+      expect(insertedRows(fakeDb, auditLogEntry)).toContainEqual(expect.objectContaining({
+        payloadSnapshot: expect.objectContaining({ paymentMode: "principal_payment" }),
+      }));
     } finally {
       vi.doUnmock("@mi-banquito/db");
       vi.resetModules();
@@ -998,6 +1065,7 @@ describe("Sprint 2 loan domain rules", () => {
         accountId: "99999999-9999-4999-8999-999999999999",
         amount: "1040.0000",
         datedOn: "2026-07-01",
+        paymentMode: "principal_payment",
       });
 
       expect(result.paidOff).toBe(true);

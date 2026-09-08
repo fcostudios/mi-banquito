@@ -105,7 +105,7 @@ export type RecordRepaymentInput = {
   accountId: string;
   amount: string;
   datedOn: string;
-  paymentMode?: RepaymentMode;
+  paymentMode: RepaymentMode;
   slipPhotoId?: string;
   notes?: string;
 };
